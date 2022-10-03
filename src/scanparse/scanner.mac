@@ -1,0 +1,341 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+%
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+%
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+module Macro
+    import (currentMacroIndex, var nextChar, maxstr, Error, tracing, traceFile)
+    export (StartNewDefinition, EnterParameterName, SaveText,
+	    SavePossibleParameter, HasParameters, EnterArgument,
+	    PushReplacementText, BeingExpanded, GetNextChar,
+	    PushFile, PopFile, Undefine, Finally)
+
+    % The macro mechanism 
+
+    type MacroDefinition :
+	record
+	    defined:		boolean
+	    beingExpanded:	boolean
+	    numParams:		0 .. maxMacroParameters
+	    textLen:		0 .. maxMacroSize
+	    text:		char(maxMacroSize)
+	end record
+
+    var macros : array 1 .. maxMacros of MacroDefinition
+    var macroTop : 0 .. maxMacros := 0
+
+    var newMacroIndex : 0 .. maxMacros := 0
+
+    var parameters : array 1 .. maxMacroParameters of string
+
+
+    type ExpandBuffer :
+	record
+	    macroIndex:		1 .. maxMacros
+	    lastChar:		char
+	    textIndex:		1 .. maxMacroSize+1
+	    textLen:		0 .. maxMacroSize
+	    text:		char(maxMacroSize)
+	end record
+
+    var arguments : array 1 .. maxMacroParameters of string
+    var argumentTop : 0 .. maxMacroParameters := 0
+
+    var expansions : array 1 .. maxMacroNesting of ExpandBuffer
+    var expansionTop : 0 .. maxMacroNesting := 0
+
+    var fileStack : array 1 .. maxIncludeDepth of 0 .. maxMacroNesting
+    var fileStackTop : 0 .. maxIncludeDepth := 0
+
+
+    /*
+    ** Macro definition routines.
+    */
+
+
+    procedure StartNewDefinition (var macroIndex : 1 .. maxMacros)
+	newMacroIndex := 0
+	for i : 1 .. macroTop
+	    if not macros(i).defined then
+		newMacroIndex := i
+	    end if
+	end for
+	if newMacroIndex = 0 then
+	    if macroTop = maxMacros then
+		Error (eTooManyMacros)
+	    else
+		macroTop += 1
+	    end if
+	    newMacroIndex := macroTop
+	end if
+	bind var register mac to macros(newMacroIndex)
+	mac.defined := true
+	mac.beingExpanded := false
+	mac.numParams := 0
+	mac.textLen := 0
+	macroIndex := newMacroIndex
+#if DEBUG then
+	if tracing then
+	    put : traceFile, "Macro.StartNewDefinition = ", newMacroIndex
+	end if
+#end if
+    end StartNewDefinition
+
+
+    procedure EnterParameterName (name : string)
+	bind var register mac to macros(newMacroIndex)
+	if mac.numParams = maxMacroParameters then
+	    Error (eTooManyMacroParameters)
+	else
+	    mac.numParams += 1
+	end if
+	parameters(mac.numParams) := name
+#if DEBUG then
+	if tracing then
+	    put : traceFile, "Macro.EnterParameterName (\"", name,
+		    "\" = ", mac.numParams
+	end if
+#end if
+    end EnterParameterName
+
+
+    procedure SaveText (text : char(*), textLen : int)
+#if DEBUG then
+	if tracing and textLen > 0 and text(textLen) not= '\0' then
+	    put : traceFile, "Macro.SaveText (\"", text(1..textLen), "\")"
+	end if
+#end if
+
+	bind var register mac to macros(newMacroIndex)
+	var copyLength : int
+
+	if mac.textLen + textLen > maxMacroSize then
+	    Error (eMacroTextTooBig)
+	    copyLength := maxMacroSize - mac.textLen
+	else
+	    copyLength := textLen
+	end if
+	if copyLength = 0 then
+	    return
+	end if
+
+	var register src : addressint := addr(text)
+	var register tgt : addressint := addr(mac.text(mac.textLen+1))
+	for : 1 .. copyLength
+	    char@(tgt) := char@(src)
+	    src += 1
+	    tgt += 1
+	end for
+
+	mac.textLen += copyLength
+    end SaveText
+
+
+    procedure SavePossibleParameter (name : string, nameLen : int)
+	for i : 1 .. macros(newMacroIndex).numParams
+	    if parameters(i) = name then
+		var text : char(2)
+		text(1) := '\0'
+		text(2) := chr(i)
+		SaveText (text, 2)
+#if DEBUG then
+		if tracing then
+		    put : traceFile, "Macro.SaveParameter (\"", name,
+			    "\") = ", i
+		end if
+#end if
+		return
+	    end if
+	end for
+	SaveText (type(char(maxstr+1),name), nameLen)
+    end SavePossibleParameter
+
+
+    /*
+    ** Macro expansion routines.
+    */
+
+
+    function HasParameters : boolean
+	pre currentMacroIndex > 0
+	result macros(currentMacroIndex).numParams > 0
+    end HasParameters
+
+
+    procedure EnterArgument (text : string)
+	pre currentMacroIndex > 0
+	if argumentTop = macros(currentMacroIndex).numParams then
+	    Error (eTooManyMacroArguments)
+	else
+	    argumentTop += 1
+	end if
+	arguments(argumentTop) := text
+#if DEBUG then
+	if tracing then
+	    put : traceFile, "Macro.EnterArgument (\"", text,
+		    "\") = ", argumentTop
+	end if
+#end if
+    end EnterArgument
+
+
+    procedure PushReplacementText
+	pre currentMacroIndex > 0
+	bind var register mac to macros(currentMacroIndex)
+
+	if argumentTop < mac.numParams then
+	    Error (eTooFewMacroArguments)
+	end if
+
+	if expansionTop = maxMacroNesting then
+	    Error (eMacroNestingTooDeep)
+	else
+	    expansionTop += 1
+	end if
+
+	bind var register expan to expansions(expansionTop)
+	expan.macroIndex := currentMacroIndex
+	expan.textIndex := 1
+	if nextChar = endOfFile then
+	    expan.lastChar := ' '
+	else
+	    expan.lastChar := nextChar
+	end if
+
+	var register dst : addressint := addr(expan.text)
+	var register src : addressint := addr(mac.text)
+	const register lastDst : addressint := addr(expan.text) + maxMacroSize
+	const register lastSrc : addressint := addr(mac.text) + mac.textLen
+	loop
+	    exit when src = lastSrc
+	    if char@(src) = '\0' then
+		src += 1
+		assert src < lastSrc
+		var register arg : addressint := addr(arguments(nat1@(src)))
+		src += 1
+		loop
+		    exit when char@(arg) = '\0'
+		    if dst = lastDst then
+			Error (eMacroTextTooBig)
+			exit
+		    end if
+		    char@(dst) := char@(arg)
+		    dst += 1
+		    arg += 1
+		end loop
+	    else
+		if dst = lastDst then
+		    Error (eMacroTextTooBig)
+		    exit
+		end if
+		char@(dst) := char@(src)
+		dst += 1
+		src += 1
+	    end if
+	end loop
+	expan.textLen := dst - addr(expan.text)
+
+	mac.beingExpanded := true
+	argumentTop := 0
+
+#if DEBUG then
+	if tracing then
+	    put : traceFile, "Macro.PushReplacementText = \"",
+		    expan.text(1..expan.textLen), "\""
+	end if
+#end if
+    end PushReplacementText
+
+
+    function BeingExpanded : boolean
+	pre currentMacroIndex > 0
+	result macros(currentMacroIndex).beingExpanded
+    end BeingExpanded
+
+
+    procedure GetNextChar
+	assert expansionTop > fileStack(fileStackTop)
+	loop
+	    bind var expan to expansions(expansionTop)
+	    if expan.textIndex <= expan.textLen then
+		nextChar := expan.text(expan.textIndex)
+		expan.textIndex += 1
+		exit
+	    end if
+	    if expan.lastChar not= endOfFile then
+		nextChar := expan.lastChar
+		expan.lastChar := endOfFile
+		exit
+	    end if
+	    macros(expan.macroIndex).beingExpanded := false
+	    expansionTop -= 1
+	    if expansionTop = fileStack(fileStackTop) then
+		nextChar := endOfFile
+		exit
+	    end if
+	end loop
+#if DEBUG then
+	if tracing then
+	    if nextChar = endOfFile then
+		put : traceFile, "Macro.GetNextChar = \"<EOF>\""
+	    else
+		put : traceFile, "Macro.GetNextChar = \"", nextChar, "\""
+	    end if
+	end if
+#end if
+    end GetNextChar
+
+
+    procedure PushFile
+	pre fileStackTop < maxIncludeDepth
+	fileStackTop += 1
+	fileStack(fileStackTop) := expansionTop
+#if DEBUG then
+	if tracing then
+	    put : traceFile, "Macro.PushFile"
+	end if
+#end if
+    end PushFile
+
+
+    procedure PopFile
+	pre fileStackTop > 0
+	fileStackTop -= 1
+#if DEBUG then
+	if tracing then
+	    put : traceFile, "Macro.PopFile"
+	end if
+#end if
+    end PopFile
+
+
+    procedure Undefine
+	macros(currentMacroIndex).defined := false
+#if DEBUG then
+	if tracing then
+	    put : traceFile, "Macro.Undefine (", currentMacroIndex, ")"
+	end if
+#end if
+    end Undefine
+
+
+    procedure Finally
+	assert argumentTop = 0
+	assert expansionTop = 0
+	assert fileStackTop = 0
+    end Finally
+
+end Macro

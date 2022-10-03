@@ -1,0 +1,446 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+% 
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+% 
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+body "symbol.st" module Symbol
+    /*
+     * Module:	Semantic Pass Symbol Mechanism V1.00
+     * Author: Mark Mendell, Stephen Perelgut
+     * Date:	March 11, 1986
+     */
+
+    /*
+     * This mechanism maintains all information about declared symbols
+     * in the Symbol Table, and allows referencing of particular entries
+     * via the Symbol Stack.  The kind of entries in the Symbol Stack
+     * is the kind of the particular reference and is not necessarily
+     * the same kind as in the corresponding Symbol Table entry.
+     */
+
+    /* Symbol Reference Descriptor */
+    type SymbolReference :
+	record
+	    kind:	SymbolKinds
+	    ident:	IdentifierIndex
+	    symbol:	SymbolIndex
+	end record
+
+    /* Symbol Stack */
+    var symbolStack: array 1..maxSymbolDepth of SymbolReference
+    var symbolTop: 0..maxSymbolDepth := 0
+    var maxSymbolTop: 0..maxSymbolDepth := 0
+
+
+    /* Symbol Table Entry */
+    type SymbolTableEntry :
+	record
+	    kind :	SymbolKinds
+	    attributes:	SymbolAttributeSet
+	    typex:	TypeIndex
+	    unqualifedCount : nat1
+	    value:	int /* Index of symbol bound to OR scope table index */
+	    scopeLevelOrIdent: int
+	end record
+
+    /* Symbol Table */
+    var symbolTable:	array -maxDummySymbols..maxSymbols of SymbolTableEntry
+    var symbolTableTop:	0..maxSymbols := 0
+
+    /* dummy symbols */
+    var freeDummy : array -maxDummySymbols..-1 of boolean
+
+
+    procedure PushAnySymbol (ident : IdentifierIndex, symbol: SymbolIndex)
+	pre symbol >= -maxDummySymbols and symbol <= symbolTableTop
+
+	if symbolTop < maxSymbolDepth then
+	    symbolTop += 1
+	    if statistics and maxSymbolTop < symbolTop then
+		maxSymbolTop := symbolTop
+	    end if
+	    bind var register s to symbolStack(symbolTop)
+	    s.symbol := symbol
+	    s.kind := symbolTable(symbol).kind
+	    s.ident := ident
+	else
+	    Error (eSymbolStackOverflow)
+	end if
+    end PushAnySymbol
+
+
+    body procedure PushSymbol % (ident : IdentifierIndex, symbol: SymbolIndex)
+	pre symbol >= -maxDummySymbols and symbol <= symbolTableTop
+
+	if symbolTop < maxSymbolDepth then
+	    symbolTop += 1
+	    if statistics and maxSymbolTop < symbolTop then
+		maxSymbolTop := symbolTop
+	    end if
+	    bind var register s to symbolStack(symbolTop)
+	    if symbol < 0 then
+		% this is a dummy symbol;  push a new dummy one
+		% this crops up mostly with binds.
+		for i : -maxDummySymbols..-1
+		    if freeDummy(i) then
+			freeDummy(i) := false
+			bind var register t to symbolTable(i)
+			t.kind := sUndefined
+			t.attributes := SymbolAttributeSet()
+			t.typex := 0
+			t.value := 0
+			t.scopeLevelOrIdent := 0
+			t.unqualifedCount := 0
+			s.symbol := i
+			s.kind := sUndefined
+			s.ident := ident
+			return
+		    end if
+		end for
+	    else
+		s.symbol := symbol
+		s.kind := symbolTable(symbol).kind
+		s.ident := ident
+	    end if
+	else
+	    Error (eSymbolStackOverflow)
+	end if
+    end PushSymbol
+
+
+    body procedure PushNewSymbol % (ident: IdentifierIndex, kind: SymbolKinds)
+	if symbolTableTop < maxSymbols then
+	    symbolTableTop += 1
+
+	    begin
+		bind var register s to symbolTable(symbolTableTop)
+		s.kind := kind
+		s.attributes := SymbolAttributeSet()
+		s.typex := 0
+		s.value := 0
+		s.scopeLevelOrIdent := 0
+		s.unqualifedCount := 0
+	    end
+	    PushSymbol (ident, symbolTableTop)
+	    if stabInformation then
+		write : stabStream, symbolTableTop, ident
+	    end if
+	else
+	    Error (eSymbolTableOverflow)
+	end if
+    end PushNewSymbol
+
+
+    body proc PushDummySymbol % (ident : IdentifierIndex)
+	/* find a free dummy symbol */
+	for i : -maxDummySymbols..-1
+	    if freeDummy(i) then
+		freeDummy(i) := false
+		begin
+		    bind var register s to symbolTable(i)
+		    s.kind := sUndefined
+		    s.attributes := SymbolAttributeSet()
+		    s.typex := 0
+		    s.value := 0
+		    s.scopeLevelOrIdent := 0
+		    s.unqualifedCount := 0
+		end
+		PushAnySymbol(ident, i)
+		return
+	    end if
+	end for
+	Error(eNoFreeDummySymbols)
+    end PushDummySymbol
+
+
+    body proc PushCopyDummySymbol
+	pre symbolTop > 0
+	/* find a free dummy symbol */
+	for i : -maxDummySymbols..-1
+	    if freeDummy(i) then
+		freeDummy(i) := false
+		symbolTable(i) := symbolTable(symbolStack(symbolTop).symbol)
+		PushAnySymbol(0, i)
+		/* transfer the temporary kind */
+		symbolStack(symbolTop).kind := symbolStack(symbolTop-1).kind
+		return
+	    end if
+	end for
+	Error(eNoFreeDummySymbols)
+    end PushCopyDummySymbol
+
+
+    body procedure PopSymbol
+	pre symbolTop > 0
+	const i := symbolStack(symbolTop).symbol
+	if i < 0 then
+	    assert not freeDummy(i)
+	    freeDummy(i) := true
+	end if
+	symbolTop -= 1
+    end PopSymbol
+
+
+    body procedure EnterType % (typex: TypeIndex)
+	pre symbolTop > 0 
+	symbolTable(symbolStack(symbolTop).symbol).typex := typex
+    end EnterType
+
+
+    body function UnqualifiedExportLevel % : int
+	result symbolTable(symbolStack(symbolTop).symbol).unqualifedCount
+    end UnqualifiedExportLevel
+
+
+    body procedure IncrementUnqualifiedExportLevel
+	symbolTable(symbolStack(symbolTop).symbol).unqualifedCount += 1
+    end IncrementUnqualifiedExportLevel
+
+
+    body procedure DecrementUnqualifiedExportLevel
+	symbolTable(symbolStack(symbolTop).symbol).unqualifedCount -= 1
+    end DecrementUnqualifiedExportLevel
+
+
+    body procedure EnterScopeLevel % (count : int)
+	pre symbolTop > 0
+	bind var register sc to
+	    symbolTable(symbolStack(symbolTop).symbol).scopeLevelOrIdent
+
+	if sc < count then
+	    sc := count
+	end if
+    end EnterScopeLevel
+    
+
+    body function ReturnScopeLevel % : int
+	pre symbolTop > 0
+	result symbolTable(symbolStack(symbolTop).symbol).scopeLevelOrIdent
+    end ReturnScopeLevel
+
+
+    body procedure EnterAttribute % (attribute: SymbolAttributes)
+	pre symbolTop > 0
+	symbolTable(symbolStack(symbolTop).symbol).attributes +=
+	    SymbolAttributeSet(attribute)
+    end EnterAttribute
+
+
+    body procedure EnterLeftSymbolBoundTo
+	pre symbolTop >= 2
+	bind var register s to symbolTable(symbolStack(symbolTop-1).symbol)
+	s.value := symbolStack(symbolTop).symbol
+	s.scopeLevelOrIdent := symbolStack(symbolTop).ident
+    end EnterLeftSymbolBoundTo
+
+
+    body procedure EnterLeftResultSymbolScope % (scope: ScopeIndex)
+	pre symbolTop >= 2
+	symbolTable(symbolStack(symbolTop-1).symbol).value := scope
+    end EnterLeftResultSymbolScope
+
+
+    body procedure EnterKind % (kind: SymbolKinds)
+	pre symbolTop > 0
+	bind var register s to symbolStack(symbolTop)
+	s.kind := kind
+	symbolTable(s.symbol).kind := kind
+    end EnterKind
+
+
+    body procedure ChangeKind % (kind: SymbolKinds)
+	pre symbolTop > 0
+	symbolStack(symbolTop).kind := kind
+    end ChangeKind
+
+
+    body procedure ClearAttribute % (attribute: SymbolAttributes)
+	pre symbolTop > 0
+	symbolTable(symbolStack(symbolTop).symbol).attributes -=
+	    SymbolAttributeSet(attribute)
+    end ClearAttribute
+
+
+    body procedure ResolveKind
+	pre symbolTop > 0
+	bind var register s to symbolStack(symbolTop)
+	s.kind := symbolTable(s.symbol).kind
+    end ResolveKind
+
+
+    body procedure SwapSymbols
+	pre symbolTop >= 2
+	var s := symbolStack(symbolTop)
+
+	symbolStack(symbolTop) := symbolStack(symbolTop-1)
+	symbolStack(symbolTop-1) := s
+    end SwapSymbols
+
+
+    body function SymbolHasAttribute % (attribute: SymbolAttributes) : boolean
+	pre symbolTop > 0
+	result attribute in
+	    symbolTable(symbolStack(symbolTop).symbol).attributes
+    end SymbolHasAttribute
+
+
+    body function SameSymbols % : boolean
+	pre symbolTop >= 2
+	result symbolStack(symbolTop).symbol = symbolStack(symbolTop-1).symbol
+    end SameSymbols
+
+
+    body function  SymbolValue % : int
+	result symbolTable(symbolStack(symbolTop).symbol).value
+    end SymbolValue
+
+
+    body function SymbolIdent % : IdentifierIndex
+	pre symbolTop > 0
+	result symbolStack(symbolTop).ident
+    end SymbolIdent
+
+
+    body function BoundSymbolIdent % : IdentifierIndex
+	pre symbolTop > 0
+	assert saBinds in symbolTable(symbolStack(symbolTop).symbol).attributes
+	result symbolTable(symbolStack(symbolTop).symbol).scopeLevelOrIdent
+    end BoundSymbolIdent
+
+
+    body function SymbolKind % : SymbolKinds
+	pre symbolTop > 0
+	result symbolStack(symbolTop).kind
+    end SymbolKind
+
+
+    body function ReturnSymbolAttributes % : SymbolAttributeSet
+	pre symbolTop > 0
+	result symbolTable(symbolStack(symbolTop).symbol).attributes
+    end ReturnSymbolAttributes
+
+
+    body function SymbolType % : TypeIndex
+	pre symbolTop > 0
+	result symbolTable(symbolStack(symbolTop).symbol).typex
+    end SymbolType
+
+
+    body function ResultSymbolScope % : ScopeIndex
+	pre symbolTop > 0
+	result symbolTable(symbolStack(symbolTop).symbol).value
+    end ResultSymbolScope
+
+
+    body function SymbolBoundTo % : SymbolIndex 
+	pre symbolTop > 0
+	assert saBinds in symbolTable(symbolStack(symbolTop).symbol).attributes
+	result symbolTable(symbolStack(symbolTop).symbol).value
+    end SymbolBoundTo
+
+
+    body function SymbolIndexx % : SymbolIndex
+	pre symbolTop > 0
+	result symbolStack(symbolTop).symbol
+    end SymbolIndexx
+
+
+    body function SymStackEmpty % : boolean
+	result symbolTop = 0
+    end SymStackEmpty
+
+
+    body procedure SymStats
+	put "symbol\n\tStack = ", maxSymbolTop, "/", maxSymbols
+	put "\tTable = ", symbolTableTop, "/", maxSymbols
+    end SymStats
+
+
+    procedure PutSymbolKind (kind : SymbolKinds)
+	if kind >= firstSymbolKind and kind <= lastSymbolKind then
+	    put symbolNames(kind) : 20 ..
+	else
+	    put "?? " : 20 , kind ..
+	end if
+    end PutSymbolKind
+
+
+    procedure PutAttributes(a : SymbolAttributeSet)
+	const attrchars := "PUEIAFfBbGgCSVfpMTeDiBdWuw"
+	var res := ""
+	for i : firstSymbolAttribute .. lastSymbolAttribute
+	    if i in a then
+		res += attrchars(i+1)
+	    else
+		res += "-"
+	    end if
+	end for
+	put res ..
+    end PutAttributes
+
+
+    body procedure DumpSymbols
+	var ss := symbolTop
+	var st := symbolTableTop
+
+	var maxIndex := symbolTableTop
+
+	if maxIndex < symbolTop then
+	    maxIndex := symbolTop
+	end if
+	assert maxIndex >= 0
+
+	put "\nSymbolStack\t\t\t\t\tSymbolTable"
+	put "\tIdent\tSymbol\tKind                \t\tKind                \tType\tValue\tScLv/Id\tUnqual\tAttributes"
+	for decreasing i : maxIndex..1
+	    assert ss <= i and st <= i
+	    if ss = i then
+		put i:7, "\t", symbolStack(ss).ident:7, "\t",
+		    symbolStack(ss).symbol:7, "\t" ..
+		PutSymbolKind(symbolStack(ss).kind)
+		put "\t" ..
+		ss := ss - 1
+	    else
+		put "\t\t\t\t\t\t" ..
+	    end if
+	    if st = i then
+		put intstr(i,7), "\t" ..
+		PutSymbolKind(symbolTable(i).kind)
+		put "\t", symbolTable(i).typex, "\t", symbolTable(i).value,
+		    "\t", symbolTable(i).scopeLevelOrIdent,
+		    "\t", symbolTable(i).unqualifedCount, "\t" ..
+		PutAttributes(symbolTable(i).attributes)
+		st := st - 1
+	    end if
+	    put ""
+	end for
+	put "\n", repeat("-", 79)
+    end DumpSymbols
+
+
+
+    /* Initialize null symbol entry */
+    symbolTable(0).kind := sNotFound
+    symbolTable(0).attributes := SymbolAttributeSet()
+    symbolTable(0).typex := 0
+    symbolTable(0).value := 0
+
+    /* set up the dummy symbols */
+    for i : -maxDummySymbols..-1
+	freeDummy(i) := true
+    end for
+
+end Symbol

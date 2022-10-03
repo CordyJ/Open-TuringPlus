@@ -1,0 +1,722 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+% 
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+% 
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+/*
+ *   Turing Plus to C Translator
+ *   Module: Types - provide GetType and SetType of an id plus construction.
+ *   By:     Mark Mendell
+ *   Date:   28 Oct 1986
+ *   From:
+ *
+ *	Turing  Source Level Global Optimizer
+ *	Module: Types - provide GetType and SetType of an id plus construction.
+ *	By:     Peter Ashwood-Smith,
+ *	Date:   September 1986.
+ */
+
+body "types.st" module Types
+
+/*
+ * Usual module limits                                  
+ */
+    const maxId := 8000
+    const minId := 1
+    const maxDelimiters := 10		 /* deepest PushDelim... sequence. */
+    const maxIdListLength := 50          /* longest list of var a,b,c,....  */
+					 /* or nesting of var a : record b:. */
+
+/*
+ * Usual stack stuff and an array of Trees, the types.
+ */
+    type AttributeSet : set of firstAttribute..lastAttribute
+
+    type *TypeEntry :
+	record
+	    id:			ExpressionPointer
+	    tree:		TreePointer     
+	    colinfo : 		TreePointer
+	    asinfo:		ArrayStringPointer
+	    unionNumber:	nat2
+	    unionFieldNumber:	nat2
+	    indir:		IndirectionType
+	    attr:		AttributeSet
+	    kind:		TypeKinds
+	end record
+
+    var tTable : unchecked collection of TypeEntry
+    type *TblPointer : pointer to tTable
+
+    var typeTable  : array minId..maxId of TblPointer
+    var idStack    : array 1..maxIdListLength of ExpressionPointer
+    var idStackTop : int := 1
+    var kindProc : function f (t : TreePointer) : TypeKinds
+
+    const TypeKindNames : array TypeKinds of string (10) := 
+	init ("Boolean", "Char", "CharStr", "Int", "Nat", "Real",
+	      "String", "AddrInt", "Pointer", "Subrange", "Enum", 
+	      "Set", "Array", "Record", "Union", "Collect", "Module",
+	      "Monitor", "Procedure", "Function", "Process", 
+	      "Condition", "PrioCond", "DeferCond", 
+	      "TimeCond", "Forward", "FlexArray", "FlexCStr", "ParamArr",
+	      "ParChrStr", "PAPChrStr", "ParamStr", "PArrPStr", "ProcVar",
+	      "FcnVar", "UnionMap", "*NoType*", "Mon Var")
+
+
+/*
+ * Delimiter stack when user does PushDelim the top of the idStack is pushed
+ * so that MakeType function knows where to stop. 
+ */
+    var dStack     : array 1..maxDelimiters of minId..maxId
+    var dStackTop  : int := 1
+
+
+    var initEntry : TypeEntry
+
+    procedure InitTableEntry (i : int)
+	new tTable, typeTable(i)
+	tTable(typeTable(i)) := initEntry
+    end InitTableEntry
+
+
+/*
+ * HoldIdentifier(id) Will push the identifier 'id' expression on a stack  
+ * until a MakeType operation is performed, then the type will be set. This
+ * is used for processing identifier lists, eg var x,y,z : int would result
+ * in 3 HoldIdentifier operations followed by a MakeType (passed parse tree 
+ * for the type 'int'.
+ */
+    body proc HoldIdentifier % (id:ExpressionPointer)
+        pre idStackTop > 0 
+	if idStackTop <= maxIdListLength then
+	    idStack(idStackTop) := id
+	    idStackTop += 1
+	else
+	    Error(eTypesIdStackOverflow, nil(tNode), true)
+	end if
+    end HoldIdentifier
+
+
+/*
+ * Simple push and pop of the dilimiter stack. The dilimiter stack holds 
+ * tops of the idStack. Have a look at the MakeType code.
+ */
+    body proc PushDelimiter
+	pre dStackTop > 0 and dStackTop <= maxDelimiters
+	dStack(dStackTop) := idStackTop
+        dStackTop += 1
+    end PushDelimiter
+
+
+    body proc PopDelimiter
+	dStackTop -= 1
+	assert dStackTop > 0 and dStackTop < maxDelimiters
+    end PopDelimiter
+
+/*
+ * Make sure that the module has correctly reached the ending state.
+ * This occurs when both stacks are empty. This is called by the
+ * SSL after it has finished building the parse tree and type table.
+ */
+    body proc AssertTypeStackEmpty
+	assert dStackTop = 1
+	assert idStackTop = 1
+    end AssertTypeStackEmpty
+
+/*
+ * Pop the idStack and set the type of each identifier expression on this stack
+ * to by 'tipe'. We take the top element on the Delimiter Stack and use it as
+ * the lower limit on the set of id's to be typed to 'tipe'. 
+ */
+    body proc MakeType % (tipe:TreePointer)
+        pre idStackTop > 1 and idStackTop <= maxIdListLength +  1
+	assert dStackTop > 1 and dStackTop <= maxDelimiters + 1
+        var bot := dStack(dStackTop-1)
+        for i:bot..idStackTop-1
+            SetType(idStack(i),tipe)
+        end for
+        idStackTop := bot
+    end MakeType
+
+
+    function AttrString (register attr : AttributeSet) : string
+	var res : char(lastAttribute+1)
+	for i : firstAttribute..lastAttribute
+	    if i in attr then
+		res(i+1) := attrchars(i+1)
+	    else
+		res(i+1) := '-'
+	    end if
+	end for
+	result res
+    end AttrString
+
+
+/*
+ * Dump the type table, but ignore any entries that are nil they are not in
+ * use.
+ */
+    body proc Dump % (stream:int)
+        put :stream, "--- DUMP OF TYPE TABLE STARTS ---"
+        for i:minId..maxId
+	    if typeTable(i) not= nil(tTable) then
+		bind register t to tTable(typeTable(i))
+		Expression.Output(t.id, stream)
+		put :stream, "  type:  ", AttrString(t.attr), " ",
+		    TypeKindNames(t.kind), " ", t.indir(inPointer), " ",
+		    t.indir(inSubprogram), " ", t.unionNumber, " ",
+		    t.unionFieldNumber ..
+		if t.asinfo not= nil(asNode) then
+		    put :stream, " A" ..
+		else
+		    put :stream, "  " ..
+		end if
+		if t.colinfo not= nil(tNode) then
+		    put :stream, " C"
+		else
+		    put :stream, ""
+		end if
+		TreeDump(t.tree,10,stream)
+	    end if
+        end for
+        put :stream, "--- DUMP OF TYPE TABLE ENDS ---"
+    end Dump
+
+
+/*
+ * Set the kind for all variables known
+ */
+    body proc SetKindProc %(kindproc : function f (t : TreePointer) : TypeKinds)
+        kindProc := kindproc
+    end SetKindProc
+
+/*
+ * Associate type 'tipe' with identifier 'id'. We get the id number from the
+ * expression node, then check its range to make sure we are not violating
+ * the modules limits, check that the type entry is free, then use it to
+ * store the value.
+ */
+    body proc SetType % (id:ExpressionPointer, tipe:TreePointer)
+#if DEBUG then
+	handler (quitCode)
+	    if quitCode not= excpSIGINT then
+		put :0, "SetType Abort:"
+		Expression.Dump(id, 0, 0)
+		TreeDump(tipe, 0, 0)
+		put :0, ""
+	    end if
+	    quit <
+	end handler
+#end if
+
+	const i := eNode(id).u.referenceValue
+        assert i >= minId and i <= maxId	/* values ok for array? */
+
+	if typeTable(i) = nil(tTable) then
+	    InitTableEntry(i)
+	end if
+
+	bind var register ty to tTable(typeTable(i))
+	if tNode(tipe).operatorNumber = aConstInit or
+		tNode(tipe).operatorNumber = aVarInit then
+	    varTypeTree(tNode(tNode(tipe).operand).leaf, ty.tree)
+	else
+	    ty.tree := tipe
+	end if
+        ty.id := id
+	if ty.tree = nil(tNode) then
+	    ty.kind := tInt 			/* temporary kind */
+	else
+	    loop
+		exit when tNode(ty.tree).operatorNumber not= aType and
+			tNode(ty.tree).operatorNumber not= aRecordElementType
+		ty.tree := tNode(ty.tree).operand
+	    end loop
+	    ty.kind := kindProc(ty.tree)	/* map the type kind */
+	end if
+    end SetType    
+
+
+    procedure SetTypeNoDecl (id: ExpressionPointer, tipe: TreePointer)
+	SetType(id, tipe)
+	tTable(typeTable(eNode(id).u.referenceValue)).attr +=
+	    AttributeSet(aaNoDeclaration)
+    end SetTypeNoDecl
+
+
+/*
+ * Get the type associated with id 'id'. We get the identifier number from the
+ * expression node, then check that its range does not violate a module limit,
+ * make sure the slot is not free and return the type in the non free slot.
+ */
+    body function GetType % (id:ExpressionPointer) : TreePointer
+        pre id not= nil(eNode)
+	const register i := eNode(id).u.referenceValue
+
+        assert i >= minId and i <= maxId
+
+	if typeTable(i) = nil(tTable) then
+	    result nil(tNode)
+	end if
+
+        var register tipe := tTable(typeTable(i)).tree
+
+	if tipe = nil(tNode) then
+	    result nil(tNode)
+	end if
+
+	var register temp := tNode(tipe).operatorNumber
+	/*
+	 * if it has an aRecordElementType root, scan down
+	 */
+	if temp = aRecordElementType then
+	   tipe := tNode(tipe).operand
+	   temp := tNode(tipe).operatorNumber
+	end if
+
+	/* if it is a type which is an ident, recurse. */
+	if temp = aIdent then
+	   result GetType (tNode(tipe).leaf)
+        end if
+	result tipe
+    end GetType
+
+
+    body function GetTree % (id:ExpressionPointer) : TreePointer
+        pre id not= nil(eNode)
+	const register i := eNode(id).u.referenceValue
+
+        assert i >= minId and i <= maxId
+
+        result tTable(typeTable(i)).tree
+    end GetTree
+
+
+    body procedure EnterAttribute % (id: ExpressionPointer, attr: AttributeType)
+	const register i := eNode(id).u.referenceValue
+	if typeTable(i) = nil(tTable) then
+	    InitTableEntry(i)
+	end if
+	tTable(typeTable(i)).attr += AttributeSet(attr)
+    end EnterAttribute
+
+
+    body procedure ClearAttribute % (id: ExpressionPointer, attr: AttributeType)
+	const register i := eNode(id).u.referenceValue
+	if typeTable(i) = nil(tTable) then
+	    InitTableEntry(i)
+	end if
+	tTable(typeTable(i)).attr -= AttributeSet(attr)
+    end ClearAttribute
+
+
+    body procedure IncreaseIndirection % (id: ExpressionPointer,
+				       % iKind : IndirectionKind)
+	const register i := eNode(id).u.referenceValue
+	if typeTable(i) = nil(tTable) then
+	    InitTableEntry(i)
+	end if
+	tTable(typeTable(i)).indir(iKind) += 1
+    end IncreaseIndirection
+
+
+    body procedure SetIndirection % (id: ExpressionPointer, indir : nat,
+				  %  iKind : IndirectionKind)
+	tTable(typeTable(eNode(id).u.referenceValue)).indir(iKind) := indir
+    end SetIndirection
+
+
+    body procedure DecreaseIndirection % (id: ExpressionPointer,
+				       % iKind : IndirectionKind)
+	tTable(typeTable(eNode(id).u.referenceValue)).indir(iKind) -= 1
+    end DecreaseIndirection
+
+
+    body procedure ResetIndirection % (id: ExpressionPointer)
+	bind var register t to tTable(typeTable(eNode(id).u.referenceValue))
+
+	if aaReference in t.attr then
+	    t.indir(inPointer) := 1
+	else
+	    t.indir(inPointer) := 0
+	end if
+	t.attr -= AttributeSet(aaResetIndirection)
+    end ResetIndirection
+
+
+    body function Indirection % (id: ExpressionPointer) : IndirectionType
+	const register i := eNode(id).u.referenceValue
+
+	if typeTable(i) = nil(tTable) then
+	    const dummy : IndirectionType := init (0,0)
+	    result dummy
+	else
+	    result tTable(typeTable(i)).indir
+	end if
+    end Indirection
+
+
+    body procedure SetKind % (id: ExpressionPointer, kind : TypeKinds)
+	tTable(typeTable(eNode(id).u.referenceValue)).kind := kind
+    end SetKind
+
+
+    body function GetKind % (id: ExpressionPointer) : TypeKinds
+	const register i := eNode(id).u.referenceValue
+
+	if typeTable(i) = nil(tTable) then
+	    result tInt
+	else
+	    result tTable(typeTable(i)).kind
+	end if
+    end GetKind
+
+
+    body function HasAttribute % (id : ExpressionPointer,
+			       %attr : AttributeType) : boolean
+#if DEBUG then
+	handler (quitCode)
+	    if quitCode not= excpSIGINT then
+		put :0, "HasAttribute Abort: attr: ", #attr
+		Expression.Dump(id, 0, 0)
+		put :0, ""
+	    end if
+	    quit <
+	end handler
+#end if
+	const register i := eNode(id).u.referenceValue
+
+	if typeTable(i) = nil(tTable) then
+	    result false
+	else
+	    result attr in tTable(typeTable(i)).attr
+	end if
+    end HasAttribute
+
+
+    body procedure EnterTypeInfo % (id : ExpressionPointer)
+	const register i := eNode(id).u.referenceValue
+
+	case tTable(typeTable(i)).kind of
+	    label tString, tCharString, tFlexCharString,
+		  tParameterCharString, tParameterString, tChar:
+		bind var register ty to tTable(typeTable(i))
+		ArrayString.CreateStringNode(ty.asinfo, GetType(id),
+					 ty.kind, SetTypeNoDecl, false)
+
+	    label tSubrange:
+		bind var register ty to tTable(typeTable(i))
+		/* this might be a char subrange */
+		var register t := GetType(id)
+
+		if tNode(t).operatorNumber = aPacked then
+		    t := tNode(t).operand
+		end if
+		if eNode(tNode(tNode(t).operand).leaf).u.operatorNumber =
+			aCharLit then
+		    ArrayString.CreateStringNode(ty.asinfo, t,
+					     ty.kind, SetTypeNoDecl, false)
+		end if
+
+	    label tArray, tFlexArray, tParameterArray:
+		bind var register ty to tTable(typeTable(i))
+		var refVal := i
+
+		if aaGrant not in tTable(typeTable(i)).attr then
+		    refVal := -1
+		end if
+		ArrayString.CreateArrayNode(refVal, ty.asinfo, GetType(id),
+					SetTypeNoDecl, GetType, EnterTypeInfo,
+					EnterAttribute)
+
+	    label tParameterArrayParameterCharString,
+		  tParameterArrayParameterString:
+		var newId : ExpressionPointer
+		var t : TreePointer
+		var register lastT : TreePointer
+		begin
+		    bind var register ty to tTable(typeTable(i))
+
+		    /* create a new copy of the entire type tree */
+		    TreeCopy(ty.tree, t)
+		    ty.tree := t
+
+		    /*
+		     * find the string/char(*) node  -- may be replaced
+		     * already
+		     */
+		    t := tNode(ty.tree).operand
+		    loop
+			exit when tNode(t).sibling = nil(tNode) or
+			    tNode(t).operatorNumber = aChar or
+			    tNode(t).operatorNumber = aString
+			lastT := t
+			t := tNode(t).sibling
+		    end loop
+
+		    if tNode(t).nodeKind not= NodeKinds.ExpressionLeaf then
+			/* set up the new char bound type */
+			/* must create a named type for the char bound */
+			Expression.CreateUniqueIdentifier(newId)
+			SetType(newId, t)
+
+			/* now replace the tree by that type */
+			new tNode, t
+			tNode(t).nodeKind := NodeKinds.ExpressionLeaf
+			tNode(t).leaf := newId
+			tNode(t).operatorNumber := 0
+			tNode(t).sibling := nil(tNode)
+			tNode(t).operand := nil(tNode)
+			tNode(t).transformed := false
+			tNode(t).lineNumber := 0
+
+			/* now link it in */
+			tNode(lastT).sibling := t
+		    else
+			newId := tNode(t).leaf
+		    end if
+		    ArrayString.CreateArrayNode(-1, ty.asinfo, GetType(id),
+				    SetTypeNoDecl, GetType, EnterTypeInfo,
+				    EnterAttribute)
+		end
+		bind var register ty to
+		    tTable(typeTable(eNode(newId).u.referenceValue))
+
+		ArrayString.CreateStringNode(ty.asinfo, GetType(newId),
+					     ty.kind, SetTypeNoDecl, true)
+	    label tSet:
+		var e : ExpressionType
+
+		CTypeEnterSize(e, GetType(id), false)
+		if e.u.integerValue <= 4 then
+		    tTable(typeTable(i)).attr += AttributeSet(aaSmallSet)
+		end if
+
+	    label tPointer:
+		var register t := GetType(id)
+
+		if tNode(t).operatorNumber = aPointer then
+		    const ptrT := t
+
+		    t := tNode(t).operand
+		    if tNode(t).nodeKind = NodeKinds.ExpressionLeaf then
+			tTable(typeTable(eNode(
+			    tNode(t).leaf).u.referenceValue)).colinfo := ptrT
+		    end if
+		end if
+
+	    label tCollection:
+		/* do this sort of recursively, to get maximal information */
+		var register t := tTable(typeTable(i)).tree
+
+		if tNode(t).nodeKind = NodeKinds.ExpressionLeaf then
+		    t := GetType(tNode(t).leaf)
+		end if
+
+		assert tNode(t).operatorNumber = aCollection
+		t := tNode(t).operand
+		if tNode(t).operatorNumber = aForward then
+		    t := tNode(t).operand
+		end if
+		if tNode(t).nodeKind = NodeKinds.ExpressionLeaf then
+		    t := GetType(tNode(t).leaf)
+		end if
+		if t = nil(tNode) then
+		    /* forward collection type in stub */
+		    return
+		end if
+
+		const tKind := kindProc(t)
+		case tKind of
+		    label tString, tCharString, tChar:
+			ArrayString.CreateStringNode(
+			    tTable(typeTable(i)).asinfo, t, tKind,
+			    SetTypeNoDecl, false)
+
+		    label tArray:
+			ArrayString.CreateArrayNode(-1,
+			    tTable(typeTable(i)).asinfo, t, SetTypeNoDecl,
+			    GetType, EnterTypeInfo, EnterAttribute)
+
+		    label tSet:
+			var e : ExpressionType
+
+			CTypeEnterSize(e, t, false)
+			if e.u.integerValue <= 4 then
+			    tTable(typeTable(i)).attr +=
+				AttributeSet(aaSmallSet)
+			end if
+
+		    label :
+		end case
+
+	    label :
+	end case
+    end EnterTypeInfo
+
+
+    body procedure TransferTypeInfo % (fromId, toId : ExpressionPointer)
+	bind register fromT to
+		tTable(typeTable(eNode(fromId).u.referenceValue)),
+	    var register toT to tTable(typeTable(eNode(toId).u.referenceValue))
+
+	toT.colinfo := fromT.colinfo
+	toT.asinfo := fromT.asinfo
+	toT.unionNumber := fromT.unionNumber
+	toT.unionFieldNumber := fromT.unionFieldNumber
+
+	if aaSmallSet in fromT.attr then
+	    toT.attr += AttributeSet(aaSmallSet)
+	end if
+    end TransferTypeInfo
+
+
+    body function ArrayStringInformation % (id : ExpressionPointer) :
+					 %  ArrayStringPointer
+#if DEBUG then
+	handler (quitCode)
+	    if quitCode not= excpSIGINT then
+		put :0, "ArrayStringInformation Abort:"
+		Expression.Dump(id, 0, 0)
+		put :0, ""
+	    end if
+	    quit <
+	end handler
+#end if
+	const register i := eNode(id).u.referenceValue
+
+	if tTable(typeTable(i)).asinfo not= nil(asNode) then
+	    result tTable(typeTable(i)).asinfo
+	else
+	    /* must be a named type */
+	    const register t := tTable(typeTable(i)).tree
+
+	    if tNode(t).operatorNumber = aRecordElementType then
+		const register l := tNode(tNode(t).operand).leaf
+		if l not= nil(eNode) then
+		    result ArrayStringInformation(l)
+		else
+		    /* must be before transformation */
+		    result nil(asNode)
+		end if
+	    else
+		if tNode(t).leaf not= nil(eNode) then
+		    result ArrayStringInformation(tNode(t).leaf)
+		else
+		    /* must be before transformation */
+		    result nil(asNode)
+		end if
+	    end if
+	end if
+    end ArrayStringInformation
+
+
+    body function CollectionInformation % (id : ExpressionPointer) :
+					 %  TreePointer
+	result tTable(typeTable(eNode(id).u.referenceValue)).colinfo
+    end CollectionInformation
+
+
+    body procedure EnterUnionNumber % (id : ExpressionPointer, un, ufn : nat2)
+	bind var register ty to tTable(typeTable(eNode(id).u.referenceValue))
+
+	ty.unionNumber := un
+	ty.unionFieldNumber := ufn
+	ty.attr += AttributeSet(aaUnionField)
+    end EnterUnionNumber
+
+
+    body function UnionNumber % (id : ExpressionPointer) : nat2
+	result tTable(typeTable(eNode(id).u.referenceValue)).unionNumber
+    end UnionNumber
+
+
+    body function UnionFieldNumber % (id : ExpressionPointer) : nat2
+	result tTable(typeTable(eNode(id).u.referenceValue)).unionFieldNumber
+    end UnionFieldNumber
+
+
+    body function Component % (id : ExpressionPointer) : TreePointer
+#if DEBUG then
+	handler (quitCode)
+	    if quitCode not= excpSIGINT then
+		put :0, "Component: "
+		TreeDump(GetType(id), 0, 0)
+	    end if
+	    quit <
+	end handler
+#end if
+	var register t := GetType(id)
+
+	if tNode(t).operatorNumber = aRecordElementType then
+	    t := tNode(t).operand
+	end if
+	if tNode(t).operatorNumber = aPacked then
+	    t := tNode(t).operand
+	end if
+	assert tNode(t).operatorNumber = aArray
+	t := tNode(t).operand
+
+	loop
+	    exit when tNode(t).sibling = nil(tNode)
+	    t := tNode(t).sibling
+	end loop
+	result t
+    end Component
+
+
+    /*
+     * Initialize the module, make all the slots free and clean out the stack.
+     */
+    body proc Init
+	for i: minId..maxId	
+	    if typeTable(i) not= nil(tTable) then
+		free tTable, typeTable(i)
+	    end if
+	end for
+	for i: 1..maxIdListLength
+	    idStack(i) := nil(eNode)
+	end for
+	idStackTop := 1
+	dStackTop := 1
+    end Init
+
+
+    /* initialize the module for the first time */
+    for i: minId..maxId	
+	typeTable(i) := nil(tTable)
+    end for
+    for i: 1..maxIdListLength
+	idStack(i) := nil(eNode)
+    end for
+    idStackTop := 1
+    dStackTop := 1
+    begin
+	bind var register t to initEntry
+
+	t.id := nil(eNode)
+	t.tree := nil(tNode)
+	t.attr := AttributeSet()
+	t.indir(inPointer) := 0
+	t.indir(inSubprogram) := 0
+	t.kind := tNoType
+	t.unionNumber := 0
+	t.unionFieldNumber := 0
+	t.colinfo := nil(tNode)
+	t.asinfo := nil(asNode)
+    end
+end Types

@@ -1,0 +1,849 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+% 
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+% 
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+body "trexpnutil.st" module TransExpnUtility
+
+    body procedure CreateCommaList % (subExpn : ExpressionPointer,
+				   % var newExpn : ExpressionPointer)
+	var register e := subExpn
+
+	if eNode(e).u.operatorNumber = aComma then
+	    /* put it at the beginning.  The sub-expn will be done next */
+	    const oldsibling := eNode(e).u.operand
+	    new eNode, eNode(e).u.operand
+	    e := eNode(e).u.operand
+	    newExpn := e
+	    eNode(e).sibling := oldsibling
+	else
+	    /* change this to a comma node */
+	    new eNode, e
+	    eNode(e).u := eNode(subExpn).u
+	    eNode(e).sibling := nil(eNode)
+	    const oldNode := e
+
+	    tag eNode(subExpn).u, aComma
+	    new eNode, eNode(subExpn).u.operand
+	    e := eNode(subExpn).u.operand
+	    newExpn := e
+
+	    eNode(e).sibling := oldNode
+	end if
+#if DEBUG then
+	tag eNode(e).u, aComma
+	eNode(e).u.operand := nil(eNode)
+#end if
+    end CreateCommaList
+
+
+    body function FindOperand % (ep : ExpressionPointer) : ExpressionPointer
+	var register e := ep
+
+	if eNode(e).u.operatorNumber not= aComma then
+	    result e
+	else
+	    e := eNode(e).u.operand
+	    loop
+		exit when eNode(e).sibling = nil(eNode)
+		e := eNode(e).sibling
+	    end loop
+	    result FindOperand (e)
+	end if
+    end FindOperand
+
+
+    body function SetCmpOp %(operation : int, subExpn : ExpressionPointer) : int
+	case operation of
+	    label aEqual:
+		if subExpn = nil(eNode) then
+		    result pLargeSetEqual
+		else
+		    result pLargeSetEqualFcn
+		end if
+
+	    label aNotEqual:
+		if subExpn = nil(eNode) then
+		    result pLargeSetNotEqual
+		else
+		    result pLargeSetNotEqualFcn
+		end if
+
+	    label aSetLessEqual:
+		if subExpn = nil(eNode) then
+		    result pLargeSetLessEqual
+		else
+		    result pLargeSetLessEqualFcn
+		end if
+
+	    label aSetGreaterEqual:
+		if subExpn = nil(eNode) then
+		    result pLargeSetGreaterEqual
+		else
+		    result pLargeSetGreaterEqualFcn
+		end if
+	end case
+    end SetCmpOp
+
+
+    body function SetAll % (lowBound, upperBound : int) : nat4
+	var register one : nat := 1
+	var register res : nat := 0
+	for : lowBound .. upperBound
+	    res or= one
+	    one shl= 1
+	end for
+	result res
+    end SetAll
+
+
+    body function CastableExpression %(register e : ExpressionPointer) : boolean
+	case eNode(e).u.operatorNumber of
+	    label aIntegerLit, aTrue, aFalse, aCharLit, aStringLit,
+		    aIdent, aField, aSubstring, aSubs, aCollection:
+		result true
+
+	    label :
+		result ExpnType(e) not= tReal
+	end case
+    end CastableExpression
+
+
+    body function TreeFromKindSize % (eKind : TypeKinds, sz : int) : TreePointer
+	if eKind = tInt then
+	    if sz = 1 then
+		result predtree(pWithoutType, pInt1)
+	    elsif sz = 2 then
+		result predtree(pWithoutType, pInt2)
+	    else
+		assert sz = 4
+		result predtree(pWithoutType, pInt4)
+	    end if
+	elsif eKind = tNat then
+	    if sz = 1 then
+		result predtree(pWithoutType, pNat1)
+	    elsif sz = 2 then
+		result predtree(pWithoutType, pNat2)
+	    else
+		assert sz = 4
+		result predtree(pWithoutType, pNat4)
+	    end if
+	else
+	    assert eKind = tReal
+	    if sz = 4 then
+		result predtree(pWithoutType, pReal4)
+	    else
+		assert sz = 8
+		result predtree(pWithoutType, pReal8)
+	    end if
+	end if
+    end TreeFromKindSize
+
+
+    body function IsVariable % (e : ExpressionPointer) : boolean
+	case eNode(e).u.operatorNumber of
+	    label aIdent:
+		result not Types.HasAttribute(e, aaRegister)
+
+	    label aField, aSubs, aTypeCheat, aCollection, aSubstring:
+		result true
+
+	    label :
+		result false
+	end case
+    end IsVariable
+
+
+    body procedure BeginBlockAndFunctionCall % (t, tempType : TreePointer,
+				 % predFcn : int,
+				 % var newId, subsExpn : ExpressionPointer,
+				 % subExpn : ExpressionPointer)
+	/*
+	 * put the statement into a begin block
+	 * allocate a temporary for the new parameter
+	 * call a fcn to do the conversion
+	 */
+	var statementHolder : TreePointer
+	CreateBeginBlock(t, statementHolder)
+
+	const originalStatement := tNode(statementHolder).sibling
+
+	/* we can now add statements starting with statementHolder */
+
+	/* declare the temporary */
+	Expression.CreateUniqueIdentifier(newId)
+
+	var register tn := statementHolder
+
+	tNode(tn).operatorNumber := aVar
+	tNode(tn).nodeKind := NodeKinds.OperatorNode
+	tNode(tn).leaf := nil(eNode)
+
+	new tNode, tNode(tn).operand
+	tn := tNode(tn).operand
+
+	tNode(tn).operatorNumber := 0
+	tNode(tn).nodeKind := NodeKinds.ExpressionLeaf
+	tNode(tn).leaf := newId
+	tNode(tn).operand := nil(tNode)
+	tNode(tn).transformed := false
+	tNode(tn).lineNumber := 0
+
+	/* pessimize the fact that the tempType might not be a real temp */
+	new tNode, tNode(tn).sibling
+	tn := tNode(tn).sibling
+	tNode(tn).operatorNumber := aType
+	tNode(tn).nodeKind := NodeKinds.OperatorNode
+	tNode(tn).leaf := nil(eNode)
+	tNode(tn).operand := tNode(tempType).operand
+	tNode(tn).sibling := nil(tNode)
+	tNode(tn).transformed := false
+	tNode(tn).lineNumber := 0
+
+	Types.SetType(newId, tn)
+	Types.EnterTypeInfo(newId)
+
+	/* fake out the static test */
+	Types.EnterAttribute(newId, aaGrant)
+
+	new tNode, tNode(statementHolder).sibling
+	tn := tNode(statementHolder).sibling
+
+	tNode(tn).sibling := originalStatement
+	tNode(tn).transformed := true
+	tNode(tn).lineNumber := 0
+	var register e : ExpressionPointer
+
+	if subExpn = nil(eNode) then
+	    tNode(tn).nodeKind := NodeKinds.ExpressionLeaf
+	    tNode(tn).operand := nil(tNode)
+	    tNode(tn).operatorNumber := aCall
+
+	    new eNode, tNode(tn).leaf
+	    e := tNode(tn).leaf
+	    eNode(e).sibling := nil(eNode)
+	else
+	    var newExpn : ExpressionPointer
+
+	    /* must create a Comma Expression */
+	    tNode(tn).nodeKind := NodeKinds.SimpleLeaf
+	    tNode(tn).operand := nil(tNode)
+	    tNode(tn).operatorNumber := aNoOp
+	    CreateCommaList(subExpn, newExpn)
+	    e := newExpn
+	end if
+
+	tag eNode(e).u, aCall
+	BBAndFCCallNode := e
+	
+	new eNode, eNode(e).u.operand
+	e := eNode(e).u.operand
+	tag eNode(e).u, aPredefinedId
+	eNode(e).u.funcOrProcNumber := predFcn
+	
+	new eNode, eNode(e).sibling
+	e := eNode(e).sibling
+
+	tag eNode(e).u, aSubs
+	eNode(e).sibling := nil(eNode)
+	subsExpn := e
+    end BeginBlockAndFunctionCall
+
+
+    body procedure TransformToString % (t : TreePointer, ep : ExpressionPointer,
+				     % eKind : TypeKinds,
+				     % subExpn : ExpressionPointer)
+	var register e : ExpressionPointer
+	var newId, subsExpn : ExpressionPointer
+
+	case eKind of
+	    label tString, tParameterString:
+		return
+
+	    label tChar, tSubrange:
+		if eNode(ep).u.operatorNumber = aCharLit then
+		    /* use the fact that char lits are really strings */
+		    var temp := eNode(ep).u
+
+		    tag eNode(ep).u, aStringLit
+		    eNode(ep).u.stringValue := temp.charValue
+		    eNode(ep).u.stringLen := temp.charLen
+		    return
+		else
+		    BeginBlockAndFunctionCall(t, predtree(pWithType, pString1),
+			      pConvertCharToString, newId, subsExpn, subExpn)
+		end if
+
+	    label tCharString, tFlexCharString, tParameterCharString:
+		if eNode(ep).u.operatorNumber = aCharLit then
+		    /* use the fact that char lits are really strings */
+		    var temp := eNode(ep).u
+
+		    tag eNode(ep).u, aStringLit
+		    eNode(ep).u.stringValue := temp.charValue
+		    eNode(ep).u.stringLen := temp.charLen
+		    return
+		else
+		    BeginBlockAndFunctionCall(t, predtree(pWithType, pString),
+				  pConvertCharStringToString, newId,
+				  subsExpn, subExpn)
+		end if
+	end case
+
+	e := subsExpn
+	Expression.Copy(ep, eNode(e).u.operand)
+	e := eNode(e).u.operand
+	if eKind = tCharString or eKind = tFlexCharString or
+		eKind = tParameterCharString then
+	    if eNode(ep).u.operatorNumber = aCharLit then
+		new eNode, eNode(e).sibling
+		e := eNode(e).sibling
+
+		tag eNode(e).u, aIntegerLit
+		eNode(e).u.integerValue := eNode(ep).u.charLen
+		eNode(e).u.integerKind := iInteger
+	    else
+		const register as :=
+		    Types.ArrayStringInformation(VariableId(ep))
+
+		if asNode(as).u.kind = nonManifestStringLength then
+		    Expression.Copy(asNode(as).u.nmStringUpper,
+			eNode(e).sibling)
+		    e := eNode(e).sibling
+		else
+		    new eNode, eNode(e).sibling
+		    e := eNode(e).sibling
+
+		    tag eNode(e).u, aIntegerLit
+		    eNode(e).u.integerValue := asNode(as).u.mStringUpper
+		    eNode(e).u.integerKind := iInteger
+		end if
+	    end if
+	end if
+	Expression.Copy(newId, eNode(e).sibling)
+
+	/* replace the expression by the temp */
+	eNode(ep).u := eNode(newId).u
+    end TransformToString
+
+
+    body procedure TransformToChar % (t : TreePointer, ep : ExpressionPointer,
+				   % eKind : TypeKinds,
+				   % subExpn : ExpressionPointer)
+	var register e : ExpressionPointer
+
+	if eKind = tChar then
+	    return
+	end if
+
+	/* replace this by a subroutine call */
+	new eNode, e
+	const newExpn := e
+
+	tag eNode(e).u, aCall
+
+	new eNode, eNode(e).u.operand
+	e := eNode(e).u.operand
+	tag eNode(e).u, aPredefinedId
+	eNode(e).u.funcOrProcNumber := pConvertToChar
+	
+	new eNode, eNode(e).sibling
+	e := eNode(e).sibling
+
+	tag eNode(e).u, aSubs
+	eNode(e).sibling := nil(eNode)
+
+	Expression.Copy(ep, eNode(e).u.operand)
+
+	eNode(ep).u := eNode(newExpn).u
+    end TransformToChar
+
+
+    function ReferenceNotRegisterVariable (e : ExpressionPointer) : boolean
+	case eNode(e).u.operatorNumber of
+	    label aField, aCollection, aSubs:
+		result true
+
+	    label aIdent:
+		result not Types.HasAttribute(e, aaRegister)
+
+	    label aHash, aRangeCheck, aRangeCheck2:
+		result ReferenceNotRegisterVariable(eNode(e).u.operand)
+
+	    label aSubstring:
+		var register x := eNode(e).u.operand
+		const register et := ExpnType(x)
+
+		if et = tCharString or et = tFlexCharString or
+			et = tParameterCharString then
+		    x := eNode(x).sibling
+		    loop
+			exit when x = nil(eNode) or
+			    eNode(x).u.operatorNumber = aEndSubstring
+			x := eNode(x).sibling
+		    end loop
+		    result x = nil(eNode) or
+			eNode(x).u.substringKind mod 256 = ssNone
+		else
+		    result true
+		end if
+
+	    label :
+		result false
+	end case
+    end ReferenceNotRegisterVariable
+
+
+    body procedure TransformToCharString % (t : TreePointer,
+					 % ep : ExpressionPointer,
+					 % eKind : TypeKinds,
+					 % subExpn : ExpressionPointer)
+	var register e : ExpressionPointer
+	var newId, subsExpn : ExpressionPointer
+
+	if not (eKind = tChar or eKind = tSubrange) then
+	    return
+	end if
+
+	if ReferenceNotRegisterVariable (ep) then
+	    /* just make it addr(ep) */
+	    new eNode, e
+	    const newNode := e
+	    tag eNode(e).u, aCall
+	    
+	    new eNode, eNode(e).u.operand
+	    e := eNode(e).u.operand
+	    tag eNode(e).u, aPredefinedId
+	    eNode(e).u.funcOrProcNumber := pInternalAddr
+	    
+	    new eNode, eNode(e).sibling
+	    e := eNode(e).sibling
+
+	    tag eNode(e).u, aSubs
+	    eNode(e).sibling := nil(eNode)
+	    Expression.Copy(ep, eNode(e).u.operand)
+	    e := eNode(e).u.operand
+	    eNode(e).sibling := nil(eNode)
+
+	    eNode(ep).u := eNode(newNode).u
+	    return
+	end if
+
+	BeginBlockAndFunctionCall(t, predtree(pWithType, pCharString1),
+		      pConvertCharToCharString, newId, subsExpn, subExpn)
+
+	e := subsExpn
+	Expression.Copy(ep, eNode(e).u.operand)
+	e := eNode(e).u.operand
+	Expression.Copy(newId, eNode(e).sibling)
+
+	/* replace the expression by the temp */
+	eNode(ep).u := eNode(newId).u
+    end TransformToCharString
+
+
+    /*
+     * put the stmt into a begin block
+     * create a new temp
+     * call a predefined to assign temp with set & element
+     * change expn to a comparison to 0
+     */
+    body procedure LargeSetIn % (t : TreePointer,
+			      % ep : ExpressionPointer,
+			      % lowBound : int4,
+			      % upperBound : ExpressionPointer,
+			      % wasIn : boolean,
+			      % subExpn : ExpressionPointer)
+	var newId, subsExpn : ExpressionPointer
+	var register e : ExpressionPointer
+
+	if subExpn = nil(eNode) then
+	    BeginBlockAndFunctionCall(t, predtree(pWithType, pNat4),
+		pLargeSetIn, newId, subsExpn, subExpn)
+	else
+	    BeginBlockAndFunctionCall(t, predtree(pWithType, pNat4),
+		pLargeSetInFcn, newId, subsExpn, subExpn)
+	end if
+	var register EP := FindOperand(ep)
+	
+	e := subsExpn
+	Expression.Copy(newId, eNode(e).u.operand)
+	e := eNode(e).u.operand
+	InRange(eNode(EP).u.operand, upperBound, lowBound,
+		eNode(e).sibling, true, 19)
+	e := eNode(e).sibling
+	Expression.Copy(eNode(eNode(EP).u.operand).sibling, eNode(e).sibling)
+	e := eNode(e).sibling
+	eNode(e).sibling := nil(eNode)
+
+	/* now change the aIn to a compare */
+	Expression.Free(eNode(EP).u.operand)
+	
+	new eNode, eNode(EP).u.operand
+	e := eNode(EP).u.operand
+	if wasIn then
+	    tag eNode(e).u, aNotEqual
+	else
+	    tag eNode(e).u, aEqual
+	end if
+	eNode(e).sibling := nil(eNode)
+	Expression.Copy(newId, eNode(e).u.operand)
+	e := eNode(e).u.operand
+
+	/* set the compare operand to 0 */
+	new eNode, eNode(e).sibling
+	e := eNode(e).sibling
+
+	tag eNode(e).u, aIntegerLit
+	eNode(e).u.integerValue := 0
+	eNode(e).u.integerKind := iInteger
+	eNode(e).sibling := nil(eNode)
+    end LargeSetIn
+
+
+    /* string comparisons  aInfixCompare compOP a b */
+    body procedure StringComparison % (t : TreePointer, ep : ExpressionPointer)
+	var register e := eNode(ep).u.operand	 /* = compOP */
+	const firstOperand := eNode(e).u.operand
+
+	/* change to:
+	    aInfixCompare compOP [aCall(strcmp) aSubs (a, b)] 0 */
+	new eNode, eNode(e).u.operand
+	e := eNode(e).u.operand
+
+	tag eNode(e).u, aCall
+
+	/* compare this to zero */
+	new eNode, eNode(e).sibling
+	const register f := eNode(e).sibling
+	eNode(f).sibling := nil(eNode)
+	tag eNode(f).u, aIntegerLit
+	eNode(f).u.integerValue := 0
+	eNode(f).u.integerKind := iInteger
+
+
+	/* call strcmp */
+	new eNode, eNode(e).u.operand
+	e := eNode(e).u.operand
+	tag eNode(e).u, aPredefinedId
+	eNode(e).u.funcOrProcNumber := pStringCompare
+	
+	/* aSubs */
+	new eNode, eNode(e).sibling
+	e := eNode(e).sibling
+	eNode(e).sibling := nil(eNode)
+	tag eNode(e).u, aSubs
+
+	/* just place the original operands as the parameters */
+	eNode(e).u.operand := firstOperand
+    end StringComparison
+
+
+    /* char string comparisons  aInfixCompare compOP a b */
+    body procedure CharStringComparison % (t : TreePointer,
+					% ep : ExpressionPointer)
+	var register e := eNode(ep).u.operand	 /* = compOP */
+	const firstOperand := eNode(e).u.operand
+
+	/* change to:
+	    aInfixCompare compOP [aCall(charstrcmp) aSubs (a, b, size )] 0 */
+	new eNode, eNode(e).u.operand
+	e := eNode(e).u.operand
+
+	tag eNode(e).u, aCall
+
+	/* compare this to zero */
+	new eNode, eNode(e).sibling
+	var register f := eNode(e).sibling
+	eNode(f).sibling := nil(eNode)
+	tag eNode(f).u, aIntegerLit
+	eNode(f).u.integerValue := 0
+	eNode(f).u.integerKind := iInteger
+
+
+	/* call charstrcmp */
+	new eNode, eNode(e).u.operand
+	e := eNode(e).u.operand
+	tag eNode(e).u, aPredefinedId
+	eNode(e).u.funcOrProcNumber := pCharStringCompare
+	
+	/* aSubs */
+	new eNode, eNode(e).sibling
+	e := eNode(e).sibling
+	eNode(e).sibling := nil(eNode)
+	tag eNode(e).u, aSubs
+
+	/* just place the original operands as the parameters */
+	eNode(e).u.operand := firstOperand
+
+	/* now put in the size */
+	e := eNode(e).u.operand
+	f := eNode(e).sibling
+
+	/* try to find the easiest size */
+	if eNode(e).u.operatorNumber = aCharLit then
+	    new eNode, eNode(f).sibling
+	    f := eNode(f).sibling
+	    tag eNode(f).u, aIntegerLit
+	    eNode(f).u.integerValue := eNode(e).u.charLen
+	    eNode(f).u.integerKind := iInteger
+	    eNode(f).sibling := nil(eNode)
+	elsif eNode(f).u.operatorNumber = aCharLit then
+	    new eNode, eNode(f).sibling
+	    e := eNode(f).sibling
+	    tag eNode(e).u, aIntegerLit
+	    eNode(e).u.integerValue := eNode(f).u.charLen
+	    eNode(e).u.integerKind := iInteger
+	    eNode(e).sibling := nil(eNode)
+	else
+	    /* neither is a literal;  use a size */
+	    var ttree : TreePointer
+
+	    ExpnTypeTree (f, ttree)
+	    new eNode, eNode(f).sibling
+	    f := eNode(f).sibling
+	    eNode(f).sibling := nil(eNode)
+	    CTypes.EnterTypeSize(eNode(f), ttree, false)
+	end if
+    end CharStringComparison
+
+
+    const stringPredefinedRoutine :
+	array ssStar..ssExpn, ssStar..ssNone of int := init (
+	    /*	ssStar 	ssStarMinus	ssExpn		ssNone */
+	    pSubstringStarStar, pSubstringStarStar,
+		pSubstringStarExpn, pSubstringStar,
+	    pSubstringStarStar, pSubstringStarStar,
+		pSubstringStarExpn, pSubstringStar,
+	    pSubstringExpnStar, pSubstringExpnStar,
+		pSubstringExpnExpn, pSubstringExpn)
+
+
+    const charPredefinedRoutine :
+	array ssStar..ssExpn, ssStar..ssNone of int := init (
+	    /*	ssStar 	ssStarMinus	ssExpn		ssNone */
+	    pSubstringCharStarStar, pSubstringCharStarStar,
+		pSubstringCharStarExpn, pSubstringCharStar,
+	    pSubstringCharStarStar, pSubstringCharStarStar,
+		pSubstringCharStarExpn, pSubstringCharStar,
+	    pSubstringCharExpnStar, pSubstringCharExpnStar,
+		pSubstringCharExpnExpn, 0)
+
+
+    function SubstringRoutine(substringKind : nat,
+			      substringType : TypeKinds) : int
+	const register left := substringKind div 256
+	const register right := substringKind mod 256
+
+	if substringType = tString or substringType = tParameterString then
+	    result stringPredefinedRoutine(left, right)
+	else
+	    result charPredefinedRoutine(left, right)
+	end if
+    end SubstringRoutine
+
+
+
+    body procedure CreatePredefinedSubstringCall% (t : TreePointer,
+					% substringexpn : ExpressionPointer,
+					% substringType : TypeKinds,
+					% substringKind : int,
+					% var newId : ExpressionPointer,
+					% subExpn : ExpressionPointer)
+	var register e : ExpressionPointer
+
+	/*
+	 * put the statement into a begin block
+	 * allocate a temporary for the result string
+	 * move the substring operation before this statement and
+	 *	replace it by the proper procedure call
+	 * replace this node by a reference to the temporary
+	*/
+	var subsExpn : ExpressionPointer
+	var targetString := predtree(pWithType, pString)
+
+	if substringKind = ssExpn * 256 + ssExpn then
+	    /* may be able to use a smaller temporary string */
+	    var register x := eNode(substringexpn).sibling
+
+	    if ManifestExpression(x) and
+		    ManifestExpression(eNode(x).sibling) then
+		const register s := eNode(eNode(x).sibling).u.integerValue -
+				    eNode(x).u.integerValue + 2
+		if s > 1 and s < 255 then
+		    Tree.Copy(predtree(pWithType, pString1), targetString)
+		    x := tNode(tNode(tNode(tNode(
+			targetString).operand).operand).operand).leaf
+		    eNode(x).u.integerValue := s
+		end if
+	    end if
+	elsif substringKind mod 256 = ssNone then
+	    /* use a smaller temporary string */
+	    Tree.Copy(predtree(pWithType, pString1), targetString)
+	end if
+
+	BeginBlockAndFunctionCall(t, targetString,
+	    SubstringRoutine(substringKind, substringType), newId,
+	    subsExpn, subExpn)
+
+	e := subsExpn
+	eNode(e).u.operand := substringexpn
+
+	/*
+	 * if this is a char string, then must enter the size after the
+	 * first expression
+	 */
+	if not (substringType = tString or
+		    substringType = tParameterString) then
+	    const register as := Types.ArrayStringInformation(
+					VariableId(substringexpn))
+	    var newE : ExpressionPointer
+
+	    if asNode(as).u.kind = manifestStringLength then
+
+		new eNode, newE
+		tag eNode(newE).u, aIntegerLit
+		eNode(newE).u.integerKind := iInteger
+		eNode(newE).u.integerValue := asNode(as).u.mStringUpper
+	    else
+		Expression.Copy(asNode(as).u.nmStringUpper, newE)
+	    end if
+
+	    eNode(newE).sibling := eNode(substringexpn).sibling
+	    eNode(substringexpn).sibling := newE
+	end if
+
+	/* add the result as the last parameter instead of the aEndSubstring */
+	e := substringexpn
+	loop
+	    exit when eNode(e).u.operatorNumber = aEndSubstring
+	    e := eNode(e).sibling
+	end loop
+
+	eNode(e).u := eNode(newId).u
+	eNode(e).sibling := nil(eNode)
+    end CreatePredefinedSubstringCall
+
+
+    procedure ManifestCharStar (ep : ExpressionPointer, upperBound : int)
+	var register e : ExpressionPointer
+
+	new eNode, e
+	eNode(e).u := eNode(ep).u
+
+	tag eNode(ep).u, aAdd
+	new eNode, eNode(ep).u.operand
+
+	const register e2 := eNode(ep).u.operand
+
+	tag eNode(e2).u, aIntegerLit
+	eNode(e2).u.integerValue := upperBound - 1
+	eNode(e2).u.integerKind := iInteger
+
+	eNode(e2).sibling := e
+	eNode(e).sibling := nil(eNode)
+    end ManifestCharStar
+
+
+    procedure NonManifestCharStar (ep, upperBound : ExpressionPointer)
+	var register e : ExpressionPointer
+
+	new eNode, e
+	eNode(e).u := eNode(ep).u
+
+	tag eNode(ep).u, aAdd
+	new eNode, eNode(ep).u.operand
+
+	const register e2 := eNode(ep).u.operand
+
+	eNode(e2).u := eNode(upperBound).u
+
+	eNode(e2).sibling := e
+	eNode(e).sibling := nil(eNode)
+
+	OneToZeroOrigin(ep)
+    end NonManifestCharStar
+
+
+    body procedure TransFormSingleCharCharSubstring
+					% (ep, kind : ExpressionPointer)
+	var register e := eNode(ep).sibling
+	const ssKind := eNode(kind).u.substringKind div 256
+
+	/* remove the aEndSubstring */
+	assert eNode(e).sibling = kind
+	eNode(e).sibling := nil(eNode)
+
+	if ssKind = ssExpn then
+	    /* offset the expression */
+	    OneToZeroOrigin(e)
+	else
+	    assert ssKind = ssStarMinus or ssKind = ssStar
+	    const register as := Types.ArrayStringInformation(VariableId(ep))
+
+	    if asNode(as).u.kind = manifestStringLength then
+		ManifestCharStar(e, asNode(as).u.mStringUpper)
+	    else
+		NonManifestCharStar(e, asNode(as).u.nmStringUpper)
+	    end if
+	end if
+    end TransFormSingleCharCharSubstring
+
+
+    body procedure CreateLargeSetTemp % (newStmt : TreePointer,
+			     	      % var newId : ExpressionPointer,
+				      % setType : ExpressionPointer)
+	var register t := newStmt
+
+	Expression.CreateUniqueIdentifier(newId)
+	Types.SetType(newId, Types.GetType(setType))
+	Types.EnterTypeInfo(newId)
+	Types.EnterAttribute(newId, aaGrant)	/* fake out the static test */
+
+	tNode(t).nodeKind := NodeKinds.OperatorNode
+	tNode(t).operatorNumber := aVar
+	tNode(t).leaf := nil(eNode)
+
+	new tNode, tNode(t).operand
+	t := tNode(t).operand
+	tNode(t).nodeKind := NodeKinds.ExpressionLeaf
+	tNode(t).operatorNumber := 0
+	tNode(t).leaf := newId
+	tNode(t).operand := nil(tNode)
+	tNode(t).transformed := false
+	tNode(t).lineNumber := 0
+
+	new tNode, tNode(t).sibling
+	t := tNode(t).sibling
+	tNode(t).nodeKind := NodeKinds.OperatorNode
+	tNode(t).operatorNumber := aType
+	tNode(t).leaf := nil(eNode)
+	tNode(t).sibling := nil(tNode)
+	tNode(t).transformed := false
+	tNode(t).lineNumber := 0
+
+	new tNode, tNode(t).operand
+	t := tNode(t).operand
+	tNode(t).nodeKind := NodeKinds.ExpressionLeaf
+	tNode(t).operatorNumber := 0
+	Expression.Copy(setType, tNode(t).leaf)
+	tNode(t).operand := nil(tNode)
+	tNode(t).sibling := nil(tNode)
+	tNode(t).transformed := false
+	tNode(t).lineNumber := 0
+    end CreateLargeSetTemp
+
+end TransExpnUtility

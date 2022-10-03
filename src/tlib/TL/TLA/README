@@ -1,0 +1,211 @@
+This directory contains the machine-independent implementations
+of the Turing Plus miscellaneous machine-independent library routines.
+
+The various routines are as follows:
+
+TLA.ch		(internal)
+	The TLA parent module.
+
+TLA4AD.ch	(pRealAdd4)
+	This routine implements addition of real4 values.
+
+TLA4CM.ch	(pRealCompare4)
+	This routine implements comparison of real4 values.
+
+TLA4DN.ch	(pRealDivision4)
+	This routine implements division of real4 values.
+
+TLA4DV.ch	(pRealDiv4)
+	This routine implements div of real4 values.
+
+TLA4ML.ch	(pRealMultiply4)
+	This routine implements multiplication of real4 values.
+
+TLA4MN.ch	(pRealMin4)
+	This routine implements min of real4 values.
+
+TLA4MX.ch	(pRealMax4)
+	This routine implements max of real4 values.
+
+TLA8AD.ch	(pRealAdd8)
+	This routine implements addition of real8 values.
+
+TLA8CD.ch	(pCosD)
+	This routine implements cos of a real8 value, specified in degrees.
+
+TLA8CL.ch	(pCeil)
+	This routine implements ceil of a real8 value.
+
+TLA8CM.ch	(pRealCompare8)
+	This routine implements comparison of real8 values.
+
+TLA8CR.ch	(pCos)
+	This routine implements cos of a real8 value, specified in radians.
+
+TLA8DN.ch	(pRealDivision8)
+	This routine implements division of real8 values.
+
+TLA8DV.ch	(pRealDiv8)
+	This routine implements div of real8 values.
+
+TLA8FL.ch	(pFloor)
+	This routine implements floor of a real8 value.
+
+TLA8GX.ch	(getexp)
+	This routine returns the exponent of a real8 value.
+
+TLA8LN.ch	(pLn)
+	This routine implements ln of a real8 value.
+
+TLA8MD.ch	(pRealMod8)
+	This routine implements mod of real8 values.
+
+TLA8ML.ch	(pRealMultiply8)
+	This routine implements multiplication of real8 values.
+
+TLA8MN.ch	(pRealMin8)
+	This routine implements min of real8 values.
+
+TLA8MX.ch	(pRealMax8)
+	This routine implements max of real8 values.
+
+TLA8QR.ch	(pSqrt)
+	This routine implements sqrt of a real8 value.
+
+TLA8RD.ch	(pRound)
+	This routine implements round of a real8 value.
+
+TLA8RE.ch	(rreb)
+	This routine returns the relative roundoff error bound for real8 values.
+
+TLA8SD.ch	(pSinD)
+	This routine implements sin of a real8 value, specified in degrees.
+
+TLA8SG.ch	(pSign)
+	This routine implements sign of a real8 value.
+
+TLA8SR.ch	(pSin)
+	This routine implements sin of a real8 value, specified in radians.
+
+TLA8SX.ch	(setexp)
+	This routine sets the exponent of a real8 variable.
+
+TLA8T.ch	(TrigCompute)
+	This routine performs the actual triginometric calculations for
+	sin, cos, et. al.
+
+TLA8TD.ch	(pArcTanD)
+	This routine implements arctan of a real8 value,
+	specified in degrees.
+
+TLA8TR.ch	(pArcTan)
+	This routine implements arctan of a real8 value,
+	specified in radians.
+
+TLA8X.ch	(Exp)
+	This routine returns e**value, for a real8 value.
+
+TLA8XP.ch	(pExp)
+	This routine implements exp for a real8 value.
+
+TLAIDV.st	(pIntDiv)
+	This routine implements integer div.
+
+TLAIMD.ch	(pIntMod)
+	This routine implements integer mod.
+
+TLAIML.st	(pSignedLongMultiply)
+	This routine implements checked integer multiplication.
+
+TLANDV.st	(pNatDiv)
+	This routine implements nat div.
+
+TLANMD.ch	(pMatMod)
+	This routine implements nat mod.
+
+TLANML.st	(pUnsignedLongMultiply)
+	This routine implements checked nat multiplication.
+
+TLANMU.st	(pUnsignedLongMultiplyUnchecked)
+	This routine implements unchecked int/nat multiplication.
+
+TLAPII.ch	(pPowerII)
+	This routine implements integer exponentiation to integer power.
+
+TLAPRI.ch	(pPowerRI)
+	This routine implements real exponentiation to integer power.
+
+TLAPRR.ch	(pPowerRR)
+	This routine implements real exponentiation to real power.
+
+TLARNI.ch	(pRandInt)
+	This routine implements randint.
+
+TLARNR.ch	(pRand)
+	This routine implements rand.
+
+TLARNZ.ch	(pRandomize)
+	This routine implements randomize.
+
+TLARSC.ch	(RandomCalcuation)
+	This routine performs the actual random number compuation for
+	the given random number sequence.
+
+TLARSR.ch	(pRandNext)
+	This routine implements randnext.
+
+TLARSZ.ch	(pRandSeed)
+	This routine sets the seed for random number sequences.
+
+TLARZ.ch	(internal)
+	This routine initializes the random number sequences.
+
+TLAV48.ch	(pConvertReal4ToReal8)
+	This routine converts a real4 value to a real8 value.
+
+TLAV84.ch	(pConvertReal8ToReal4)
+	This routine converts a real8 value to a real4 value.
+
+TLAV8D.st	(ConvertReal8ToDouble)
+	This routine converts a real8 value into the machine-dependent
+	hi-order and lo-order longwords.
+
+TLAVD8.st	(ConvertDoubleToReal8)
+	This routine converts machine-dependent hi-order and lo-order
+	longwords into the corresponding real8 value.
+
+TLAVES.ch	(ERealStr)
+	This routine performs the actual conversion of a real value into
+	a string with E format.
+
+TLAVFS.ch	(FRealStr)
+	This routine performs the actual conversion of a real value into
+	a string with F format.
+
+TLAVI4.ch	(pConvertIntToReal4)
+	This routine converts an int value into a real4 value.
+
+TLAVI8.ch	(pIntreal)
+	This routine converts an int value into a real8 value.
+
+TLAVN4.ch	(pConvertNatToReal4)
+	This routine converts a nat value into a real4 value.
+
+TLAVN8.ch	(pNatreal)
+	This routine converts a nat value into a real8 value.
+
+TLAVRS.ch	(RealStr)
+	This routine performs the actual conversion of a real value into
+	a string.
+
+TLAVS8.ch	(StrReal)
+	This routine performs the actual conversion of a string into
+	a real8 value.
+
+TLAVSI.ch	(StrInt)
+	This routine performs the actual conversion of a string into
+	an int value.
+
+TLAVSN.ch	(StrNat)
+	This routine performs the actual conversion of a string into
+	a nat value.

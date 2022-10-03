@@ -1,0 +1,140 @@
+This directory contains the machine-independent implementations of the
+Turing Plus Input/Output library routines.
+
+The various routines are as follows:
+
+TLI.ch		(internal)
+	The TLI parent module.
+
+TLICL.ch	(pClose)
+	This routine implements the close statement.
+
+TLIEFR.ch	(ResetEOF)
+	This routine resets the EOF status of a given stream.
+
+TLIEOF.ch	(pEof)
+	This routine implements the eof function.
+
+TLIFA.ch	(FetchArg)
+	This routine returns the value of the specified run-time argument.
+
+TLIFS.ch	(FlushStreams)
+	This routine will flush any buffered output of all output streams.
+
+TLIGC.ch	(pGetCharString)
+	This routine implements a "get" for a char string.
+
+TLIGCB.ch	(pGetCharSubrange)
+	This routine implements a "get" for a char subrange.
+
+TLIGF.ch	(pGetFileInfo)
+	Return the "info" field for a given stream number.
+
+TLIGI.ch	(pGetInt)
+	This routine implements a "get" for an integer of whatever size.
+
+TLIGIB.ch	(pGetSubrange)
+	This routine implements a "get" for an integer subrange of
+	whatever size.
+
+TLIGK.ch	(pGetSkip)
+	This routine implements a "get skip".
+
+TLIGN.ch	(pGetNat)
+	This routine implements a "get" for a nat of whatever size.
+
+TLIGR.ch	(pGetReal)
+	This routine implements a "get" for a real of whatever size.
+
+TLIGS.ch	(pGetString)
+	This routine implements a "get" of a string.
+
+TLIGSS.ch	(pGetStringStar)
+	This routine implements a "get" of a string with a star width.
+
+TLIGSW.ch	(pGetStringWidth)(
+	This routine implements a "get" of a string with a specified width.
+
+TLIGT.ch	(GetToken)
+	This routine performs the actual read of single-token items, such
+	as integers.
+
+TLIOA.ch	(pOpenArg)
+	This routine performs an open of a specified run-time argument.
+
+TLIOF.ch	(pOpenFile)
+	This routine performs an open of a specified file.
+
+TLIOP.ch	(pOpen)
+	This routine implements the old-style open() routine.
+
+TLIOS.ch	(OpenStream)
+	This routine performs the actual open of a given stream number.
+
+TLIPC.ch	(pPutChar)
+	This routine performs a "put" of a char string.
+
+TLIPE.ch	(pPutEReal)
+	This routine performs a "put" of a real with specified E format.
+
+TLIPF.ch	(pPutFReal)
+	This routine performs a "put" of a real with specified F format.
+
+TLIPI.ch	(pPutInt)
+	This routine performs a "put" of an int.
+
+TLIPK.ch	(pPutSkip)
+	This routine performs a "put" of the newline at the end of a put list.
+
+TLIPN.ch	(pPutNat)
+	This routine performs a "put" of a nat.
+
+TLIPR.ch	(pPutReal)
+	This routine performs a "put" of a real.
+
+TLIPS.ch	(pPutString)
+	This routine performs a "put" of a string.
+
+TLIRE.ch	(pRead)
+	This routine performs a "read" with no status return.
+
+TLIRER.ch	(pReadResult)
+	This routine performs a "read" with a status return.
+
+TLISF.ch	(pSetFileInfo)
+	Set the "info" field for a given stream number.
+
+TLISK.ch	(pSeek)
+	This routine performs a "seek" to an absolute location.
+
+TLISKE.ch	(pSeekToEnd)
+	This routine performs a "seek" to the end of the file.
+
+TLISS.ch	(pSetStream)
+	This routine specifies the stream for upcoming I/O operations.
+
+TLISSI.ch	(pSetStreamToStdin)
+	This routine specifies the standard input stream for upcoming
+	I/O operations.
+
+TLISSO.ch	(pSetStreamToStdout)
+	This routine specifies the standard output stream for upcoming
+	I/O operations.
+
+TLISSS.ch	(pSetStreamAndStatus)
+	This routine specifies the stream for upcoming I/O operations,
+	and specifies the location for status returns.
+
+TLITL.ch	(pTell)
+	This routine implements the "tell" statement.
+
+TLIWR.ch	(pWrite)
+	This routine performs a "write" with no status return.
+
+TLIWRR.ch	(pWriteWithResult)
+	This routine performs a "write" with a status return.
+
+TLIZ.st		(TLI Initialize)
+	The machine-dependent body of this stub should set up the I/O
+	subsystem, including setting the stream information for parameters
+	and standard input/output/error.

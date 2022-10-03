@@ -1,0 +1,109 @@
+%
+%	Computer Systems Research Group
+%   	University of Toronto
+  
+%	Turing Plus SUN/Unix Limits V1.0
+%   	Author:	Ric Holt
+%   	Date:	January 1984 (Revised 9 Aug 85)
+
+% Copyright (C) 1984  The University of Toronto
+
+% This module describes the Turing SUN/Unix limits.
+% Floating point on the SUN uses IEEE double precision format.
+% This module should be included in the user's program
+% using the include statement:
+
+%	include "%limits"
+
+% and compiled with the production Turing compiler (pttc).
+
+
+	%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+	%						%
+	%	    The "limits" Include File		%
+	%						%
+	%    Definition of limitations on the Turing	%
+	%         types: int, string and real.		%
+	%						%
+	%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+% Turing compiler being described:  CHECKING VERSION FOR SUN
+
+
+% Default widths for printing using the "put" statement
+
+    const defaultfw := 6	% Default fraction width
+    const defaultew := 2	% Default exponent width
+
+% Range of supported int values
+%    Note that the value -2 ** 31 = -2147483648 is the "uninitialized" int
+
+    const minint : int := -2147483647
+    const maxint : nat :=  2147483647		%  2**31 - 1
+
+
+% Range of supported nat values
+
+    const minnat : nat := 0
+    const maxnat : nat := 4294967295
+
+
+% Maximum number of IO streams
+    const maxstream := 30
+    const maxargfiles := 20
+
+% Maximum length of string
+
+    const maxstr := 4095
+
+% The representation of a "real" number as floating point is:
+%   f * (radix ** e)    or     0
+% where, for non-zero f:
+%   (1/radix) <= abs(f)  and  abs(f) < 1.0 
+%   minexp <= e  and  e <= maxexp
+
+% Numdigits is the number of radix digits in f.
+   
+    const radix := 2
+    const numdigits := 53
+    const minexp := -1021
+    const maxexp := +1023
+
+% Functions to access and modify exponents
+
+    external "TL_TLA_TLA8GX" function getexp (a: real) e : int
+    % post (a=0 & e=0) or (a~=0 & e=e0)
+    %   where
+    %      a = f0 * (radix ** e0)
+    %   and
+    %      (1/radix) <= abs(f0) < 1
+
+    % assert getexp(0) = 0
+
+    external "TL_TLA_TLA8SX" function setexp (a: real, e: int) r : real
+    % post (a ~= 0 -> r = f0 * (radix ** e)) and (a = 0 -> r = 0)
+    %   where
+    %      a = f0 * (radix ** e0)
+    %   and
+    %      (1/radix) <= abs(f0) < 1
+
+
+% The relative roundoff error bound
+
+    external "TL_TLA_TLA8RE" function rreb : real
+    % const rreb := setexp(1.0, 1 - numdigits)
+
+% Because the Sun uses rounding floating point, the following holds:
+
+    % assert rreb = 0.5 * intreal(radix) ** (-numdigits + 1)
+
+% Conformance to recommendations of the Turing Language Report
+%	The following assertions demonstrate conformance:
+
+    % assert minint <= -(2**30 - 1 + 2**30)      % -(2**31 -1)
+    % assert maxstr >= 255
+    % assert minexp <= -38 * ln(10) / ln(radix)
+    % assert maxexp >= +38 * ln(10) / ln(radix)
+    % assert rreb   <= 1e-14

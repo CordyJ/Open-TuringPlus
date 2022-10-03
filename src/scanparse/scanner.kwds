@@ -1,0 +1,154 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+%
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+%
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+/* Keywords */
+const keywordTokens:
+    array firstKeywordToken .. lastKeywordToken of string(15) := init (
+	"addressint",	% tAddressInt
+	"all",		% tAll
+	"and",		% tAnd
+	"array",	% tArray
+	"asm",		% tAsm
+	"assert",	% tAssert
+	"begin",	% tBegin
+	"bind",		% tBind
+	"bits",		% tBits
+	"body",		% tBody
+	"boolean",	% tBoolean
+	"case",		% tCase
+	"char",		% tChar
+	"checked",	% tChecked
+	"child",	% tChild
+	"close",	% tClose
+	"collection",	% tCollection
+	"condition",	% tCondition
+	"const",	% tConst
+	"decreasing",	% tDecreasing
+	"deferred",	% tDeferred
+	"div",		% tDiv
+	"else",		% tElse
+	"elsif",	% tElsif
+	"end",		% tEnd
+	"endcase",	% tEndCase
+	"endfor",	% tEndFor
+	"endif",	% tEndIf
+	"endloop",	% tEndLoop
+	"enum",		% tEnum
+	"exit",		% tExit
+	"export",	% tExport
+	"external",	% tExternal
+	"false",	% tFalse
+	"fcn",		% tFcn
+	"for",		% tFor
+	"fork",		% tFork
+	"forward",	% tForward
+	"free",		% tFree
+	"function",	% tFunction
+	"get",		% tGet
+	"grant",	% tGrant
+	"handler",	% tHandler
+	"if",		% tIf
+	"import",	% tImport
+	"in",		% tIn
+	"include",	% tInclude
+	"init",		% tInit
+	"int",		% tInt
+	"int1",		% tInt1
+	"int2",		% tInt2
+	"int4",		% tInt4
+	"invariant",	% tInvariant
+	"label",	% tLabel
+	"loop",		% tLoop
+	"mod",		% tMod
+	"module",	% tModule
+	"monitor",	% tMonitor
+	"nat",		% tNat
+	"nat1",		% tNat1
+	"nat2",		% tNat2
+	"nat4",		% tNat4
+	"new",		% tNew
+	"not",		% tNot
+	"of",		% tOf
+	"opaque",	% tOpaque
+	"open",		% tOpen
+	"or",		% tOr
+	"packed",	% tPacked
+	"parent",	% tParent
+	"pause",	% tPause
+	"pervasive",	% tPervasive
+	"pointer",	% tPointer
+	"post",		% tPost
+	"pre",		% tPre
+	"priority",	% tPriority
+	"proc",		% tProc
+	"procedure",	% tProcedure
+	"process",	% tProcess
+	"put",		% tPut
+	"quit",		% tQuit
+	"read",		% tRead
+	"real",		% tReal
+	"real4",	% tReal4
+	"real8",	% tReal8
+	"record",	% tRecord
+	"register",	% tRegister
+	"result",	% tResult
+	"return",	% tReturn
+	"seek",		% tSeek
+	"set",		% tSet
+	"shl",		% tShl
+	"shr",		% tShr
+	"signal",	% tSignal
+	"skip",		% tSkip
+	"string",	% tString
+	"stub",		% tStub
+	"tag",		% tTag
+	"tell",		% tTell
+	"then",		% tThen
+	"timeout",	% tTimeout
+	"to",		% tTo
+	"true",		% tTrue
+	"type",		% tType
+	"unchecked",	% tUnchecked
+	"union",	% tUnion
+	"unqualified",	% tUnqualified
+	"var",		% tVar
+	"wait",		% tWait
+	"when",		% tWhen
+	"write",	% tWrite
+	"xor"		% tXor
+    )
+
+const predefinedIdTokens:
+    array firstPredefinedId .. lastPredefinedId of string(15) := init (
+	"abs", "addr", "arctan", "arctand", "ceil", "chr", "cos", "cosd",
+	"empty", "eof", "erealstr", "exp", "floor", "frealstr", "getpriority",
+	"index", "intreal", "intstr", "length", "ln", "lower", "max", "min",
+	"natreal", "natstr", "nil", "ord", "pred", "rand", "randint",
+	"randnext", "randseed", "randomize", "realstr", "repeat", "round",
+	"setpriority", "sign", "sin", "sind", "size", "sqrt", "strint",
+	"strnat", "strdelete", "strmove", "strreal", "strreplace", "succ",
+	"upper"
+    )
+
+const preprocTokens:
+    array firstPreprocToken .. lastRealPreprocToken of string(15) := init (
+	"if", "then", "elsif", "else", "end", "endif",
+	"and", "or", "not",
+	"define", "undef",
+	"macro", "unmacro", "defined"
+    )

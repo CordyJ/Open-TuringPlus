@@ -1,0 +1,721 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+% 
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+% 
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+body "transutil.st"  module Utility
+    /*
+     * create a new type definition, based on the expression type
+     */
+    body procedure CreateNewType % (var t: TreePointer, e: ExpressionPointer)
+	if ExpnType(e) = tChar then
+	    t := predtree(pWithType, pChar)
+	else
+	    t := predtree(pWithType, pInt4)
+	end if
+    end CreateNewType
+
+
+    /*
+     * newNode is the aFor;  t is the aForRange;  decrease -> decreasing
+     */
+    body procedure ReplaceForExpressionIfNecessary % (forNode, t : TreePointer,
+					       	   %  decrease : boolean)
+	assert tNode(t).operatorNumber = aForRange
+	var newid : ExpressionPointer
+	var register x : TreePointer
+
+	/* tranform the 2 expressions */
+	if ManifestExpression(tNode(tNode(tNode(t).operand).sibling).leaf) then
+	    /* the loop end point is manifest */
+	    return
+	end if
+
+	/*
+	 * The appropriate expression is not manifest:
+	 * add a new variable definition
+	 * add an assignment of the expression to the new variable
+	 * replace the appropriate aForRange expn with the id
+	 */
+	Expression.CreateUniqueIdentifier(newid)
+
+	const lineNumber := tNode(forNode).lineNumber
+	const fileNumber := tNode(forNode).fileNumber
+
+	/* Start with the variable definition */
+	new tNode, x
+	const oldForNode := x
+	tNode(x) := tNode(forNode)
+	tNode(x).transformed := false
+
+	x := forNode
+	tNode(x).nodeKind := NodeKinds.OperatorNode
+	tNode(x).operatorNumber := aVar
+	tNode(x).leaf := nil(eNode)
+
+	/* make a node for the id */
+	new tNode, tNode(x).operand
+	x := tNode(x).operand
+	tNode(x).nodeKind := NodeKinds.ExpressionLeaf
+	tNode(x).operatorNumber := aIdent
+	tNode(x).fileNumber := fileNumber
+	tNode(x).lineNumber := lineNumber
+	tNode(x).operand := nil(tNode)
+	tNode(x).leaf := newid
+	tNode(x).transformed := true
+	tNode(x).lineNumber := 0
+
+	CreateNewType(tNode(x).sibling, tNode(tNode(t).operand).leaf)
+
+	/* now do the variable assignment */
+	new tNode, tNode(forNode).sibling
+	x := tNode(forNode).sibling
+	tNode(x).nodeKind := NodeKinds.OperatorNode
+	tNode(x).operatorNumber := aAssign
+	tNode(x).leaf := nil(eNode)
+	tNode(x).sibling := oldForNode
+	tNode(x).fileNumber := fileNumber
+	tNode(x).lineNumber := lineNumber
+	tNode(x).transformed := true
+
+	/* make a node for the id */
+	new tNode, tNode(x).operand
+	x := tNode(x).operand
+	tNode(x).nodeKind := NodeKinds.ExpressionLeaf
+	tNode(x).operatorNumber := aIdent
+	tNode(x).operand := nil(tNode)
+	tNode(x).leaf := newid
+	tNode(x).fileNumber := fileNumber
+	tNode(x).lineNumber := lineNumber
+	tNode(x).transformed := true
+
+	/* now put in the proper expression */
+	new tNode, tNode(x).sibling
+	x := tNode(x).sibling
+	tNode(x).nodeKind := NodeKinds.ExpressionLeaf
+	tNode(x).operatorNumber := 0
+	tNode(x).operand := nil(tNode)
+	tNode(x).sibling := nil(tNode)
+	tNode(x).fileNumber := fileNumber
+	tNode(x).lineNumber := lineNumber
+	tNode(x).transformed := true
+
+	tNode(x).leaf := tNode(tNode(tNode(t).operand).sibling).leaf
+	tNode(tNode(tNode(t).operand).sibling).leaf := newid
+    end ReplaceForExpressionIfNecessary
+
+
+    /*
+     *
+     */
+    body procedure IsFunctionResultVariableNecessary
+					% (fcnId : ExpressionPointer,
+					%  tp : TreePointer)
+	if tp = nil(tNode) or Types.HasAttribute(fcnId, aaNonScalar) then
+	    /* this has already been handled */
+	    return
+	end if
+
+	var register t := tp
+	var register needTemp := Types.HasAttribute(fcnId, aaMonitorEntry) or
+					tNode(t).operatorNumber = aHandler
+
+	if not needTemp then
+	    loop
+		exit when t = nil(tNode) or tNode(t).operatorNumber = aPost
+		t := tNode(t).sibling
+	    end loop
+	    if t not= nil(tNode) then
+		needTemp := true
+	    end if
+	end if
+	if needTemp then
+	    Types.EnterAttribute(fcnId, aaFcnResultNecessary)
+	end if
+    end IsFunctionResultVariableNecessary
+
+
+    body procedure MoveAllDeclarationsToTop % (tp : TreePointer)
+	var register t := tp
+	var register lastDecl := nil(tNode)
+	var register lastT := t
+
+	loop
+	    exit when t = nil(tNode)
+	    case tNode(t).operatorNumber of
+		label aType, aVar, aConst, aModule, aMonitor, aProcedure,
+			aFunction, aProcess, aBody, aBind, aChild, aHandler,
+			aStub, aNoOp, aPre, aPost, aChecked, aUnchecked:
+		    /* must move this node up in the scope */
+		    if t = tp or (lastDecl not= nil(tNode) and
+				  tNode(lastDecl).sibling = t) then
+			/* just advance declaration pointer! */
+			lastDecl := t
+			lastT := t
+			t := tNode(t).sibling
+		    elsif lastDecl = nil(tNode) then
+			/*
+			 * change first node to aNoOp
+			 * Put a copy of first node AFTER decl
+			 * This is to prevent moving the declaration
+			 */
+			var register newNode : TreePointer
+
+			new tNode, newNode
+			tNode(newNode) := tNode(tp)
+			tNode(tp).operatorNumber := aNoOp
+			tNode(tp).nodeKind := NodeKinds.SimpleLeaf
+			if lastT = tp then
+			    /* beginning of the scope */
+			    tNode(newNode).sibling := tNode(t).sibling
+			else
+			    tNode(lastT).sibling := tNode(t).sibling
+			end if
+			tNode(t).sibling := newNode
+			tNode(tp).sibling := t
+			lastDecl := t
+			lastT := t
+			t := tNode(t).sibling
+		    else
+			/* can just swap pointers around */
+			const temp := tNode(lastDecl).sibling
+			tNode(lastDecl).sibling := t
+			tNode(lastT).sibling := tNode(t).sibling
+			tNode(t).sibling := temp
+
+			/* remember where we are, and where we are going */
+			lastDecl := t
+			t := tNode(lastT).sibling
+		    end if
+		label :
+		    lastT := t
+		    t := tNode(t).sibling
+	    end case
+	end loop
+    end MoveAllDeclarationsToTop
+
+
+    body procedure PrefixAllDeclarations % (tp : TreePointer)
+	var register t := tp
+
+	loop
+	    exit when t = nil(tNode)
+	    case tNode(t).operatorNumber of
+		label aType, aConst, aVar:
+		    var register x := tNode(t).operand
+
+		    if tNode(x).operatorNumber = aPervasive then
+			x := tNode(x).sibling
+		    end if
+		    if tNode(x).operatorNumber = aRegister then
+			x := tNode(x).sibling
+		    end if
+		    if not Types.HasAttribute(tNode(x).leaf, aaExternal) then
+			Identifier.EnterName(
+			    eNode(tNode(x).leaf).u.referenceValue)
+		    end if
+
+		label :
+	    end case
+	    t := tNode(t).sibling
+	end loop
+    end PrefixAllDeclarations
+
+
+    /*
+     * Reset the type of the subprogram
+     */
+    body procedure ResetType % (t : TreePointer)
+	/* find the subprogram again */
+	var register tp := t
+	var register kind : int
+
+	loop
+	    kind := tNode(tp).operatorNumber
+	    exit when kind = aProcedure or kind = aFunction or kind = aProcess
+	    tp := tNode(tp).sibling
+	end loop
+	Types.SetType(tNode(tNode(tp).operand).leaf, tp)
+    end ResetType
+
+
+    /*
+     * Change e to e-1 to account for the difference
+     * in origin between T+ and C
+     */
+    body procedure OneToZeroOrigin % (ep : ExpressionPointer)
+	var register e : ExpressionPointer
+
+	new eNode, e
+	eNode(e).u := eNode(ep).u
+
+	tag eNode(ep).u, aSubtract
+	eNode(ep).u.operand := e
+
+	new eNode, eNode(e).sibling
+	e := eNode(e).sibling
+
+	eNode(e).sibling := nil(eNode)
+	tag eNode(e).u, aIntegerLit
+
+	eNode(e).u.integerValue := 1
+	eNode(e).u.integerKind := iInteger
+    end OneToZeroOrigin
+
+
+    body function SimpleType % (t : TreePointer) : boolean
+
+	/* if it is a named type, leave it alone */
+	if tNode(t).nodeKind = NodeKinds.ExpressionLeaf then
+	    result true
+	end if
+
+	case CTypes.TypeKind(t) of
+	    label tInt, tNat, tChar, tReal, tPointer, tBoolean,
+		  tAddressInt, tSubrange, tCondition,
+		  tPriorityCondition, tDeferredCondition,
+		  tTimeoutCondition, tMonitor, tMonitorVariable:
+		result true
+
+	    label tSet:
+		result not CTypes.NonScalar(t)
+
+	    label tFlexArray, tFlexCharString, tParameterArray,
+		  tParameterCharString, tParameterArrayParameterCharString,
+		  tParameterString, tParameterArrayParameterString:
+		/* handled specially */
+		result true
+
+	    label tString:
+		/* if this is simple string, then make it simple */
+		result tNode(t).nodeKind = NodeKinds.SimpleLeaf
+
+	    label :
+		result false
+	end case
+    end SimpleType
+
+
+    var nextUnionNumber : nat2 := 1
+
+
+    body procedure TransformRecordType % (st, t : TreePointer,
+				       % unionNumber, unionFieldNumber : nat2)
+	var register next, rtype : TreePointer
+
+	if tNode(t).operatorNumber = aPacked then
+	    next := tNode(tNode(t).operand).operand
+	else
+	    next := tNode(t).operand
+	end if
+	loop
+	    /* through all the elements */
+	    rtype := next
+	    /* find the record type */
+	    loop
+		if unionNumber not= 0 then
+		    Types.EnterUnionNumber(tNode(rtype).leaf,
+					   unionNumber, unionFieldNumber)
+		end if
+		if prefixRecordUnion then
+		    Identifier.EnterName(
+			eNode(tNode(rtype).leaf).u.referenceValue)
+		end if
+		rtype := tNode(rtype).sibling
+		exit when tNode(rtype).operatorNumber = aRecordElementType
+	    end loop
+	    if not SimpleType(tNode(rtype).operand) then
+		SimplifyType(st, tNode(rtype).operand)
+		/* reset the type for all the fields */
+		var register x := next
+		loop
+		    exit when x = rtype
+		    Types.SetType(tNode(x).leaf, tNode(rtype).operand)
+		    x := tNode(x).sibling
+		end loop
+	    end if
+	    /* force the proper indirection */
+	    const tKind := CTypes.TypeKind(tNode(rtype).operand)
+	    case tKind of
+		label tPointer, tProcedure, tFunction:
+		    var register x := next
+		    loop
+			exit when x = rtype
+			SetIndirection(tNode(x).leaf, tKind,
+			    tNode(rtype).operand)
+			x := tNode(x).sibling
+		    end loop
+		label :
+	    end case
+
+	    /* set up the array/string information */
+	    var register x := next
+	    loop
+		exit when x = rtype
+		Types.EnterTypeInfo(tNode(x).leaf)
+		x := tNode(x).sibling
+	    end loop
+
+	    next := tNode(rtype).sibling
+	    exit when next = nil(tNode)
+	end loop
+    end TransformRecordType
+
+
+    body procedure TransformArrayType % (st: TreePointer, var t : TreePointer)
+	var register tp := st
+
+	if tNode(tp).operatorNumber = aPacked then
+	    tp := tNode(tp).operand
+	end if
+	const tName := tNode(tNode(tp).operand).leaf
+
+	SimplifyType(st, t)
+	/* reset the type for the type name */
+	Types.SetType(tName, t)
+    end TransformArrayType
+
+
+    body procedure TransformUnionType % (st, t : TreePointer)
+	var register next := t
+	const unionNumber := nextUnionNumber
+
+	if tNode(next).operatorNumber = aPacked then
+	    next := tNode(tNode(next).operand).operand
+	else
+	    next := tNode(next).operand
+	end if
+	nextUnionNumber += 1
+	Types.SetType(tNode(next).leaf, tNode(next).sibling)
+	next := tNode(next).sibling
+	next := tNode(tNode(next).sibling).sibling
+	loop
+	    exit when next = nil(tNode)
+	    if tNode(next).operatorNumber = aUnionLabelBody then
+		const unionFieldNumber := nextUnionNumber
+		nextUnionNumber += 1
+		TransformRecordType(st, next, unionNumber, unionFieldNumber)
+	    end if
+	    next := tNode(next).sibling
+	end loop
+    end TransformUnionType
+
+
+    body procedure SimplifyType % (t : TreePointer, var tipe : TreePointer)
+	var register x : TreePointer
+	var newid : ExpressionPointer
+
+	if tNode(tipe).operatorNumber = aFunction then
+	    varTransformFunction(t, tipe, false)
+	    return
+	elsif tNode(tipe).operatorNumber = aProcedure then
+	    varTransformProcedure(t, tipe, true, false)
+	    return
+	end if
+
+	new tNode, x
+
+	/* contents of new node := contents of old node */
+	tNode(t).transformed := true
+	tNode(x) := tNode(t)
+
+	/* make the old node into the new type definition */
+	tNode(t).sibling := x
+	tNode(t).nodeKind := NodeKinds.OperatorNode
+	tNode(t).operatorNumber := aType
+	tNode(t).leaf := nil(eNode)
+
+	/* create the type id; link it into the old node's operand */
+	new tNode, tNode(t).operand
+	x := tNode(t).operand
+	tNode(x).nodeKind := NodeKinds.ExpressionLeaf
+	tNode(x).operatorNumber := aIdent
+	tNode(x).operand := nil(tNode)
+	tNode(x).transformed := true
+	tNode(x).lineNumber := 0
+
+	Expression.CreateUniqueIdentifier(newid)
+	Types.EnterAttribute(newid, aaTypeName)
+	tNode(x).leaf := newid
+
+	/* create the type node;  use the type definition from tipe */
+	assert tipe not= nil(tNode)
+	tNode(x).sibling := tipe
+	const origType := tipe
+
+	/* replace the old type defintion by a pointer to the new id */
+	new tNode, tipe
+	tNode(tipe) := tNode(tNode(t).operand)
+	tNode(tipe).sibling := nil(tNode)
+
+	/* do this recursively */
+	if tNode(origType).nodeKind = NodeKinds.OperatorNode then
+	    case CTypes.TypeKind(origType) of
+		label tArray:
+		    /* find the component type */
+		    if tNode(origType).operatorNumber = aPacked then
+			x := tNode(tNode(origType).operand).operand
+		    else
+			x := tNode(origType).operand
+		    end if
+		    loop
+			exit when tNode(tNode(x).sibling).sibling = nil(tNode)
+			x := tNode(x).sibling
+		    end loop
+		    SetIndirection(newid, CTypes.TypeKind(tNode(x).sibling),
+			tNode(x).sibling)
+		    Types.EnterAttribute(newid, aaResetIndirection)
+
+		    if not SimpleType(tNode(x).sibling) then
+			SimplifyType(t, tNode(x).sibling)
+		    end if
+
+		label tRecord:
+		    TransformRecordType(t, origType, 0, 0)
+
+		label tUnion:
+		    TransformUnionType(t, origType)
+
+		label :
+	    end case
+	end if
+
+	/* enter the new id in the type table */
+	Types.SetType(newid, origType)
+	Types.EnterTypeInfo(newid)
+    end SimplifyType
+
+
+    body procedure ResetVarType % (varNode, tipe : TreePointer)
+	/* reset the type for all the variables */
+	var register x := tNode(varNode).operand
+	var register t := tipe
+	var register nonScalar := false
+
+	if tNode(t).nodeKind = NodeKinds.ExpressionLeaf then
+	    t := Types.GetType(tNode(t).leaf)
+	end if
+	if tNode(t).operatorNumber = aFunction then
+	    if Types.HasAttribute(tNode(tNode(t).operand).leaf,
+				  aaNonScalar) then
+		nonScalar := true
+	    end if
+	end if
+
+	if tNode(x).operatorNumber = aRegister then
+	    x := tNode(x).sibling
+	end if
+	loop
+	    exit when tNode(x).operatorNumber = aType
+	    Types.SetType(tNode(x).leaf, tipe)
+	    if nonScalar then
+		Types.EnterAttribute(tNode(x).leaf, aaNonScalar)
+	    end if
+	    x := tNode(x).sibling
+	end loop
+    end ResetVarType
+
+
+    body procedure DeclareMonitorVariable % (tp, deviceMonitor : TreePointer,
+					  %  var monVar : ExpressionPointer,
+					  %  monName : ExpressionPointer)
+	var register t : TreePointer := tp
+
+	Expression.CreateUniqueIdentifier(monVar)
+	Types.SetType(monVar, predtree(pWithoutType, pMonitorVar))
+
+	/* create a node at TP for variable declaration */
+	new tNode, t
+	tNode(t) := tNode(tp)
+
+	tNode(tp).sibling := t
+	t := tp
+
+	tNode(t).nodeKind := NodeKinds.OperatorNode
+	tNode(t).operatorNumber := aVar
+	tNode(t).leaf := nil(eNode)
+	new tNode, tNode(t).operand
+
+	t := tNode(t).operand
+	tNode(t).nodeKind := NodeKinds.ExpressionLeaf
+	tNode(t).operatorNumber := 0
+	tNode(t).leaf := monVar
+	tNode(t).operand := nil(tNode)
+	tNode(t).sibling := predtree(pWithType, pMonitorVar)
+	tNode(t).transformed := true
+	tNode(t).lineNumber := 0
+
+	/* now initialize the monitor */
+	t := tp
+	const oldNode := tNode(t).sibling
+
+	new tNode, tNode(t).sibling
+	t := tNode(t).sibling
+	tNode(t).nodeKind := NodeKinds.ExpressionLeaf
+	tNode(t).operatorNumber := aCall
+	tNode(t).operand := nil(tNode)
+	tNode(t).sibling := oldNode
+	tNode(t).transformed := true
+	tNode(t).lineNumber := 0
+
+	var register e : ExpressionPointer
+	new eNode, tNode(t).leaf
+	e := tNode(t).leaf
+
+	tag eNode(e).u, aCall
+	eNode(e).sibling := nil(eNode)
+
+	new eNode, eNode(e).u.operand
+	e := eNode(e).u.operand
+	tag eNode(e).u, aPredefinedId
+	if deviceMonitor = nil(tNode) then
+	    eNode(e).u.funcOrProcNumber := pInitializeMonitor
+	else
+	    eNode(e).u.funcOrProcNumber := pInitializeDeviceMonitor
+	end if
+
+	/* aSubs */
+	new eNode, eNode(e).sibling
+	e := eNode(e).sibling
+	tag eNode(e).u, aSubs
+	eNode(e).sibling := nil(eNode)
+
+	/* name, monitorVariable [,monitor prio] */
+	Expression.Copy(monName, eNode(e).u.operand)
+	if deviceMonitor not= nil(tNode) then
+	    e := eNode(e).u.operand
+	    Expression.Copy(tNode(deviceMonitor).leaf, eNode(e).sibling)
+	end if
+    end DeclareMonitorVariable
+
+
+    procedure InsertCall(tp : TreePointer, predef : int)
+	var register t : TreePointer
+	var register e : ExpressionPointer
+
+	/* put the old node away */
+	new tNode, t
+	tNode(t) := tNode(tp)
+	tNode(tp).sibling := t
+	t := tp
+
+	tNode(t).operatorNumber := aCall
+	tNode(t).nodeKind := NodeKinds.ExpressionLeaf
+	tNode(t).operand := nil(tNode)
+	tNode(t).transformed := true
+
+	new eNode, tNode(t).leaf
+	e := tNode(t).leaf
+
+	tag eNode(e).u, aCall
+	eNode(e).sibling := nil(eNode)
+
+	new eNode, eNode(e).u.operand
+	e := eNode(e).u.operand
+
+	tag eNode(e).u, aPredefinedId
+	eNode(e).u.funcOrProcNumber := predef
+	eNode(e).sibling := nil(eNode)
+    end InsertCall
+
+
+    procedure MonitorEntry (tp : TreePointer, predef : int)
+	var register t : TreePointer
+	var register e : ExpressionPointer
+
+	/* put the old node away */
+	new tNode, t
+	tNode(t) := tNode(tp)
+	tNode(tp).sibling := t
+	t := tp
+
+	tNode(t).operatorNumber := aCall
+	tNode(t).nodeKind := NodeKinds.ExpressionLeaf
+	tNode(t).operand := nil(tNode)
+	tNode(t).transformed := true
+
+	new eNode, tNode(t).leaf
+	e := tNode(t).leaf
+
+	tag eNode(e).u, aCall
+	eNode(e).sibling := nil(eNode)
+
+	new eNode, eNode(e).u.operand
+	e := eNode(e).u.operand
+
+	tag eNode(e).u, aPredefinedId
+	eNode(e).u.funcOrProcNumber := predef
+
+	new eNode, eNode(e).sibling
+	e := eNode(e).sibling
+	tag eNode(e).u, aSubs
+	eNode(e).sibling := nil(eNode)
+
+	Expression.Copy(currentMonitorVariable, eNode(e).u.operand)
+    end MonitorEntry
+
+
+    body procedure MonitorEntryTimeSlice % (tp : TreePointer,
+				         % fcnName : ExpressionPointer)
+	if tp = nil(tNode) then
+	    return
+	end if
+	if timeSlice then
+	    InsertCall(tp, pRoutineTimeSlice)
+	end if
+	if Types.HasAttribute(fcnName, aaMonitorEntry) then
+	    if Types.HasAttribute(fcnName, aaDeviceMonitorEntry) then
+		MonitorEntry(tp, pEnterDeviceMonitor)
+	    else
+		MonitorEntry(tp, pEnterMonitor)
+	    end if
+	elsif Types.HasAttribute(fcnName, aaInterruptProcedure) then
+	    var register t : TreePointer
+	    var register e : ExpressionPointer
+
+	    /* put the old node away */
+	    new tNode, t
+	    tNode(t) := tNode(tp)
+	    tNode(tp).sibling := t
+	    t := tp
+
+	    tNode(t).operatorNumber := aCall
+	    tNode(t).nodeKind := NodeKinds.ExpressionLeaf
+	    tNode(t).operand := nil(tNode)
+	    tNode(t).transformed := true
+
+	    new eNode, tNode(t).leaf
+	    e := tNode(t).leaf
+
+	    tag eNode(e).u, aCall
+	    eNode(e).sibling := nil(eNode)
+
+	    new eNode, eNode(e).u.operand
+	    e := eNode(e).u.operand
+
+	    tag eNode(e).u, aPredefinedId
+	    eNode(e).u.funcOrProcNumber := pInterruptProcedureEnter
+
+	    new eNode, eNode(e).sibling
+	    e := eNode(e).sibling
+	    tag eNode(e).u, aSubs
+	    eNode(e).sibling := nil(eNode)
+
+	    Expression.Copy(currentMonitorVariable, eNode(e).u.operand)
+	end if
+    end MonitorEntryTimeSlice
+
+end Utility

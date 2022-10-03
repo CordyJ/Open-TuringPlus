@@ -1,0 +1,157 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+% 
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+% 
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+/*
+ *    Turing Plus to C Translator
+ *    Module:Token: Token input & output.
+ *    By:    Mark Mendell
+ *    Date:  28 Oct 1986
+ *    From:
+ *
+ *	Turing Source Level Global Optimizer
+ *	Module:Token: Token input & output.
+ *	By:    Peter Ashwood-Smith
+ *	Date:  May 1986.
+ */
+
+body "token.st" module Token
+
+/*
+ * Procedure to pick up a string from input 'stream' of length 'len'
+ * the string is read as a sequence of integer byte values. The string
+ * is collected in 'target' which is returned.
+ */
+    procedure ReadInputString(stream, len :int, var target : TokenString)
+       if len > MaxStringTokenSize then
+	   Error(inputStringTooBig, nil(tNode), fatalError)
+       end if
+       read :stream, target : len
+    end ReadInputString
+
+/*
+ * Procedure to pluck an entire input token from 'stream' and to return 
+ * it in the var 't'. Depending on the type of the token, we pick up some
+ * other stuff and put it in the auxiliary fields in the TokenType record.
+ */
+    body procedure In % (var t : TokenType, stream : int)
+	if t.tokenKind not= aEndOfFile then
+	   var tok : nat1
+	   loop
+	       read : stream, tok
+	       t.tokenKind := tok
+	       exit when t.tokenKind not= aNewLine and t.tokenKind not= aNewFile
+	       case t.tokenKind of
+		  label aNewLine:
+			var n2 : nat2
+			read : stream, n2
+			currentLineNumber := n2
+
+		  label aNewFile:
+			var n2 : nat2
+			read :stream, n2
+			var tstring : TokenString
+			ReadInputString(stream,n2,tstring)
+			LineInfo.SetFileNumber(tstring, n2)
+	       end case
+	   end loop
+
+	   var n2 : nat2
+	   var i2 : int2
+	   var n1 : nat1
+	   case t.tokenKind of
+		label aPredefinedId:
+		      read :stream, i2
+		      t.ident := i2
+		      read :stream, n2
+		      t.predefinedIdent := n2
+
+		label aStringLit, aCharLit, aIdentText, aRealLit:
+		      read :stream, n2
+		      t.stringLen := n2
+		      ReadInputString(stream,t.stringLen,t.stringText)
+
+		label aIdent, aRoutineIndex :
+		      read :stream, n2
+		      t.ident := n2
+
+		label aIntegerLit :
+		      read :stream, n1
+		      t.intKind := n1
+		      read :stream, t.intValue
+
+		label aDataDescriptor:
+		      assert false	% can't handle this
+
+		label aEndSubstring :
+		      read :stream, n2
+		      t.intValue := n2
+
+		label :
+	    end case
+	 else
+	    t.tokenKind := aEndOfFile
+	 end if
+    end In
+
+/*
+ * Function to return the turing constant name associated with input 
+ * token 'n'. 
+ */
+    body function TokenToString % (n : int) : string
+#if DEBUG then
+	handler (quitCode)
+	    if quitCode = excpSIGINT then
+		quit >
+	    else
+		result "invalid token number = " + intstr(n)
+	    end if
+	end handler
+#end if
+	include "citoks.in"	 
+	result tokenNames(n)
+    end TokenToString
+
+
+/*
+ * Procedure to Dump a token to one line on the output stream 'stream'
+ * this is used for tracing info and for debugging of parse tree builder.
+ */
+    body proc Dump % (t : TokenType, stream: int)
+       var s := TokenToString(t.tokenKind)
+       case t.tokenKind of
+	    label aPredefinedId:
+		  put :stream,s," ", t.ident," ", t.predefinedIdent
+
+	    label aStringLit, aCharLit, aIdentText, aRealLit:
+		  put :stream,s," ", t.stringText(1..t.stringLen)
+
+	    label aIdent:
+		  put :stream,s," ", t.ident
+
+	    label aRoutineIndex, aEndSubstring :
+		  put :stream,s," ", t.intValue
+
+	    label aIntegerLit:
+		  put :stream,s," ", t.intValue, " (", t.intKind, ")"
+
+	    label :
+		  put :stream, s
+       end case
+    end Dump
+
+end Token

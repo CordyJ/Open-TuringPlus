@@ -1,0 +1,85 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+%
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+%
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+const *fatalError := true
+const *nonFatalError := false
+
+/*
+ * Error Codes from the Expression Module
+ */
+const *expressionStackOverflow        := 1       
+const *expressionStackUnderflow       := 2 
+const *expressionStackInvalidTop      := 3 
+const *expressionBadCallSequence      := 4 
+const *expressionBadoperatorNumber    := 5 
+const *expressionEndOpBadKidCount     := 6 
+const *expressionEndOpBadOpNumber     := 7 
+const *expressionBadFirstOperand      := 8 
+const *expressionBadNextOperand       := 9 
+const *expressionBadLabelOperand      := 10
+const *expressionBadNode2TokenOperand := 11
+const *expressionBadIsLeafOperand     := 12
+const *expressionBadNewOp             := 13
+const *expressionGetSetIntBadOperand  := 14
+const *expressionOverlayBadOperand    := 15
+const *expressionGetSetIdBadOperand   := 16
+
+/*
+ * Error Codes from the Token module
+ */
+const *cannotConvertTokenToString  := 20
+const *outputStringTooBig          := 21
+const *inputStringTooBig           := 22
+
+/*
+ * Error Codes from the Transform module
+ */
+const *eSelfReferentialCollection := 25
+const *eTooManyDynamicArrays	  := 26
+
+/*
+ * Error Codes from the Tree module
+ */
+const *treeStackOverflow	:= 31
+const *treeStackUnderflow	:= 32
+const *treeStackInvalidTop	:= 33
+const *treeBadCallSequence	:= 34
+const *treeBadoperatorNumber	:= 35
+const *treeBadFirstOperand	:= 36
+const *treeBadNextOperand	:= 37
+const *treeBadLabelOperand	:= 38
+const *treeBadExprLeafOperand	:= 39
+const *treeBadIsLeafOperand	:= 40
+const *treeBadIsExprOperand	:= 41
+const *treeBadWritesOperand	:= 42
+
+/*
+ * Error codes from CType module
+ */
+const *eInvalidStorageSize	    := 45
+const *eRealStorageSizeNotSupported := 46
+
+/*
+ * Error codes from the Output module
+ */
+const *eUnionInit		:= 47
+
+/*
+ * Error codes from the Types module
+ */
+const *eTypesIdStackOverflow	:= 48

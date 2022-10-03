@@ -1,0 +1,1662 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+% 
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+% 
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+/*
+ *  Turing Plus to C Translator
+ *  Module:Transform T+ trees to a form that C likes
+ *  By:    Mark Mendell
+ *  Date:  11 Nov 1986
+ */
+body "transform.st" module Transform
+    grant BitMask, SetIndirection, var flexStack, var flexTop,
+	  var TransExpn, OneToZeroOrigin, CreateBeginBlock, SimpleExpression,
+	  SimpleType, SimplifyType, NewFlexScope,
+	  PopFlexScope, ResetVarType, TransformArrayType, PossibleDynamicVar,
+	  var TransformAssignment, TransformRecordType, TransformUnionType,
+	  varTransformFunction, varTransformProcedure, currentMonitorVariable,
+	  ExpnTypeTree
+
+    /* data structure to remember dynamic arrays for deallocation */
+    var flexStack : array 1 .. maxFlexDepth of ExpressionPointer
+
+    var flexTop: 0 .. maxFlexDepth := 0
+
+    const *fsBegin :=		0
+    const *fsLoop :=		1
+    const *fsRoutine := 	2
+
+    var flexScopeStack: array 1 .. maxFlexDepth of
+	packed record
+	    start : 0 .. maxFlexDepth
+	    scope : fsBegin..fsRoutine
+	end record
+
+    var flexScopeTop  : 0 .. maxFlexDepth := 0
+
+    var functionResultSymbol : ExpressionPointer := nil(eNode)
+    var alternateFunctionResultSymbol : ExpressionPointer := nil(eNode)
+
+    var originalChildIsOrphan := false
+
+    var currentMonitorVariable := nil(eNode)
+
+
+    procedure NewFlexScope(fs : fsBegin..fsRoutine)
+	flexScopeTop += 1
+	flexScopeStack(flexScopeTop).start := flexTop
+	flexScopeStack(flexScopeTop).scope := fs
+    end NewFlexScope
+
+
+    procedure PopFlexScope
+	flexTop := flexScopeStack(flexScopeTop).start
+	flexScopeTop -= 1
+    end PopFlexScope
+
+
+    procedure DeallocateFlexScope( var firstDealloc,
+				       lastDealloc : TreePointer,
+						fs : fsBegin..fsRoutine)
+	var register t : TreePointer
+	firstDealloc := nil(tNode)
+	lastDealloc := nil(tNode)
+
+	/* find the scope that fits */
+	var bottom : int
+	for decreasing i : flexScopeTop .. 1
+	    if flexScopeStack(i).scope = fs then
+		bottom := i
+		exit
+	    end if
+	end for
+
+	if flexTop > flexScopeStack(bottom).start then
+	    /* there is something to deallocate */
+
+	    for decreasing i : flexTop .. flexScopeStack(bottom).start + 1
+		/* create a predefined call to pDeallocate */
+		if firstDealloc = nil(tNode) then
+		    /* this is a new chain */
+		    new tNode, firstDealloc
+		    t := firstDealloc
+		else
+		    new tNode, tNode(t).sibling
+		    t := tNode(t).sibling
+		end if
+		lastDealloc := t
+
+		/* set up this node */
+		tNode(t).nodeKind := NodeKinds.ExpressionLeaf
+		tNode(t).transformed := true
+		tNode(t).operatorNumber := aCall
+		tNode(t).operand := nil(tNode)
+		tNode(t).sibling := nil(tNode)
+		tNode(t).lineNumber := 0
+
+		var register e : ExpressionPointer
+		new eNode, tNode(t).leaf
+		e := tNode(t).leaf
+		tag eNode(e).u, aCall
+		eNode(e).sibling := nil(eNode)
+
+		new eNode, eNode(e).u.operand
+		e := eNode(e).u.operand
+		tag eNode(e).u, aPredefinedId
+		eNode(e).u.funcOrProcNumber := pDeallocate
+
+		/* aSubs */
+		new eNode, eNode(e).sibling
+		e := eNode(e).sibling
+		tag eNode(e).u, aSubs
+		eNode(e).sibling := nil(eNode)
+
+		/* flex name */
+		eNode(e).u.operand := flexStack(i)
+	    end for
+	end if
+    end DeallocateFlexScope
+
+
+    function BitMask (a, b : int) : nat4
+	type LongSet : set of 0..31
+	var register t := LongSet()
+
+	for i : max(0,a) .. min (b, 31)
+	    t += LongSet(i)
+	end for
+	result #t
+    end BitMask
+
+
+    body procedure SetIndirection % (id : ExpressionPointer, tKind : TypeKinds,
+				  % tipe : TreePointer)
+#if DEBUG then
+	handler (quitCode)
+	    if quitCode not= excpSIGINT then
+		put :0, "SetIndirection Abort"
+		Expression.Dump(id,0,0)
+		Tree.Dump(tipe,0,0)
+	    end if
+	    quit >
+	end handler
+#end if
+	case tKind of
+	    label tProcedure:
+		Types.IncreaseIndirection(id, inSubprogram)
+		Types.EnterAttribute(id, aaResetIndirection)
+		Types.EnterAttribute(id, aaSubprogramVariable)
+
+	    label tFunction:
+		Types.IncreaseIndirection(id, inSubprogram)
+		Types.EnterAttribute(id, aaResetIndirection)
+		Types.EnterAttribute(id, aaSubprogramVariable)
+
+		/* do this recursively on the function result type */
+		var register x : TreePointer := tipe
+
+		if tNode(x).operatorNumber = aType then
+		    x := tNode(x).operand
+		end if
+		if tNode(x).operatorNumber = aFunction then
+		    x := tNode(x).operand
+		else
+		    assert tNode(x).nodeKind = NodeKinds.ExpressionLeaf
+		    x := tNode(Types.GetType(tNode(x).leaf)).operand
+		end if
+		loop
+		    exit when tNode(x).operatorNumber = aType
+		    x := tNode(x).sibling
+		end loop
+		x := tNode(x).operand
+		if not (tNode(x).nodeKind = NodeKinds.ExpressionLeaf and
+			eNode(tNode(x).leaf).u.operatorNumber = aIdent) then
+		    /* this is not a named type */
+		    SetIndirection(id, CTypes.TypeKind(x), x)
+		end if
+
+	    label tPointer:
+		var register x := tipe
+
+		Types.IncreaseIndirection(id, inPointer)
+		Types.EnterAttribute(id, aaResetIndirection)
+
+		if tNode(x).operatorNumber = aType then
+		    x := tNode(x).operand
+		end if
+		if tNode(x).nodeKind = NodeKinds.ExpressionLeaf then
+		    x := Types.GetType(tNode(x).leaf)
+		    x := Types.GetType(tNode(tNode(x).operand).leaf)
+		else
+		    x := Types.GetType(tNode(tNode(x).operand).leaf)
+		end if
+		if tNode(x).operatorNumber = aPointer then
+		    x := Types.GetType(tNode(tNode(x).operand).leaf)
+		end if
+		assert tNode(x).operatorNumber = aCollection
+		x := tNode(x).operand
+		if tNode(x).operatorNumber = aForward then
+		    x := tNode(x).operand
+		end if
+		SetIndirection(id, CTypes.TypeKind(x), x)
+
+	    label :
+	end case
+    end SetIndirection
+
+
+    /*
+     * make tp into a begin block, with newNode as the first node,
+     * and the contents of tp as the next node
+     */
+    procedure CreateBeginBlock(tp : TreePointer, var newNode : TreePointer)
+	var register t, t2 : TreePointer
+
+	/* copy the old node */
+	t2 := tp
+	new tNode, t
+	tNode(t) := tNode(t2)
+	tNode(t).sibling := nil(tNode)
+
+	tNode(t2).operatorNumber := aBegin
+	tNode(t2).transformed := true
+	tNode(t2).nodeKind := NodeKinds.OperatorNode
+	tNode(t2).leaf := nil(eNode)
+
+	/* create the new node */
+	new tNode, tNode(t2).operand
+	t2 := tNode(t2).operand
+	newNode := t2
+	tNode(t2).lineNumber := tNode(t).lineNumber
+	tNode(t2).fileNumber := tNode(t).fileNumber
+	tNode(t2).transformed := false
+
+	tNode(t2).sibling := t
+    end CreateBeginBlock
+
+
+    /* These are used to move more code into child modules */
+    var varTransformFunction :
+	procedure TransformFunction (tp, t : TreePointer,
+				     realSubprogram : boolean)
+
+    var varTransformProcedure :
+	procedure TransformProcedure (tp, t: TreePointer,
+				      resetType, realSubprogram : boolean)
+
+
+    /* Transform Utility module */
+    child "transutil.st"
+
+    /* Transform Parameters module */
+    child "transparam.st"
+
+
+    /* Transform Expression module */
+    child "transexpn.st"
+
+
+    /* Transform Assigment Statement module */
+    child "transassign.st"
+
+    /* More Utility Routines */
+    child "transutil2.st"
+
+
+    forward procedure IterateSubScope (register subscope : TreePointer,
+				       deallocateFlexArrays : boolean)
+    import IterateSubScope, var tNode, TransformAsm,
+	   var TransformAssignment, var Tree,
+	   forward TransformCase, TransformCollection,
+	   forward TransformFor, TransformFork,
+	   forward TransformFunction, forward TransformModuleMonitor,
+	   forward TransformIf, TransformInit, TransformIo,
+	   forward TransformResult, forward TransformProcedure, TransformQuit,
+	   TransformTag, TransformType, TransformVar, forward TransformStub,
+	   forward TransformProcess, forward TransformExitWhen,
+	   MoveAllDeclarationsToTop, TransformGrant,
+	   var TransExpn, TransformConst, eNode,
+	   NewFlexScope, DeallocateFlexScope, PopFlexScope, strings,
+	   var Identifier, TransformExternal, TransformForward,
+	   forward TransformBody, forward TransformChild, TransformBind,
+	   var unChecked, originalUnChecked, TransformConditionVar
+
+
+    forward procedure TransformCase (tp : TreePointer)
+	import var TransExpn, IterateSubScope, tNode, eNode
+
+
+    forward procedure TransformResult (tp : TreePointer)
+	import var TransExpn, var tNode, var TransformAssignment,
+		eNode, functionResultSymbol, CreateBeginBlock,
+		alternateFunctionResultSymbol
+
+
+    forward procedure TransformFor (tp : TreePointer)
+	import var TransExpn, IterateSubScope, var tNode, var Types,
+	       CreateNewType, eNode, ManifestExpression,
+	       ReplaceForExpressionIfNecessary, CreateBeginBlock
+
+
+    forward procedure TransformIf (t : TreePointer)
+	import var TransExpn, IterateSubScope, tNode, var TransformParameters,
+	       eNode
+
+
+    forward procedure TransformExitWhen (t : TreePointer)
+	import var TransExpn, var tNode, eNode, DeallocateFlexScope
+
+
+    forward procedure TransformFunction (parentt, t : TreePointer,
+					 realSubprogram : boolean)
+	import var TransExpn, IterateSubScope, var tNode,
+	       var TransformParameters, var Types,
+	       var eNode, var Expression,
+	       var Identifier, ResetType, var functionResultSymbol,
+	       var CTypes, strings, SimpleType, SetIndirection,
+	       IsFunctionResultVariableNecessary,
+	       var alternateFunctionResultSymbol, SimplifyType,
+	       MonitorEntryTimeSlice, TransformProcedure,
+	       TransformFunction
+
+
+    forward procedure TransformModuleMonitor (t : TreePointer)
+	import IterateSubScope, var tNode,
+	       var Identifier, var eNode, TransformGrant, var Expression,
+	       PrefixAllDeclarations, DeclareMonitorVariable,
+	       var Types, var currentMonitorVariable
+
+
+    forward procedure TransformProcedure (parentt, t : TreePointer,
+					  resetType, realSubprogram : boolean)
+	import var TransExpn, IterateSubScope, var tNode,
+	       var TransformParameters, var Types,
+	       var Identifier, var eNode, ResetType, strings,
+	       MonitorEntryTimeSlice, var Expression
+
+
+    forward procedure TransformProcess (t : TreePointer)
+	import var TransExpn, IterateSubScope, tNode, var TransformParameters,
+	       var Identifier, eNode, ResetType, var Types,
+	       MonitorEntryTimeSlice
+
+
+    forward procedure TransformStubModuleMonitor (childt, t : TreePointer,
+					      isCompilation, popName: boolean)
+	import var tNode, var Identifier, var eNode,
+	       var Expression, TransformFunction, TransformProcedure,
+	       TransformExternal, var Types, var Tree, TransformModuleMonitor,
+	       TransformType, TransformChild, TransformVar
+
+
+    forward procedure TransformStubSubprogram (t, tp : TreePointer,
+					       isCompilation: boolean)
+	import var tNode, var Expression, TransformFunction,
+	       TransformProcedure, var Types, var Tree, eNode,
+	       var functionResultSymbol, var alternateFunctionResultSymbol,
+	       NewFlexScope, PopFlexScope, IterateSubScope,
+	       MonitorEntryTimeSlice, var Identifier, SetIndirection,
+	       IsFunctionResultVariableNecessary, var CTypes
+
+
+    forward procedure TransformStub (t : TreePointer)
+	import TransformStubModuleMonitor, TransformStubSubprogram,
+	       tNode, TransformType
+
+
+    forward procedure TransformChild (t : TreePointer)
+	import var tNode, TransformStubModuleMonitor, var eNode,
+	       TransformProcedure, TransformFunction, TransformStubSubprogram,
+	       originalChildIsOrphan, TransformType, var Identifier,
+	       TransformModuleMonitor
+
+
+    procedure TransformBody (t : TreePointer)
+	var register tp := tNode(t).operand
+
+	NewFlexScope(fsRoutine)
+	case tNode(tp).operatorNumber of
+	    label aProcedure:
+		TransformProcedure(t, tp, false, true)
+
+	    label aFunction:
+		tp := tNode(tp).operand
+		const register fcnName := tNode(tp).leaf
+		var register x := Types.GetType(fcnName)
+
+		x := tNode(tNode(x).operand).sibling
+		if tNode(x).operatorNumber = aSubs then
+		    x := tNode(x).sibling
+		end if
+		IsFunctionResultVariableNecessary(fcnName, tNode(tp).sibling)
+		if Types.HasAttribute(fcnName, aaNonScalar) then
+		    functionResultSymbol := tNode(x).leaf
+		elsif Types.HasAttribute(fcnName, aaFcnResultNecessary) then
+		    const register tipe := tNode(x).sibling
+		    const resultKind := CTypes.TypeKind(tNode(tipe).operand)
+
+		    alternateFunctionResultSymbol := tNode(x).leaf
+		    /* set the proper indirection! */
+		    if not (resultKind = tFunction or
+			    resultKind = tProcedure) then
+			SetIndirection(alternateFunctionResultSymbol,
+			    CTypes.TypeKind(tipe), tipe)
+		    end if
+		end if
+		MonitorEntryTimeSlice(tNode(tp).sibling, fcnName)
+		IterateSubScope(tNode(tp).sibling, true)
+		functionResultSymbol := nil(eNode)
+		alternateFunctionResultSymbol := nil(eNode)
+
+	    label aModule, aMonitor:
+		TransformModuleMonitor (tp)
+	end case
+	PopFlexScope
+    end TransformBody
+
+
+    body procedure TransformStubSubprogram % (t, tp : TreePointer,
+					   %  isCompilation: boolean)
+	var register subprogNode := tp
+	const register fcnName := tNode(tNode(tp).operand).leaf
+
+	NewFlexScope(fsRoutine)
+	if tNode(tp).operatorNumber = aProcedure then
+	    TransformProcedure(t, tp, true, true)
+	else
+	    assert tNode(tp).operatorNumber = aFunction
+	    TransformFunction(t, tp, true)
+	end if
+	Types.EnterAttribute(fcnName, aaDontTouchName)
+
+	if isCompilation and tNode(subprogNode).sibling not= nil(tNode) then
+	    /* the transformations may have added aType nodes */
+	    loop
+		exit when tNode(subprogNode).operatorNumber not= aType
+		subprogNode := tNode(subprogNode).sibling
+	    end loop
+
+	    Types.EnterAttribute(fcnName, aaGrant)
+	    const register ttp := tNode(subprogNode).sibling
+
+	    assert tNode(ttp).operatorNumber = aIs
+	    var register x := Types.GetType(fcnName)
+
+	    x := tNode(tNode(x).operand).sibling
+	    if x not= nil(tNode) and tNode(x).operatorNumber = aSubs then
+		x := tNode(x).sibling
+	    end if
+	    if tNode(tp).operatorNumber = aFunction then
+		IsFunctionResultVariableNecessary(fcnName, tNode(ttp).operand)
+	    end if
+	    if Types.HasAttribute(fcnName, aaNonScalar) then
+		functionResultSymbol := tNode(x).leaf
+	    elsif Types.HasAttribute(fcnName, aaFcnResultNecessary) then
+		const register tipe := tNode(x).sibling
+		const resultKind := CTypes.TypeKind(tNode(tipe).operand)
+
+		alternateFunctionResultSymbol := tNode(x).leaf
+		/* set the proper indirection! */
+		if not (resultKind = tFunction or resultKind = tProcedure) then
+		    SetIndirection(alternateFunctionResultSymbol,
+			CTypes.TypeKind(tipe), tipe)
+		end if
+	    end if
+	    MonitorEntryTimeSlice(tNode(ttp).operand, fcnName)
+	    IterateSubScope(tNode(ttp).operand, true)
+	    functionResultSymbol := nil(eNode)
+	    alternateFunctionResultSymbol := nil(eNode)
+	else
+	    /* make it an external subprogram */
+	    Types.EnterAttribute(fcnName, aaExternal)
+	end if
+	PopFlexScope
+    end TransformStubSubprogram
+
+
+    body procedure TransformChild % (t : TreePointer)
+	var register tp := tNode(t).operand
+	var isCompilation := false
+	var hasParent := false
+
+	loop
+	    exit when tNode(tp).operatorNumber not= aParent
+	    hasParent := true
+	    tp := tNode(tp).operand
+	end loop
+
+	var boundary := false
+
+	if not hasParent then
+	    if tNode(tp).operatorNumber = aCompile then
+		if originalChildIsOrphan then
+		    Identifier.PushBoundary
+		    boundary := true
+		end if
+	    elsif tNode(tp).operatorNumber = aStub then
+		Identifier.PushBoundary
+		boundary := true
+	    end if
+	end if
+
+	if tNode(tp).operatorNumber = aCompile then
+	    tp := tNode(tp).operand
+	    isCompilation := true
+	end if
+	if tNode(tp).operatorNumber = aMissingStub then
+	    if isCompilation and tNode(tp).operand not= nil(tNode) then
+		tp := tNode(tNode(tp).operand).sibling
+		assert tNode(tp).operatorNumber = aBody
+		TransformModuleMonitor(tNode(tp).operand)
+	    else
+		/* change child to a call to the module */
+		tNode(t).nodeKind := NodeKinds.ExpressionLeaf
+		tNode(t).operatorNumber := aCall
+		tNode(t).transformed := true
+
+		/* create the module name expn */
+		new eNode, tNode(t).leaf
+		var register newE := tNode(t).leaf
+		tag eNode(newE).u, aCall
+		eNode(newE).sibling := nil(eNode)
+		eNode(newE).u.operand := tNode(tNode(tp).operand).leaf
+		if boundary then
+		    Identifier.PopName
+		end if
+	    end if
+	else
+	    assert tNode(tp).operatorNumber = aStub
+	    tp := tNode(tp).operand
+
+	    loop
+		exit when tNode(tp).operatorNumber not= aType
+		TransformType(tp)
+		tp := tNode(tp).sibling
+	    end loop
+	    if tNode(tp).operatorNumber = aModule or
+		    tNode(tp).operatorNumber = aMonitor then
+		TransformStubModuleMonitor(t, tp, isCompilation, boundary)
+	    else
+		TransformStubSubprogram (t, tp, isCompilation)
+		if boundary then
+		    Identifier.PopName
+		end if
+	    end if
+	end if
+    end TransformChild
+
+
+    /*
+     * aFunction EXPN [ aSubs PARAMETERLIST] EXPN type body
+     */
+    body procedure TransformFunction % (parentt, t : TreePointer,
+				     %  realSubprogram : boolean)
+	var register tp := tNode(t).operand
+	const fcnName := tNode(tp).leaf
+
+	/* tranform the name */
+	if tNode(tp).sibling not= nil(tNode) and
+		tNode(tNode(tp).sibling).operatorNumber = aExternalAddress then
+	    const extName := tNode(tNode(tNode(tp).sibling).operand).leaf
+	    Identifier.OverrideIdentText(eNode(fcnName).u.referenceValue,
+		 strings(eNode(extName).u.stringValue),
+		 eNode(extName).u.stringLen)
+	    /* remove the aExternalAddress token */
+	    tNode(tp).sibling := tNode(tNode(tp).sibling).sibling
+	    Types.EnterAttribute(fcnName, aaDontTouchName)
+	elsif not Types.HasAttribute(fcnName, aaDontTouchName) then
+	    Identifier.EnterName(eNode(fcnName).u.referenceValue)
+	end if
+
+	if realSubprogram then
+	    Types.EnterAttribute(fcnName, aaRealSubprogram)
+	end if
+
+	tp := tNode(tp).sibling
+
+	if tp not= nil(tNode) and tNode(tp).operatorNumber = aSubs then
+	    TransformParameters.TransformParameters(parentt, tp)
+	    tp := tNode(tp).sibling
+	end if
+
+	const tipe := tNode(tp).sibling
+
+	if not SimpleType(tNode(tipe).operand)
+		or CTypes.NonScalar(tNode(tipe).operand) then
+	    /* must add an extra parameter */
+
+	    /* remember that we have done this */
+	    Types.EnterAttribute(fcnName, aaNonScalar)
+
+	    var newid : ExpressionPointer
+	    Expression.CreateUniqueIdentifier(newid)
+
+	    if not SimpleType(tNode(tipe).operand) then
+		/* create a new, simpler type */
+		var register x : TreePointer
+
+		new tNode, x
+
+		/* contents of new node := contents of old node */
+		tNode(t).transformed := true
+		tNode(x) := tNode(t)
+
+		/* make the old node into the new type definition */
+		tNode(t).sibling := x
+		tNode(t).nodeKind := NodeKinds.OperatorNode
+		tNode(t).operatorNumber := aType
+		tNode(t).leaf := nil(eNode)
+
+		/* create the type id; link it into the old node's operand */
+		new tNode, tNode(t).operand
+		x := tNode(t).operand
+		tNode(x).nodeKind := NodeKinds.ExpressionLeaf
+		tNode(x).operatorNumber := aIdent
+		tNode(x).leaf := newid
+		tNode(x).transformed := true
+		tNode(x).lineNumber := 0
+
+		/* create the type node;  use the type definition from tipe */
+		assert tNode(tipe).operand not= nil(tNode)
+		tNode(x).sibling := tNode(tipe).operand
+
+		/* enter the new id in the type table */
+		Types.EnterAttribute(newid, aaTypeName)
+		Types.SetType(newid, tNode(tipe).operand)
+
+		/* replace the old type defintion by a pointer to the new id */
+		new tNode, tNode(tipe).operand
+		tNode(tNode(tipe).operand) := tNode(tNode(t).operand)
+		tNode(tNode(tipe).operand).sibling := nil(tNode)
+		tNode(tNode(tipe).operand).transformed := false
+		tNode(tNode(tipe).operand).lineNumber := 0
+	    else
+		/* enter the new id in the type table */
+		Types.SetType(newid, tNode(tipe).operand)
+	    end if
+
+	    /* tp points to the result id;  add it to the parameter list */
+	    Types.SetType(tNode(tp).leaf, tipe)
+	    Types.EnterTypeInfo(tNode(tp).leaf)
+	    TransformParameters.AddFunctionResultToParameterList(t,
+		tNode(tp).leaf)
+	    functionResultSymbol := tNode(tp).leaf
+	end if
+
+	const resultKind := CTypes.TypeKind(tNode(tipe).operand)
+
+	if tNode(tNode(tipe).operand).operatorNumber = aProcedure or
+		tNode(tNode(tipe).operand).operatorNumber = aFunction then
+	    SimplifyType(parentt, tNode(tipe).operand)
+	    if resultKind = tFunction then
+		TransformFunction(parentt,
+		    tNode(tNode(parentt).operand).sibling, false)
+	    else
+		TransformProcedure(parentt,
+		    tNode(tNode(parentt).operand).sibling, true, false)
+	    end if
+	    SetIndirection(tNode(tNode(tipe).operand).leaf, resultKind, tipe)
+	elsif resultKind = tFunction or resultKind = tProcedure then
+	    SimplifyType(parentt, tNode(tipe).operand)
+	    SetIndirection(tNode(tNode(tipe).operand).leaf, resultKind, tipe)
+	end if
+
+	/* might be a recursive call in the implementation */
+	ResetType(t)
+
+	/* Enter the result type as the result id's type */
+	const resultId := tNode(tp).leaf
+	Types.SetType(resultId, tipe)
+	Types.EnterTypeInfo(tNode(tp).leaf)
+
+	/* get the correct indirection for the function */
+	if not (resultKind = tFunction or resultKind = tProcedure) then
+	    SetIndirection(fcnName, CTypes.TypeKind(tipe), tipe)
+	end if
+
+	/* skip over function result */
+	tp := tNode(tp).sibling
+
+	/* transform the body */
+	IsFunctionResultVariableNecessary(fcnName, tNode(tp).sibling)
+	if Types.HasAttribute(fcnName, aaFcnResultNecessary) then
+	    alternateFunctionResultSymbol := resultId
+	    /* set the proper indirection! */
+	    if not (resultKind = tFunction or resultKind = tProcedure) then
+		SetIndirection(resultId, CTypes.TypeKind(tipe), tipe)
+	    end if
+	end if
+	MonitorEntryTimeSlice(tNode(tp).sibling, fcnName)
+	IterateSubScope(tNode(tp).sibling, true)
+	ResetType(t)
+	functionResultSymbol := nil(eNode)
+	alternateFunctionResultSymbol := nil(eNode)
+    end TransformFunction
+
+
+    /*
+     * aProcedure EXPN [ aSubs PARAMETERLIST] body
+     */
+    body procedure TransformProcedure % (parentt, t : TreePointer,
+				      %  resetType, realSubprogram : boolean)
+	var register tp := tNode(t).operand
+	const procName := tNode(tp).leaf
+
+	/* tranform the name */
+	if tNode(tp).sibling not= nil(tNode) and
+		tNode(tNode(tp).sibling).operatorNumber = aExternalAddress then
+	    const extName := tNode(tNode(tNode(tp).sibling).operand).leaf
+	    Identifier.OverrideIdentText(eNode(procName).u.referenceValue,
+		 strings(eNode(extName).u.stringValue),
+		 eNode(extName).u.stringLen)
+	    /* remove the aExternalAddress token */
+	    tNode(tp).sibling := tNode(tNode(tp).sibling).sibling
+	    Types.EnterAttribute(procName, aaDontTouchName)
+	elsif not Types.HasAttribute(procName, aaDontTouchName) then
+	    Identifier.EnterName(eNode(procName).u.referenceValue)
+	end if
+
+	if realSubprogram then
+	    Types.EnterAttribute(procName, aaRealSubprogram)
+	end if
+
+	tp := tNode(tp).sibling
+
+	if tp not= nil(tNode) and tNode(tp).operatorNumber = aSubs then
+	    TransformParameters.TransformParameters(parentt, tp)
+	    if resetType then
+		/* might be a recursive call in the implementation */
+		ResetType(t)
+	    end if
+	    tp := tNode(tp).sibling
+	elsif tp not= nil(tNode) and
+		tNode(tp).operatorNumber = aInterruptNumber then
+	    Types.EnterAttribute(procName, aaInterruptProcedure)
+
+	    const parentSibling := tNode(parentt).sibling
+	    var register tmp : TreePointer
+	    var register e : ExpressionPointer
+
+	    new tNode, tNode(parentt).sibling
+	    tmp := tNode(parentt).sibling
+
+	    tNode(tmp).operatorNumber := aCall
+	    tNode(tmp).nodeKind := NodeKinds.ExpressionLeaf
+	    tNode(tmp).operand := nil(tNode)
+	    tNode(tmp).sibling := parentSibling
+	    tNode(tmp).transformed := true
+	    tNode(tmp).lineNumber := 0
+
+	    new eNode, tNode(tmp).leaf
+	    e := tNode(tmp).leaf
+
+	    tag eNode(e).u, aCall
+	    eNode(e).sibling := nil(eNode)
+
+	    new eNode, eNode(e).u.operand
+	    e := eNode(e).u.operand
+
+	    tag eNode(e).u, aPredefinedId
+	    eNode(e).u.funcOrProcNumber := pInitializeInterruptProcedure
+
+	    new eNode, eNode(e).sibling
+	    e := eNode(e).sibling
+
+	    tag eNode(e).u, aSubs
+	    eNode(e).sibling := nil(eNode)
+
+	    Expression.Copy(tNode(tNode(tp).operand).leaf, eNode(e).u.operand)
+	    e := eNode(e).u.operand
+
+	    Expression.Copy(procName, eNode(e).sibling)
+
+	    /* remove the interrupt number */
+	    tNode(tp).operatorNumber := aNoOp
+	end if
+
+	MonitorEntryTimeSlice(tp, procName)
+	IterateSubScope(tp, true)
+	if resetType then
+	    ResetType(t)
+	end if
+    end TransformProcedure
+
+
+    /*
+     * aProcess EXPN [ aSubs PARAMETERLIST] body
+     */
+    body procedure TransformProcess % (t : TreePointer)
+	var register tp := tNode(t).operand
+
+	/* tranform the name */
+	Identifier.EnterName(eNode(tNode(tp).leaf).u.referenceValue)
+	Types.EnterAttribute(tNode(tp).leaf, aaRealSubprogram)
+
+	tp := tNode(tp).sibling
+
+	if tp not= nil(tNode) and tNode(tp).operatorNumber = aSubs then
+	    TransformParameters.TransformParameters(t, tp)
+	    /* might be a recursive call in the implementation */
+	    ResetType(t)
+	    tp := tNode(tp).sibling
+	end if
+
+	if tNode(tp).operatorNumber = aProcessStackSize then
+	    TransExpn.TransExpn(t, tNode(tNode(tp).operand).leaf, nil(eNode))
+	    tp := tNode(tp).sibling
+	end if
+
+	MonitorEntryTimeSlice(tp, tNode(tNode(t).operand).leaf)
+	IterateSubScope(tp, true)
+	ResetType(t)
+    end TransformProcess
+
+
+    /*
+     * Put the whole statement into a begin block
+     * define the for index variable
+     * save the appropriate bound in a variable, IF not manifest
+     */
+    body procedure TransformFor % (tp : TreePointer)
+	var register t := tNode(tp).operand
+	var decrease := false
+
+	/* handle decreasing for loops */
+	if tNode(t).operatorNumber = aDecreasing then
+	    t := tNode(t).sibling
+	    decrease := true
+	end if
+
+	/*
+	 * declare the for index variable	t -> ident
+	 * Put the while for statement into a begin block
+	 */
+	var newNode : TreePointer
+
+	CreateBeginBlock(tp, newNode)
+
+	var register x := newNode	/* points to new node before FOR stmt */
+
+	/* create the node for the variable declaration */
+	tNode(x).nodeKind := NodeKinds.OperatorNode
+	tNode(x).operatorNumber := aVar
+	tNode(x).leaf := nil(eNode)
+
+	/* create the node for the aRegister */
+	new tNode, tNode(x).operand
+	x := tNode(x).operand
+	tNode(x).nodeKind := NodeKinds.OperatorNode
+	tNode(x).operatorNumber := aRegister
+	tNode(x).operand := nil(tNode)
+	tNode(x).leaf := tNode(t).leaf
+	tNode(x).transformed := true
+	tNode(x).lineNumber := 0
+
+	/* create the node for the id */
+	new tNode, tNode(x).sibling
+	x := tNode(x).sibling
+	tNode(x).nodeKind := NodeKinds.ExpressionLeaf
+	tNode(x).operand := nil(tNode)
+	tNode(x).leaf := tNode(t).leaf
+	tNode(x).transformed := true
+	tNode(x).lineNumber := 0
+	const forId := tNode(t).leaf
+
+	/* point to the for range */
+	t := tNode(t).sibling
+	assert tNode(t).operatorNumber = aForRange
+
+	/*
+	 * create the type for the variable declaration, based on the
+	 * type of the first expression;  either char or int
+	 */
+	CreateNewType(tNode(x).sibling, tNode(tNode(t).operand).leaf)
+	Types.SetType(forId, tNode(x).sibling)
+	Types.EnterTypeInfo(forId)
+	Types.EnterAttribute(forId, aaRegister)
+
+	/* tranform the 2 expressions */
+	x := tNode(newNode).sibling
+	TransExpn.TransExpn(x, tNode(tNode(t).operand).leaf, nil(eNode))
+	TransExpn.TransExpn(x,
+	    tNode(tNode(tNode(t).operand).sibling).leaf, nil(eNode))
+
+	ReplaceForExpressionIfNecessary (x, t, decrease)
+
+	/* tranform the body of the for loop */
+	IterateSubScope(tNode(t).sibling, true)
+    end TransformFor
+
+
+    body procedure TransformIf % (t : TreePointer)
+	var register tp := tNode(t).operand
+	loop
+	    exit when tp = nil(tNode)
+	    if tNode(tp).nodeKind = NodeKinds.ExpressionLeaf then
+		TransExpn.TransExpn(t, tNode(tp).leaf, nil(eNode))
+	    else
+		if tNode(tp).nodeKind = NodeKinds.OperatorNode then
+		    IterateSubScope(tNode(tp).operand, true)
+		end if
+	    end if
+	    tp := tNode(tp).sibling
+	end loop
+    end TransformIf
+
+
+    /*
+     * place a call to the module/monitor after this, to initialize it
+     */
+    body procedure TransformModuleMonitor % (t : TreePointer)
+	/* keep some stuff at the top of the module/monitor! */
+	var register tp := tNode(t).operand
+	const moduleName := tNode(tp).leaf
+	const isMonitor := tNode(t).operatorNumber = aMonitor
+	var deviceMonitor := nil(tNode)
+	const moduleGranted := Types.HasAttribute(moduleName, aaGrant)
+
+	/* JRC 17.2.03 - Properly name nested modules and monitors */
+	Identifier.EnterName(eNode(moduleName).u.referenceValue)
+	/* */
+
+	Identifier.PushName(eNode(moduleName).u.referenceValue)
+	tp := tNode(tp).sibling
+
+	/* save other useful stuff */
+	loop
+	    exit when tp = nil(tNode)
+	    case tNode(tp).operatorNumber of
+		label aMonitorPriority:
+		    deviceMonitor := tNode(tp).operand
+
+		label aImport:
+
+		label aGrant:
+		    TransformGrant(tp)
+
+	        label aExport:
+		    if moduleGranted then
+			var register temp := tNode(tp).operand
+			loop
+			    exit when temp = nil(tNode)
+			    if tNode(temp).operatorNumber = aOpaque then
+				Types.EnterAttribute(
+				    tNode(tNode(temp).operand).leaf, aaGrant)
+			    else
+				Types.EnterAttribute(tNode(temp).leaf, aaGrant)
+			    end if
+			    temp := tNode(temp).sibling
+			end loop
+		    end if
+		    if isMonitor then
+			var register temp := tNode(tp).operand
+			loop
+			    exit when temp = nil(tNode)
+			    if tNode(temp).operatorNumber not= aOpaque then
+				Types.EnterAttribute(tNode(temp).leaf,
+				    aaMonitorEntry)
+				if deviceMonitor not= nil(tNode) then
+				    Types.EnterAttribute(tNode(temp).leaf,
+					aaDeviceMonitorEntry)
+				end if
+			    end if
+			    temp := tNode(temp).sibling
+			end loop
+		    end if
+
+		label :
+		    exit
+	    end case
+	    tp := tNode(tp).sibling
+	end loop
+	if tp not= nil(tNode) then
+	    if isMonitor then
+		DeclareMonitorVariable(tp, deviceMonitor, tNode(t).leaf,
+		    moduleName)
+		currentMonitorVariable := tNode(t).leaf
+	    end if
+	    IterateSubScope(tp, false)
+	    PrefixAllDeclarations(tp)
+	end if
+	currentMonitorVariable := nil(eNode)
+
+	Identifier.PopName
+
+	/* make up a call node */
+	var newT : TreePointer
+
+	new tNode, newT
+	tNode(newT).nodeKind := NodeKinds.ExpressionLeaf
+	tNode(newT).operatorNumber := aCall
+	tNode(newT).transformed := true
+	tNode(newT).sibling := tNode(t).sibling
+	tNode(newT).lineNumber := 0
+	tNode(t).sibling := newT
+
+	/* create the module name expn */
+	new eNode, tNode(newT).leaf
+	var newE := tNode(newT).leaf
+	tag eNode(newE).u, aCall
+	eNode(newE).sibling := nil(eNode)
+
+	Expression.Copy(tNode(tNode(t).operand).leaf, eNode(newE).u.operand)
+    end TransformModuleMonitor
+
+
+    /*
+     * replace the stub module with a call to initialize it,
+     * and make scalar functions into external function declarations
+     */
+    body procedure TransformStubModuleMonitor % (childt, t : TreePointer,
+					      % isCompilation, popName: boolean)
+	/* keep some stuff at the top of the module/monitor! */
+	const isMonitor := tNode(t).operatorNumber = aMonitor
+	var register tp := tNode(t).operand
+
+	/* tranform the name */
+	Identifier.EnterName(eNode(tNode(tp).leaf).u.referenceValue)
+	Identifier.PushName(eNode(tNode(tp).leaf).u.referenceValue)
+
+	Types.SetType(tNode(tp).leaf, t)
+	Types.EnterAttribute(tNode(tp).leaf, aaGrant)
+
+	tp := tNode(tp).sibling
+
+	loop
+	    exit when tp = nil(tNode)
+	    if not tNode(tp).transformed then
+		case tNode(tp).operatorNumber of
+		    label aExport:
+			var register ttp := tNode(tp).operand
+			loop
+			    exit when ttp = nil(tNode)
+			    if tNode(ttp).operatorNumber = aOpaque then
+				Types.EnterAttribute(
+				    tNode(tNode(ttp).operand).leaf, aaGrant)
+			    else
+				Types.EnterAttribute(tNode(ttp).leaf, aaGrant)
+			    end if
+			    ttp := tNode(ttp).sibling
+			end loop
+			if isMonitor then
+			    ttp := tNode(tp).operand
+			    loop
+				exit when ttp = nil(tNode)
+				if tNode(ttp).operatorNumber not= aOpaque then
+				    Types.EnterAttribute(tNode(ttp).leaf,
+					aaMonitorEntry)
+				end if
+				ttp := tNode(ttp).sibling
+			    end loop
+			end if
+			tNode(tp).operatorNumber := aNoOp
+
+		    label aProcedure, aFunction:
+			const fcnId := tNode(tNode(tp).operand).leaf
+			if tNode(tp).operatorNumber = aProcedure then
+			    TransformProcedure(tp, tp, true, true)
+			else
+			    TransformFunction(tp, tp, true)
+			end if
+
+			if isCompilation then
+			    Types.EnterAttribute(fcnId, aaForward)
+			else
+			    Types.EnterAttribute(fcnId, aaExternal)
+			end if
+			Types.EnterAttribute(fcnId, aaDontTouchName)
+
+		    label aChild:
+			TransformChild(tp)
+
+		    label aExternal:
+			TransformExternal(tp)
+
+		    label aType:
+			var register x := tNode(tp).operand
+
+			if tNode(x).operatorNumber = aPervasive then
+			    x := tNode(x).sibling
+			end if
+			TransformType(tp)
+			if not Types.HasAttribute(tNode(x).leaf,
+				aaExternal) then
+			    Identifier.EnterName(
+				eNode(tNode(x).leaf).u.referenceValue)
+			end if
+
+		    label aVar:
+			/* must be a collection definition */
+			TransformVar(tp)
+
+		    label :
+		end case
+	    end if
+	    tp := tNode(tp).sibling
+	end loop
+
+	Identifier.PopName
+	if popName then
+	    Identifier.PopName
+	end if
+
+	if not isCompilation then
+	    /* add a call to the module/monitor */
+	    const id := tNode(tNode(t).operand).leaf
+
+	    tp := childt
+	    const oldSibling := tNode(tp).sibling
+
+	    new tNode, tNode(tp).sibling
+	    tp := tNode(tp).sibling
+	    tNode(tp).sibling := oldSibling
+	    tNode(tp).operatorNumber := aCall
+	    tNode(tp).nodeKind := NodeKinds.ExpressionLeaf
+	    tNode(tp).operand := nil(tNode)
+	    tNode(tp).transformed := true
+	    tNode(tp).lineNumber := 0
+
+	    var register ep : ExpressionPointer
+
+	    new eNode, tNode(tp).leaf
+	    ep := tNode(tp).leaf
+
+	    tag eNode(ep).u, aCall
+	    eNode(ep).u.operand := id
+	    eNode(ep).sibling := nil(eNode)
+
+	elsif tNode(t).sibling not= nil(tNode) then
+	    tp := tNode(t).sibling
+	    assert tNode(tp).operatorNumber = aBody
+	    TransformModuleMonitor(tNode(tp).operand)
+	end if
+    end TransformStubModuleMonitor
+
+
+    body procedure TransformStub % (t : TreePointer)
+	var register tp := tNode(t).operand
+
+	loop
+	    exit when tNode(tp).operatorNumber not= aType
+	    TransformType(tp)
+	    tp := tNode(tp).sibling
+	end loop
+	if tNode(tp).operatorNumber = aModule or
+		tNode(tp).operatorNumber = aMonitor then
+	    TransformStubModuleMonitor(t, tp, false, false)
+	else
+	    assert tNode(tp).operatorNumber = aProcedure or
+		    tNode(tp).operatorNumber = aFunction
+	    TransformStubSubprogram (t, tp, false)
+	end if
+    end TransformStub
+
+
+    /*
+     * Change this to IF expn THEN EXIT
+     */
+    body procedure TransformExitWhen % (t : TreePointer)
+	var register tp := t
+
+	tNode(tp).operatorNumber := aIf
+	tp := tNode(tp).operand
+	TransExpn.TransExpn(t, tNode(tp).leaf, nil(eNode))
+
+	/* create the THEN node */
+	new tNode, tNode(tp).sibling
+	tp := tNode(tp).sibling
+	tNode(tp).operatorNumber := aThen
+	tNode(tp).nodeKind := NodeKinds.OperatorNode
+	tNode(tp).sibling := nil(tNode)
+	tNode(tp).leaf := nil(eNode)
+	tNode(tp).transformed := false
+	tNode(tp).lineNumber := 0
+
+	/* get rid of flex storage */
+	var firstDealloc, lastDealloc : TreePointer
+	DeallocateFlexScope(firstDealloc, lastDealloc, fsLoop)
+
+	/* now the EXIT now */
+	if lastDealloc = nil(tNode) then
+	    new tNode, tNode(tp).operand
+	    tp := tNode(tp).operand
+	else
+	    tNode(tp).operand := firstDealloc
+	    new tNode, tNode(lastDealloc).sibling
+	    tp := tNode(lastDealloc).sibling
+	end if
+	tNode(tp).operatorNumber := aExit
+	tNode(tp).nodeKind := NodeKinds.SimpleLeaf
+	tNode(tp).sibling := nil(tNode)
+	tNode(tp).operand := nil(tNode)
+	tNode(tp).leaf := nil(eNode)
+	tNode(tp).transformed := false
+	tNode(tp).lineNumber := 0
+    end TransformExitWhen
+
+
+    /*
+     * tranform a case statement
+     */
+    body procedure TransformCase % (tp : TreePointer)
+	var register t : TreePointer := tNode(tp).operand
+	const register e : ExpressionPointer := tNode(t).leaf
+
+	/* save the pointer to the bodies */
+	t := tNode(t).sibling
+
+	/* transform the case expression */
+	TransExpn.TransExpn(tp, e, nil(eNode))
+
+	/*
+	 * all the label expressions are manifest;  no problems
+	 * walk through the case bodies;  otherwise has no aCaseBody
+	 */
+	loop
+	    exit when t = nil(tNode)
+	    if tNode(t).operatorNumber = aCaseBody or
+		    tNode(t).operatorNumber = aOtherwise then
+		IterateSubScope(tNode(t).operand, true)
+	    end if
+	    t := tNode(t).sibling
+	end loop
+    end TransformCase
+
+
+    /*
+     * tranform a result statement
+     */
+    body procedure TransformResult % (tp : TreePointer)
+	var register t : TreePointer := tNode(tp).operand
+
+	if functionResultSymbol = nil(eNode) then
+	    if alternateFunctionResultSymbol = nil(eNode) then
+		/* transform the result expression */
+		TransExpn.TransExpn(tp, tNode(t).leaf, nil(eNode))
+	    else
+		/*
+		 * must transform the result into an assignment to the result
+		 * variable and a "result resultVariable"
+		 */
+		const expn := tNode(t).leaf
+
+		/* change tp into a begin block */
+		var assignNode : TreePointer
+
+		CreateBeginBlock(tp, assignNode)
+
+		t := assignNode
+		tNode(t).nodeKind := NodeKinds.OperatorNode
+		tNode(t).operatorNumber := aAssign
+		tNode(t).leaf := nil(eNode)
+		tNode(t).transformed := true
+
+		t := tNode(t).sibling
+		assert tNode(t).operatorNumber = aResult
+		tNode(tNode(t).operand).leaf := alternateFunctionResultSymbol
+
+		t := assignNode
+
+		new tNode, tNode(t).operand
+		t := tNode(t).operand
+		tNode(t).nodeKind := NodeKinds.ExpressionLeaf
+		tNode(t).operatorNumber := 0
+		tNode(t).leaf := alternateFunctionResultSymbol
+		tNode(t).operand := nil(tNode)
+		tNode(t).transformed := false
+		tNode(t).lineNumber := 0
+
+		new tNode, tNode(t).sibling
+		t := tNode(t).sibling
+		tNode(t).nodeKind := NodeKinds.ExpressionLeaf
+		tNode(t).operatorNumber := 0
+		tNode(t).leaf := expn
+		tNode(t).operand := nil(tNode)
+		tNode(t).sibling := nil(tNode)
+		tNode(t).transformed := false
+		tNode(t).lineNumber := 0
+
+		/* now fix it up */
+		TransformAssignment.TransformAssign(assignNode)
+	    end if
+	else
+	    /* must transform the result into an assignment and a return */
+	    const expn := tNode(t).leaf
+
+	    /* change tp into a begin block */
+	    var assignNode : TreePointer
+
+	    CreateBeginBlock(tp, assignNode)
+
+	    t := assignNode
+	    tNode(t).nodeKind := NodeKinds.OperatorNode
+	    tNode(t).operatorNumber := aAssign
+	    tNode(t).leaf := nil(eNode)
+	    tNode(t).transformed := true
+
+	    new tNode, tNode(t).sibling
+	    t := tNode(t).sibling
+	    tNode(t).nodeKind := NodeKinds.SimpleLeaf
+	    tNode(t).operatorNumber := aReturn
+	    tNode(t).leaf := nil(eNode)
+	    tNode(t).sibling := nil(tNode)
+	    tNode(t).operand := nil(tNode)
+	    tNode(t).transformed := false
+	    tNode(t).lineNumber := 0
+
+	    t := assignNode
+
+	    new tNode, tNode(t).operand
+	    t := tNode(t).operand
+	    tNode(t).nodeKind := NodeKinds.ExpressionLeaf
+	    tNode(t).operatorNumber := 0
+	    tNode(t).leaf := functionResultSymbol
+	    tNode(t).operand := nil(tNode)
+	    tNode(t).transformed := false
+	    tNode(t).lineNumber := 0
+
+	    new tNode, tNode(t).sibling
+	    t := tNode(t).sibling
+	    tNode(t).nodeKind := NodeKinds.ExpressionLeaf
+	    tNode(t).operatorNumber := 0
+	    tNode(t).leaf := expn
+	    tNode(t).operand := nil(tNode)
+	    tNode(t).sibling := nil(tNode)
+	    tNode(t).transformed := false
+	    tNode(t).lineNumber := 0
+
+	    /* now fix it up */
+	    TransformAssignment.TransformAssign(assignNode)
+	end if
+    end TransformResult
+
+
+    body procedure IterateSubScope % (register subscope : TreePointer)
+				   %  deallocateFlexArrays : boolean)
+	var register t : TreePointer := subscope
+	var register lastT := nil(tNode)
+	const oldUnChecked := unChecked
+	NewFlexScope(fsBegin)
+	loop
+	    exit when t = nil(tNode)
+	    if not tNode(t).transformed then
+		case tNode(t).operatorNumber of
+		    label aType:
+			TransformType(t)
+
+		    label aVar:
+			TransformVar(t)
+
+		    label aConst:
+			TransformConst(t)
+
+		    label aCondition:
+			TransformConditionVar(t)
+
+		    label aAssign:
+			TransformAssignment.TransformAssign(t)
+
+		    label aAndEqual, aBooleanAndEqual, aBooleanOrEqual,
+			    aConcatenateAssign, aExponentiateEqual, aDivEqual,
+			    aMinusEqual, aModEqual, aOrEqual, aPlusEqual,
+			    aRealDivEqual, aSetDifferenceAssign,
+			    aSetIntersectionAssign, aSetUnionAssign,
+			    aSetXorAssign, aShiftLeftEqual, aShiftRightEqual,
+			    aStarEqual, aXorEqual:
+			TransformAssignment.TransformOpEqual(t)
+
+		    label aAsm:
+			TransformAsm(t)
+
+		    label aAssert, aInvariant, aPre, aPost:
+			if unChecked then
+			    tNode(t).operatorNumber := aNoOp
+			else
+			    TransExpn.TransExpn (t,
+				    tNode(tNode(t).operand).leaf, nil(eNode))
+			end if
+
+		    label aGrant:
+			TransformGrant(t)
+
+		    label aChild:
+			TransformChild(t)
+
+		    label aExitWhen:
+			TransformExitWhen(t)
+
+		    label aBegin, aParent, aThen:
+			IterateSubScope(tNode(t).operand, true)
+
+		    label aLoop:
+			NewFlexScope(fsLoop)
+			IterateSubScope(tNode(t).operand, true)
+			PopFlexScope
+
+		    label aCase:
+			TransformCase(t)
+
+		    label aExit:
+			var first, last : TreePointer
+			DeallocateFlexScope(first, last, fsLoop)
+			if first not= nil(tNode) then
+			    if lastT not= nil(tNode) then
+				tNode(last).sibling := t
+				tNode(lastT).sibling := first
+			    else
+				% must put this first!
+				const tempT := tNode(t)
+				tNode(t) := tNode(first)
+				if first = last then
+				    new tNode, tNode(t).sibling
+				    t := tNode(t).sibling
+				else
+				    new tNode, tNode(last).sibling
+				    t := tNode(last).sibling
+				end if
+				tNode(t) := tempT
+			    end if
+			end if
+
+		    label aReturn, aResult:
+			var first, last : TreePointer
+
+			if tNode(t).operatorNumber = aResult then
+			    TransformResult(t)
+			end if
+
+			DeallocateFlexScope(first, last, fsRoutine)
+			if first not= nil(tNode) then
+			    if lastT not= nil(tNode) then
+				tNode(last).sibling := t
+				tNode(lastT).sibling := first
+			    else
+				% must put this first!
+				const tempT := tNode(t)
+				tNode(t) := tNode(first)
+				if first = last then
+				    new tNode, tNode(t).sibling
+				    t := tNode(t).sibling
+				else
+				    new tNode, tNode(last).sibling
+				    t := tNode(last).sibling
+				end if
+				tNode(t) := tempT
+			    end if
+			end if
+
+		    label aBind:
+			TransformBind(t)
+
+		    label aExternal:
+			TransformExternal(t)
+
+		    label aFor:
+			NewFlexScope(fsLoop)
+			TransformFor(t)
+			PopFlexScope
+
+		    label aFork:
+			TransformFork(t)
+
+		    label aProcedure:
+			NewFlexScope(fsRoutine)
+			TransformProcedure(t, t, true, true)
+			PopFlexScope
+
+		    label aFunction:
+			NewFlexScope(fsRoutine)
+			TransformFunction(t, t, true)
+			PopFlexScope
+
+		    label aMonitor, aModule:
+			TransformModuleMonitor(t)
+
+		    label aProcess:
+			NewFlexScope(fsRoutine)
+			TransformProcess(t)
+			PopFlexScope
+
+		    label aForward:
+			TransformForward(t)
+
+		    label aBody:
+			TransformBody(t)
+
+		    label aFree, aNew:
+			TransformCollection(t)
+
+		    label aHandler:
+			const register temp := tNode(t).operand
+
+			assert tNode(temp).operatorNumber = aIdent
+			IterateSubScope(tNode(temp).sibling, true)
+
+		    label aIf:
+			TransformIf(t)
+
+		    label aProcessInit:
+			if unChecked then
+			    tNode(t).operatorNumber := aNoOp
+			else
+			    TransformInit(t)
+			end if
+
+		    label aGet, aOpen, aPut, aRead, aWrite, aSeek, aTell,
+			    aClose:
+			TransformIo(t)
+
+		    label aPause:
+			TransExpn.TransExpn (t,
+				tNode(tNode(t).operand).leaf, nil(eNode))
+
+		    label aQuit:
+			TransformQuit(t)
+
+		    label aTag:
+			TransformTag(t)
+
+		    label aWait, aSignal:
+			const register temp := tNode(t).operand
+
+			TransExpn.TransExpn(t, tNode(temp).leaf,
+			    nil(eNode))
+			if eNode(tNode(temp).leaf).sibling not= nil(eNode) then
+			    TransExpn.TransExpn(t,
+				eNode(tNode(temp).leaf).sibling, nil(eNode))
+			end if
+
+		    label aStub:
+			TransformStub(t)
+
+		    label aUnchecked:
+			unChecked := true
+
+			/* add an aUncheckedStmt */
+			tNode(t).transformed := true
+			const temp := tNode(t).sibling
+
+			new tNode, tNode(t).sibling
+			t := tNode(t).sibling
+			tNode(t).nodeKind := NodeKinds.SimpleLeaf
+			tNode(t).transformed := true
+			tNode(t).operatorNumber := aUncheckedStmt
+			tNode(t).operand := nil(tNode)
+			tNode(t).sibling := temp
+			tNode(t).lineNumber := 0
+
+		    label aChecked:
+			if not originalUnChecked then
+			    unChecked := false
+			end if
+
+			/* add an aCheckedStmt */
+			tNode(t).transformed := true
+			const temp := tNode(t).sibling
+
+			new tNode, tNode(t).sibling
+			t := tNode(t).sibling
+			tNode(t).nodeKind := NodeKinds.SimpleLeaf
+			tNode(t).transformed := true
+			tNode(t).operatorNumber := aCheckedStmt
+			tNode(t).operand := nil(tNode)
+			tNode(t).sibling := temp
+			tNode(t).lineNumber := 0
+
+		    label aCheckedStmt, aUncheckedStmt:
+			/* ignore! */
+
+		    label :
+			if tNode(t).leaf not= nil(eNode) then
+			    TransExpn.TransExpn(t, tNode(t).leaf, nil(eNode))
+			end if
+		end case
+		tNode(t).transformed := true
+	    end if
+	    lastT := t
+	    t := tNode(t).sibling
+	end loop
+	if deallocateFlexArrays then
+	    var first, last : TreePointer
+	    DeallocateFlexScope(first, last, fsBegin)
+	    if first not= nil(tNode) then
+		tNode(lastT).sibling := first
+	    end if
+	end if
+	PopFlexScope
+	MoveAllDeclarationsToTop(subscope)
+	unChecked := oldUnChecked
+    end IterateSubScope
+
+
+    body procedure TransformProgram % (t : TreePointer)
+#if DEBUG then
+	handler (quitCode)
+	    if quitCode not= excpSIGINT then
+		put :debugFile, "Abort Dump:"
+		Tree.Dump(t, 0, debugFile)
+		Types.Dump(debugFile)
+	    end if
+	    quit >
+	end handler
+#end if
+	var register tp := t
+	assert tNode(tp).operatorNumber = aRoot
+	tp := tNode(tp).operand
+	if tNode(tp).operatorNumber = aCompile then
+	    tp := tNode(tp).operand
+	    if tp = nil(tNode) then
+		/* null program */
+		return
+	    end if
+	    if tNode(tp).operatorNumber = aStub then
+		tp := tNode(tp).operand
+		loop
+		    exit when tNode(tp).operatorNumber not= aType
+		    TransformType(tp)
+		    tp := tNode(tp).sibling
+		end loop
+		if tNode(tp).operatorNumber = aModule or
+			tNode(tp).operatorNumber = aMonitor then
+		    TransformStubModuleMonitor(tNode(t).operand, tp, true,
+			false)
+		else
+		    assert tNode(tp).operatorNumber = aProcedure or
+			tNode(tp).operatorNumber = aFunction
+		    TransformStubSubprogram (tNode(t).operand, tp, true)
+		end if
+	    else
+		IterateSubScope(tp, false)
+	    end if
+	else
+	    /* this is a child compilation */
+	    if tNode(tp).operatorNumber = aParent then
+		IterateSubScope(tNode(tp).operand, false)
+	    else
+		originalChildIsOrphan := true
+		IterateSubScope(tp, false)
+	    end if
+	end if
+    end TransformProgram
+
+    /*
+     * Initialize the appropriate cheating subprograms variables
+     */
+    varTransformFunction := TransformFunction
+    varTransformProcedure := TransformProcedure
+
+end Transform

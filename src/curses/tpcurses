@@ -1,0 +1,4 @@
+#!/bin/sh
+: " tpcurses - Turing Plus compiler with curses support "
+: " J.R. Cordy   14 April 1983 "
+tpc $* /local/lib/tplus/tcurses.o -lcurses -ltermcap

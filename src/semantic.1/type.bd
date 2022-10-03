@@ -1,0 +1,387 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+% 
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+% 
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+body "type.st" module Types
+    /*  Module:	Semantic Pass Type Mechanism V1.00
+     *	Author:  Mark Mendell
+     *	Date:	11 March 1986
+     */
+
+    /* This mechanism maintains all information about defined types
+     * in the Type Table, and allows referencing of particular entries
+     * via the Type Stack.
+     */
+
+    /* Type Stack */
+    var typeStack:	array 1..maxTypeDepth of TypeIndex
+    var typeTop:	0..maxTypeDepth := 0
+    var maxTypeTop:	0..maxTypeDepth := 0
+
+    /* Type Attributes */
+    type TypeAttributeSet : set of TypeAttributes
+
+    /* Type Table Entry */
+    type TypeTableEntry :
+	record
+	    kind:		TypeKinds
+	    attributes:	TypeAttributeSet
+	    imports:		int
+	    fields:		int
+	    typex:		int /* also symbol, grant*/
+	end record
+
+    /* Type Table */
+    var typeTable:	array 0..maxTypes of TypeTableEntry
+    var typeTableTop:	0..maxTypes := 0
+
+    /* BuiltIn Types */
+    var builtInType: array TypeKinds of TypeIndex
+
+
+    body procedure PushType % (typex: TypeIndex)
+	if typeTop < maxTypeDepth then
+	    typeTop += 1
+	    if statistics and maxTypeTop < typeTop then
+		maxTypeTop := typeTop
+	    end if
+	    typeStack(typeTop) := typex
+	else
+	    Error (eTypeStackOverflow)
+	end if
+    end PushType
+
+
+    body procedure PushBuiltInType % (kind: TypeKinds)
+	PushType (builtInType(kind))
+    end PushBuiltInType
+
+
+    body procedure PushNewType % (kind: TypeKinds)
+	if typeTableTop < maxTypes then
+	    typeTableTop += 1
+	    bind var register t to typeTable(typeTableTop)
+	    t.kind := kind
+	    t.attributes := TypeAttributeSet()
+	    t.imports := 0
+	    t.fields := 0
+	    t.typex := 0
+	    PushType (typeTableTop)
+	else
+	    Error (eTypeTableOverflow)
+	end if
+    end PushNewType
+
+
+    body procedure PushComponentType
+	pre typeTop > 0
+	bind register t to typeTable(typeStack(typeTop))
+	assert t.kind = tArray or t.kind = tCollection or
+	       t.kind = tSet or t.kind = tEnumeratedElement
+	PushType (t.typex)
+    end PushComponentType
+
+
+    body procedure PushResultType
+	pre typeTop > 0
+	bind register t to typeTable(typeStack(typeTop))
+	PushType (t.typex)
+    end PushResultType
+
+
+    body procedure PopType
+	pre typeTop > 0
+	typeTop -= 1
+    end PopType
+
+
+    body procedure ReplaceBuiltInType % (kind: TypeKinds)
+	pre typeTop > 0
+	typeStack(typeTop) := builtInType(kind)
+    end ReplaceBuiltInType
+
+
+    body procedure ReplaceComponentType
+	pre typeTop > 0
+	bind register t to typeTable(typeStack(typeTop))
+	assert t.kind = tArray or t.kind = tCollection or t.kind = tSet or
+		t.kind = tEnumeratedElement
+	typeStack(typeTop) := t.typex
+    end ReplaceComponentType
+
+
+    body procedure ReplaceResultType
+	pre typeTop > 0
+	bind register t to typeTable(typeStack(typeTop))
+	typeStack(typeTop) := t.typex
+    end ReplaceResultType
+
+
+    body procedure TypEnterSymbol % (symbol: SymbolIndex)
+	pre typeTop > 0
+	bind var register t to typeTable(typeStack(typeTop))
+	t.typex := symbol
+    end TypEnterSymbol
+
+
+    body procedure EnterGrant % (scope: ScopeIndex)
+	pre typeTop > 0
+	bind var register t to typeTable(typeStack(typeTop))
+	t.typex := scope
+    end EnterGrant
+
+
+    body procedure EnterFields % (scope: ScopeIndex)
+	pre typeTop > 0
+	bind var register t to typeTable(typeStack(typeTop))
+	t.fields := scope
+    end EnterFields
+
+
+    body procedure EnterFormals % (scope: ScopeIndex)
+	pre typeTop > 0
+	bind var register t to typeTable(typeStack(typeTop))
+	t.fields := scope
+    end EnterFormals
+
+
+    body procedure EnterImports % (scope: ScopeIndex)
+	pre typeTop > 0
+	bind var register t to typeTable(typeStack(typeTop))
+	t.imports := scope
+    end EnterImports
+
+
+    body procedure EnterLeftComponentType
+	pre typeTop >= 2
+	bind var register t to typeTable(typeStack(typeTop-1))
+	assert t.kind = tArray or t.kind = tCollection or t.kind = tSet or
+		t.kind = tEnumeratedElement
+	t.typex := typeStack(typeTop)
+    end EnterLeftComponentType
+
+
+    body procedure EnterLeftResultType
+	pre typeTop >= 2
+	bind var register t to typeTable(typeStack(typeTop-1))
+	t.typex := typeStack(typeTop)
+    end EnterLeftResultType
+
+
+    body procedure EnterLeftRootType
+	pre typeTop >= 2
+	bind var register t to typeTable(typeStack(typeTop-1))
+	assert t.kind = tEnumeratedRange
+	t.typex := typeStack(typeTop)
+    end EnterLeftRootType
+
+
+    body procedure TypEnterAttribute % (attribute: TypeAttributes)
+	pre typeTop > 0
+	typeTable(typeStack(typeTop)).attributes += TypeAttributeSet(attribute)
+    end TypEnterAttribute
+
+
+    body procedure TypEnterKind % (kind: TypeKinds)
+	pre typeTop > 0
+	typeTable(typeStack(typeTop)).kind := kind
+    end TypEnterKind
+
+
+    body procedure TypClearAttribute % (attribute: TypeAttributes)
+	pre typeTop > 0
+	typeTable(typeStack(typeTop)).attributes -= TypeAttributeSet(attribute)
+    end TypClearAttribute
+
+
+    body function TypeIndexx % : TypeIndex
+	pre typeTop > 0
+	result typeStack(typeTop)
+    end TypeIndexx
+
+
+    body function TypeKind % : TypeKinds
+	pre typeTop > 0
+	result typeTable(typeStack(typeTop)).kind
+    end TypeKind
+
+
+    body function LeftTypeKind % : TypeKinds
+	pre typeTop >= 2
+	result typeTable(typeStack(typeTop-1)).kind
+    end LeftTypeKind
+
+
+    body function TypeHasAttribute % (attribute: TypeAttributes) : boolean
+	pre typeTop > 0
+	result attribute in typeTable(typeStack(typeTop)).attributes
+    end TypeHasAttribute
+
+
+    body function TypeSymbol % : SymbolIndex
+	pre typeTop > 0
+	result typeTable(typeStack(typeTop)).typex
+    end TypeSymbol
+
+
+    body function TypeFormals % : ScopeIndex
+	pre typeTop > 0
+	result typeTable(typeStack(typeTop)).fields
+    end TypeFormals
+
+
+    body function TypeGrant % : ScopeIndex
+	pre typeTop > 0
+	result typeTable(typeStack(typeTop)).typex
+    end TypeGrant
+
+
+    body function TypeFields % : ScopeIndex
+	pre typeTop > 0
+	result typeTable(typeStack(typeTop)).fields
+    end TypeFields
+
+
+    body function TypeExports % : ScopeIndex
+	pre typeTop > 0
+	result typeTable(typeStack(typeTop)).fields
+    end TypeExports
+
+
+    body function TypeImports % : ScopeIndex
+	pre typeTop > 0
+	result typeTable(typeStack(typeTop)).imports
+    end TypeImports
+
+
+    body procedure CopyLeftType
+	pre typeTop >= 2
+	typeTable(typeStack(typeTop-1)) := typeTable(typeStack(typeTop))
+    end CopyLeftType
+
+
+    body procedure SwapTypes
+	pre typeTop >= 2
+	const t := typeStack(typeTop)
+	typeStack(typeTop) := typeStack(typeTop-1)
+	typeStack(typeTop-1) := t
+    end SwapTypes
+
+
+    body function TypStackEmpty % : boolean
+	result typeTop = 0
+    end TypStackEmpty
+
+
+    body procedure InitializeBuiltInType % (kind: TypeKinds)
+	PushNewType (kind)
+	builtInType (kind) := typeTableTop
+	PopType
+    end InitializeBuiltInType
+    
+    
+    body procedure TypStats
+	put "Types\n\tStack = ", maxTypeTop, "/", maxTypeDepth,
+	    "\n\tTable = ", typeTableTop, "/", maxTypes
+    end TypStats
+
+    procedure PrintTypeKinds (k:TypeKinds)
+	if k >= firstTypeKind and k <= lastTypeKind then
+	    const typeNames : array firstTypeKind..lastTypeKind of string(20) :=
+		init ( "Procedure", "Function", "Process", "Module", "Monitor",
+		       "Array", "Collection", "Record", "Union",
+		       "EnumeratedRange", "Set", "String", "Char", "Condition",
+		       "EnumeratedElement", "Pointer", "Scalar", "Varying",
+		       "NotFound", "Error")
+
+	    put typeNames(k) : 20, "\t" ..
+	else
+	    put "?????" : 20, "\t" ..
+	end if
+    end PrintTypeKinds
+
+
+    procedure PutAttributes(a : TypeAttributeSet)
+	var res := ""
+	const tattrchars := "UReCFTS"
+	for i : firstTypeAttribute .. lastTypeAttribute
+	    if i in a then
+		res += tattrchars(i+1)
+	    else
+		res += "-"
+	    end if
+	end for
+	put res ..
+    end PutAttributes
+
+
+    body procedure DumpTypes
+	var tt := typeTableTop
+	var ts := typeTop
+	var maxIndex := typeTableTop
+
+	if maxIndex < typeTop then
+	    maxIndex := typeTop
+	end if
+	put "\n\tType\t\tTypeTable"
+	put "\tStack\t\tKind                  \timports\tfields\ttype\tattributes"
+	for decreasing i : maxIndex..1
+	    assert tt <= i and ts <= i
+
+	    if ts = i then
+		put i:7, "\t", typeStack(i) : 7, "\t" ..
+		ts -= 1
+	    else
+		put "\t\t" ..
+	    end if
+
+	    if tt = i then
+		put i:7, "\t" ..
+		PrintTypeKinds(typeTable(i).kind)
+		put typeTable(i).imports, "\t", typeTable(i).fields, "\t",
+		    typeTable(i).typex, "\t" ..
+		PutAttributes(typeTable(i).attributes)
+		tt -= 1
+	    end if
+	    put ""
+	end for
+	put "\n", repeat("-", 79)
+    end DumpTypes
+
+
+    /* Initialize Null Type */
+    begin
+	bind var register tnull to typeTable(0)
+	tnull.kind := tNotFound
+	tnull.attributes := TypeAttributeSet()
+	tnull.imports := 0
+	tnull.fields := 0
+	tnull.typex := 0
+    end
+
+    /* Initialize BuiltIn Types */
+    for k : firstTypeKind .. lastTypeKind
+	builtInType(k) := 0
+    end for
+
+    InitializeBuiltInType (tNotFound)
+    InitializeBuiltInType (tScalar)
+    InitializeBuiltInType (tVaryingParameter)
+    InitializeBuiltInType (tString)
+    InitializeBuiltInType (tSet)
+    InitializeBuiltInType (tChar)
+end Types

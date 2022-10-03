@@ -1,0 +1,123 @@
+%
+%	Computer Systems Research Institute
+%	University of Toronto
+
+%	Turing Plus Full Curses Module Interface  V1.00
+%	Author: M. Mendell
+%	Date:   January 1988
+
+external var LINES, COLS : int4
+
+var WindowCollection : unchecked collection of
+	record
+	    _cury, _curx:	int2
+	    _maxy, _maxx:	int2
+	    _begy, _begx:	int2
+	    _flags:		int2
+	    _ch_off:		int2
+	    _clear:		boolean
+	    _leave:		boolean
+	    _scroll:		boolean
+	    _y:			addressint	% char **
+	    _firstch, _lastch:	addressint	% short *
+	    _nextp, _orig:	pointer to WindowCollection
+	end record
+
+type *WINDOW : pointer to WindowCollection
+
+external var stdscr, curscr : WINDOW
+
+module curses
+    export waddch, wgetch, waddstr, wgetstr, wmove, wclear, werase,
+	   wclrtobot, wclrtoeol, wdeleteln, winsertln, wrefresh, winsch,
+	   wdelch, wstandout, wstandend, wprintw, initscr, newwin, subwin,
+	   delwin, touchwin, overlay, overwrite, endwin, addch, addstr,
+	   clear, clrtobot, clrtoeol, delch, deleteln, erase, getch, hasch,
+	   getstr, inch, insch, insertln, move, refresh, standend, standout,
+	   clearok, flushlok, leaveok, scrollok, winch, getyx, cbreak,
+	   nocbreak, crmode, nocrmode, echo, noecho, nl, nonl, raw, noraw,
+	   resetty, savetty, erasechar, killchar, baudrate, scrollup,
+	   scrolldown, _puts, box
+
+    external procedure waddch (s : WINDOW, ch : int)
+    external function wgetch (s : WINDOW) : char
+    external procedure waddstr (s : WINDOW, str : string)
+    external procedure wgetstr (s : WINDOW, var str : string)
+    external procedure wmove (s : WINDOW, y, x : int)
+    external procedure wclear (s : WINDOW)
+    external procedure werase (s : WINDOW)
+    external procedure wclrtobot (s : WINDOW)
+    external procedure wclrtoeol (s : WINDOW)
+    external procedure wdeleteln (s : WINDOW)
+    external procedure winsertln (s : WINDOW)
+    external procedure wrefresh (s : WINDOW)
+    external procedure winsch (s : WINDOW, c : int)
+    external procedure wdelch (s : WINDOW)
+    external procedure wstandout (s : WINDOW)
+    external procedure wstandend (s : WINDOW)
+    external procedure wprintw (s : WINDOW, fmt : string, args : ..)
+    external procedure box (win : WINDOW, vert, horiz : char)
+
+
+    /* window manipulation routines */
+    external function initscr : WINDOW
+    external function newwin (l, c, y, x : int) : WINDOW
+    external function subwin (s : WINDOW, l, c, y, x : int) : WINDOW
+    external procedure delwin (s : WINDOW)
+    external procedure touchwin (s : WINDOW)
+    external procedure overlay (win1, win2 : WINDOW)
+    external procedure overwrite (win1, win2 : WINDOW)
+    external procedure endwin
+
+    /* current window "macro" functions */
+    external procedure addch (ch : int)
+    external procedure addstr (str : string)
+    external procedure clear
+    external procedure clrtobot
+    external procedure clrtoeol
+    external procedure delch
+    external procedure deleteln
+    external procedure erase
+    external function getch : char
+    external function hasch : boolean
+    external procedure getstr (var str : string)
+    external function inch : char
+    external procedure insch (c : int)
+    external procedure insertln
+    external procedure move (y, x : int)
+    external procedure refresh
+    external procedure standend
+    external procedure standout
+
+    /* more window "macro"s */
+    external procedure clearok (s : WINDOW, b : boolean)
+    external procedure flushlok (s : WINDOW, b : boolean)
+    external procedure leaveok (s : WINDOW, b : boolean)
+    external procedure scrollok (s : WINDOW, b : boolean)
+    external function winch (s : WINDOW) : char
+    external procedure getyx (s : WINDOW, var y, x : int)
+    external procedure _puts (s : string)
+
+    /* set terminal modes */
+    external procedure cbreak
+    external procedure nocbreak
+    external procedure crmode
+    external procedure nocrmode
+    external procedure echo
+    external procedure noecho
+    external procedure nl
+    external procedure nonl
+    external procedure raw
+    external procedure noraw
+    external procedure resetty
+    external procedure savetty
+
+    /* terminal characteristics */
+    external function erasechar : char
+    external function killchar : char
+    external function baudrate : int
+
+    /* misc stuff that we use */
+    external procedure scrollup (firstLine, secondLine, num : int)
+    external procedure scrolldown (firstLine, secondLine, num : int)
+end curses

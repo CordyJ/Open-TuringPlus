@@ -1,0 +1,53 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+%
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+%
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+% Definitions for the Array/String table entries
+
+const *manifestUpperBound := 0
+const *nonManifestUpperBound := 1
+const *componentType := 2
+const *manifestStringLength := 3
+const *nonManifestStringLength := 4
+
+var asNode : unchecked collection of forward ArrayStringNode
+
+type *ArrayStringPointer : pointer to asNode
+
+type *ArrayStringNode :
+    record
+	next:	ArrayStringPointer
+	u:	union kind : manifestUpperBound..nonManifestStringLength : 1 of
+		    label manifestUpperBound:
+			mLower, mUpper:	int4
+
+		    label nonManifestUpperBound:
+			nmLower:	int4
+			nmUpper:	ExpressionPointer
+
+		    label componentType:
+			component:	TreePointer
+			id:		ExpressionPointer
+
+		    label manifestStringLength:
+			mStringUpper:	int
+
+		    label nonManifestStringLength:
+			nmStringUpper:	ExpressionPointer
+			nmStringSize:	ExpressionPointer
+		end union
+    end record

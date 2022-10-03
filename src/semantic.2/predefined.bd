@@ -1,0 +1,474 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+% 
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+% 
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+body "predefined.st" module Predefined
+
+    var predefinedTable : array PredefinedIdIndex of SymbolIndex
+
+    body function PreSymbolIndexx % (predefinedId : int) : SymbolIndex
+	pre firstPredefinedId <= predefinedId and
+	    predefinedId <= lastPredefinedId
+	result predefinedTable(predefinedId)
+    end PreSymbolIndexx
+
+    var currentPredefinedId :
+	firstPredefinedId..lastPredefinedId + 1 := firstPredefinedId
+
+
+    function currentSymbol : SymbolIndex
+	result - currentPredefinedId - maxDummySymbols - 1
+    end currentSymbol
+
+
+    procedure PredeclareFunction (routineType : TypeIndex)
+	Symbol.PushSymbol (0, currentSymbol)
+	Symbol.EnterType (routineType)
+	Symbol.EnterKind (sFunction)
+	predefinedTable (currentPredefinedId) := Symbol.SymbolIndexx
+	Symbol.PopSymbol
+	currentPredefinedId += 1
+    end PredeclareFunction
+
+
+    var typeSymbols : array 0..1, TypeKinds of SymbolIndex
+
+
+    /*
+     * Create a symbol of the given type with both a constant and a
+     * variable kind
+     */
+    procedure CreateTypeSymbol(t : TypeKinds)
+	Types.PushBuiltInType(t)
+
+	Symbol.PushSymbol(0, - t - lastPredefinedId - maxDummySymbols - 1)
+	Symbol.EnterKind (sRuntimeConstant)
+	Symbol.EnterType (Types.TypeIndexx)
+	typeSymbols(0,t) := Symbol.SymbolIndexx
+	Symbol.PopSymbol
+
+	Symbol.PushSymbol(0, - t - lastTypeKind  - lastPredefinedId -
+			  maxDummySymbols - 1)
+	Symbol.EnterKind (sVariable)
+	Symbol.EnterType (Types.TypeIndexx)
+	typeSymbols(1,t) := Symbol.SymbolIndexx
+	Symbol.PopSymbol
+
+	Types.PopType
+    end CreateTypeSymbol
+
+
+    procedure MakeFunction (numberOfParameters : int,
+			    parameterTypes : array 1..* of TypeKinds,
+			    returnType : TypeKinds, var fnType : TypeIndex)
+
+        var currentType : TypeKinds
+    
+        Types.PushNewType(tFunction)
+
+        /* push new scope for parameters */
+        Scope.PushNewScope
+    
+        /* enter each parameter in scope */
+	for currentParameter : 1 .. numberOfParameters
+	    currentType := parameterTypes(currentParameter)
+	    assert currentType > 0
+	    assert currentType = tReal or currentType = tString or
+		   currentType = tInt or currentType = tBoolean or
+		   currentType = tCondition or currentType = tSubrange or
+		   currentType = tNat or currentType = tNotFound
+
+	    Scope.ScoEnterSymbol (typeSymbols(0, currentType))
+        end for
+    
+        Scope.SaveScope
+        Types.EnterFormals(Scope.SavedScopeIndex)
+        Scope.PopScope
+    
+        /* make the return type */
+        assert returnType = tReal or returnType = tString or
+	       returnType = tInt or returnType = tBoolean or
+	       returnType = tSubrange or returnType = tNat or
+	       returnType = tChar or
+	       returnType = tNotFound
+
+        Types.PushBuiltInType(returnType)
+        Types.EnterLeftResultType
+        Types.PopType
+    
+        /* save the index of the function type and pop it */
+        fnType := Types.TypeIndexx
+        Types.PopType
+    end MakeFunction
+
+
+    var fRR : TypeIndex		/* fcn with 1 Real parm returning a Real */
+    var fRRR : TypeIndex	/* fcn with 2 Real parm returning a Real */
+    var fRI : TypeIndex		/* fcn with 1 Real parm returning an Int */
+    var fRIR : TypeIndex	/* function(real,int):real */
+    var fNullInt : TypeIndex	/* function : int */
+    var fIB : TypeIndex		/* function(integer) : boolean */
+    var fRIIIS : TypeIndex	/* (real,int,int,int):string */
+    var fRIIS : TypeIndex	/* (real, int, int) : string */
+    var fSSI : TypeIndex	/* (string,string): int*/
+    var fIR : TypeIndex		/* (integer) : real*/
+    var fSI : TypeIndex		/* (string) : int */
+    var fSII : TypeIndex	/* (string, int) : int */
+    var fSR : TypeIndex		/* (string) : real */
+    var fIIIS : TypeIndex	/* (integer, integer, integer) : string */
+    var fII : TypeIndex		/* (integer) : integer */
+    var fIS : TypeIndex		/* (integer) : string */
+    var fIC : TypeIndex		/* (integer) : char */
+    var fCB : TypeIndex		/* function(condition) : boolean */
+    var fRIS : TypeIndex	/* (real, integer) : string */
+    var fSIS : TypeIndex	/* (string, integer) : string */
+
+    const formalR : array 1..1 of TypeKinds := init (tReal)
+    const formalRR : array 1..2 of TypeKinds := init (tReal,tReal)
+    const formalRI : array 1..2 of TypeKinds := init (tReal, tInt)
+    const formalNull : array 1..1 of TypeKinds := init (tNotFound)
+    const formalI : array 1..1 of TypeKinds := init (tInt)
+    const formalRIII : array 1..4 of TypeKinds :=
+		       init (tReal, tInt, tInt, tInt)
+    const formalRII : array 1..3 of TypeKinds :=
+		     init (tReal, tInt, tInt)
+    const formalSS : array 1..2 of TypeKinds := init (tString , tString)
+    const formalS : array 1..1 of TypeKinds := init (tString)
+    const formalIII : array 1..3 of TypeKinds := init (tInt, tInt, tInt)
+    const formalC : array 1..1 of TypeKinds := init (tCondition)
+    const formalSI : array 1..2 of TypeKinds := init (tString, tInt)
+
+    var v, v2 : ValueIndex
+
+
+    CreateTypeSymbol (tReal)
+    CreateTypeSymbol (tInt)
+    CreateTypeSymbol (tString)
+    CreateTypeSymbol (tCondition)
+    CreateTypeSymbol (tNat)
+    CreateTypeSymbol (tNotFound)
+
+    /* create a function type (real,real):real	*/
+    MakeFunction (2, formalRR, tReal, fRRR)
+
+    /* create a function type (real) : real	*/
+    MakeFunction (1, formalR, tReal, fRR)
+
+    /* create a function type (real) : int	*/
+    MakeFunction (1, formalR, tInt, fRI)
+
+    /* make a function type : int */
+    MakeFunction (0 , formalNull, tInt, fNullInt)
+
+    /* create a function ( real, int ) : int */
+    MakeFunction (2, formalRI, tReal, fRIR)
+
+    /* make a function type (int) : boolean	*/
+    MakeFunction (1, formalI, tBoolean, fIB)
+
+    /* make a function ( real, int, int, int): string	*/
+    MakeFunction (4, formalRIII, tString, fRIIIS)
+
+    MakeFunction (3, formalRII, tString, fRIIS)
+    MakeFunction (2, formalSS, tInt, fSSI)
+    MakeFunction (1, formalI, tReal, fIR)
+    MakeFunction (1, formalI, tString, fIS)
+    MakeFunction (1, formalI, tChar, fIC)
+    MakeFunction (1, formalS, tInt, fSI)
+    MakeFunction (2, formalSI, tInt, fSII)
+
+    MakeFunction (1, formalS, tReal, fSR)
+
+    MakeFunction (2, formalIII, tString, fIIIS)
+
+    /* (integer) : integer */
+    MakeFunction (1, formalI, tInt, fII)
+
+    /* function(condition) : boolean */
+    MakeFunction (1, formalC, tBoolean, fCB)
+
+    /* (real, integer) : string */
+    MakeFunction (2, formalRI, tString, fRIS)
+
+    /* (string, integer) : string */
+    MakeFunction (2, formalSI, tString, fSIS)
+
+    /* not referenced by S/SL */
+    assert currentPredefinedId = pAbs
+    PredeclareFunction(fII)
+
+    /* not referenced by S/SL */
+    assert currentPredefinedId = pAddr
+    PredeclareFunction(fII)
+
+    assert currentPredefinedId = pArctan
+    PredeclareFunction(fRR)
+
+    assert currentPredefinedId = pArctand
+    PredeclareFunction(fRR)
+
+    assert currentPredefinedId = pCeil
+    PredeclareFunction(fRI)
+
+    /* not referenced by S/SL */
+    assert currentPredefinedId = pChr
+    PredeclareFunction(fIC)
+
+    assert currentPredefinedId = pCos
+    PredeclareFunction(fRR)
+
+    assert currentPredefinedId = pCosd
+    PredeclareFunction(fRR)
+
+    assert currentPredefinedId = pEmpty
+    PredeclareFunction(fCB)
+
+    /* not referenced by S/SL */
+    assert currentPredefinedId = pEof
+    PredeclareFunction( fIB )
+
+    assert currentPredefinedId = pErealstr
+    PredeclareFunction(fRIIIS)
+
+    assert currentPredefinedId = pExp
+    PredeclareFunction(fRR)
+
+    assert currentPredefinedId = pFloor
+    PredeclareFunction(fRI)
+
+    assert currentPredefinedId = pFrealstr
+    PredeclareFunction(fRIIS)
+
+    /* not referenced by S/SL */
+    assert currentPredefinedId = pGetpriority
+    PredeclareFunction(fII)
+
+    assert currentPredefinedId = pIndex
+    PredeclareFunction(fSSI)
+
+    assert currentPredefinedId = pIntreal
+    PredeclareFunction(fIR)
+
+    assert currentPredefinedId = pIntstr
+    PredeclareFunction(fIIIS)
+
+    assert currentPredefinedId = pLength
+    PredeclareFunction(fSI)
+
+    assert currentPredefinedId = pLn
+    PredeclareFunction(fRR)
+
+    /* not referenced by S/SL */
+    assert currentPredefinedId = pLower
+    PredeclareFunction(fII)
+
+    /* not referenced by S/SL */
+    assert currentPredefinedId = pMax
+    PredeclareFunction(fRRR)
+
+    /* not referenced by S/SL */
+    assert currentPredefinedId = pMin
+    PredeclareFunction(fRRR)
+
+    assert currentPredefinedId = pNatreal
+    PredeclareFunction(fIR)
+
+    assert currentPredefinedId = pNatstr
+    PredeclareFunction(fIIIS)
+
+    /* not referenced by S/SL */
+    assert currentPredefinedId = pNil
+    PredeclareFunction(fII)
+
+    /* not referenced by S/SL */
+    assert currentPredefinedId = pOrd
+    PredeclareFunction(fII)
+
+    /* not referenced by S/SL */
+    assert currentPredefinedId = pPred
+    PredeclareFunction(fII)
+
+    assert currentPredefinedId = pRand
+	Symbol.PushSymbol (0, currentSymbol)
+	Symbol.EnterKind (sProcedure)
+        Types.PushNewType(tProcedure)
+	Symbol.EnterType(Types.TypeIndexx)
+        Scope.PushNewScope
+	Scope.ScoEnterSymbol (typeSymbols(1, tReal))
+        Scope.SaveScope
+        Types.EnterFormals(Scope.SavedScopeIndex)
+        Scope.PopScope
+	Types.PopType
+	predefinedTable (currentPredefinedId) := Symbol.SymbolIndexx
+	Symbol.PopSymbol
+	currentPredefinedId += 1
+
+    assert currentPredefinedId = pRandInt
+	Symbol.PushSymbol (0, currentSymbol)
+	Symbol.EnterKind (sProcedure)
+        Types.PushNewType(tProcedure)
+	Symbol.EnterType(Types.TypeIndexx)
+        Scope.PushNewScope
+	Scope.ScoEnterSymbol (typeSymbols(1, tInt))
+	Scope.ScoEnterSymbol (typeSymbols(0, tInt))
+	Scope.ScoEnterSymbol (typeSymbols(0, tInt))
+        Scope.SaveScope
+        Types.EnterFormals(Scope.SavedScopeIndex)
+        Scope.PopScope
+	Types.PopType
+	predefinedTable (currentPredefinedId) := Symbol.SymbolIndexx
+	Symbol.PopSymbol
+	currentPredefinedId += 1
+
+    /*
+     * create 1..10 as subrange type
+     */
+    Types.PushNewType(tSubrange)
+    Types.PushBuiltInType(tInt)
+    Types.EnterLeftRootType
+    Types.PopType
+    Value.PushValue(vInteger,positive,1)
+    Value.PushValue(vInteger,positive,10)
+    Value.LeftValueIndex(v)
+    Value.ValueIndexx(v2)
+    Types.EnterRangeBounds(v, v2, false)
+    Value.PopValue
+    Value.PopValue
+    Symbol.PushSymbol(0, - tSubrange - lastPredefinedId - maxDummySymbols - 1)
+    Symbol.EnterKind (sRuntimeConstant)
+    Symbol.EnterType (Types.TypeIndexx)
+    typeSymbols(0,tSubrange) := Symbol.SymbolIndexx
+    Symbol.PopSymbol
+    Types.PopType
+
+    assert currentPredefinedId = pRandNext
+	Symbol.PushSymbol (0, currentSymbol)
+	Symbol.EnterKind (sProcedure)
+        Types.PushNewType(tProcedure)
+	Symbol.EnterType(Types.TypeIndexx)
+        Scope.PushNewScope
+	Scope.ScoEnterSymbol (typeSymbols(1, tReal))
+	Scope.ScoEnterSymbol (typeSymbols(0, tSubrange))
+        Scope.SaveScope
+        Types.EnterFormals(Scope.SavedScopeIndex)
+        Scope.PopScope
+	Types.PopType
+	predefinedTable (currentPredefinedId) := Symbol.SymbolIndexx
+	Symbol.PopSymbol
+	currentPredefinedId += 1
+
+    assert currentPredefinedId = pRandSeed
+	Symbol.PushSymbol (0, currentSymbol)
+	Symbol.EnterKind (sProcedure)
+        Types.PushNewType(tProcedure)
+	Symbol.EnterType(Types.TypeIndexx)
+        Scope.PushNewScope
+	Scope.ScoEnterSymbol (typeSymbols(0, tInt))
+	Scope.ScoEnterSymbol (typeSymbols(0, tSubrange))
+        Scope.SaveScope
+        Types.EnterFormals(Scope.SavedScopeIndex)
+        Scope.PopScope
+	Types.PopType
+	predefinedTable (currentPredefinedId) := Symbol.SymbolIndexx
+	Symbol.PopSymbol
+	currentPredefinedId += 1
+
+    assert currentPredefinedId = pRandomize
+	Symbol.PushSymbol (0, currentSymbol)
+	Symbol.EnterKind (sProcedure)
+        Types.PushNewType(tProcedure)
+	Symbol.EnterType(Types.TypeIndexx)
+        Scope.PushNewScope
+        Scope.SaveScope
+        Types.EnterFormals(Scope.SavedScopeIndex)
+        Scope.PopScope
+	Types.PopType
+	predefinedTable (currentPredefinedId) := Symbol.SymbolIndexx
+	Symbol.PopSymbol
+	currentPredefinedId += 1
+
+    assert currentPredefinedId = pRealstr
+    PredeclareFunction(fRIS)
+
+    assert currentPredefinedId = pRepeat
+    PredeclareFunction(fSIS)
+
+    assert currentPredefinedId = pRound
+    PredeclareFunction(fRI)
+
+    assert currentPredefinedId = pSetpriority
+	Symbol.PushSymbol (0, currentSymbol)
+	Symbol.EnterKind (sProcedure)
+        Types.PushNewType(tProcedure)
+	Symbol.EnterType(Types.TypeIndexx)
+        Scope.PushNewScope
+	Scope.ScoEnterSymbol (typeSymbols(0, tNat))
+        Scope.SaveScope
+        Types.EnterFormals(Scope.SavedScopeIndex)
+        Scope.PopScope
+	Types.PopType
+	predefinedTable (currentPredefinedId) := Symbol.SymbolIndexx
+	Symbol.PopSymbol
+	currentPredefinedId += 1
+
+    assert currentPredefinedId = pSign
+    PredeclareFunction(fRI)
+
+    assert currentPredefinedId = pSin
+    PredeclareFunction(fRR)
+
+    assert currentPredefinedId = pSind
+    PredeclareFunction(fRR)
+
+    /* not referenced by S/SL */
+    assert currentPredefinedId = pSize
+    PredeclareFunction(fII)
+
+    assert currentPredefinedId = pSqrt
+    PredeclareFunction(fRR)
+
+    assert currentPredefinedId = pStrint
+    PredeclareFunction(fSII)
+
+    assert currentPredefinedId = pStrnat
+    PredeclareFunction(fSII)
+
+    /* not referenced by S/SL */
+    assert currentPredefinedId = pStrdelete
+    PredeclareFunction(fII)
+
+    /* not referenced by S/SL */
+    assert currentPredefinedId = pStrmove
+    PredeclareFunction(fII)
+
+    assert currentPredefinedId = pStrreal
+    PredeclareFunction(fSR)
+
+    /* not referenced by S/SL */
+    assert currentPredefinedId = pStrreplace
+    PredeclareFunction(fII)
+
+    /* not referenced by S/SL */
+    assert currentPredefinedId = pSucc
+    PredeclareFunction(fII)
+
+    /* not referenced by S/SL */
+    assert currentPredefinedId = pUpper
+    PredeclareFunction(fII)
+
+    assert currentPredefinedId = lastPredefinedId + 1
+end Predefined

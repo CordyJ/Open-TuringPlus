@@ -1,0 +1,1165 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+% 
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+% 
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+body "type.st" module Types
+    /*  Module:	Semantic Pass Type Mechanism V1.00
+     *	Author:  Mark Mendell
+     *	Date:	11 March 1986
+     */
+
+    /* This mechanism maintains all information about defined types
+     * in the Type Table, and allows referencing of particular entries
+     * via the Type Stack.
+     */
+
+    /* Type Stack */
+    var typeStack:	array 1..maxTypeDepth of TypeIndex
+    var typeTop:	0..maxTypeDepth := 0
+    var maxTypeTop:	0..maxTypeDepth := 0
+
+    /* Type Attributes */
+    type TypeAttributeSet : set of TypeAttributes
+
+    /* Type Table Entry */
+    type TypeTableEntry :
+	record
+	    kind:	TypeKinds
+	    attributes:	TypeAttributeSet
+	    firstx:	int	/* also value, range, union map */
+	    lastx:	int	/* also fields, formals scope */
+	    typex:	int	/* also symbol */
+	    misc, misc2:int	/* type exports, orig kind */
+	    ssize:	ValueIndex
+	end record
+
+    /* Type Table */
+    var typeTable:	array -maxDummyTypes .. maxTypes of TypeTableEntry
+    var typeTableTop:	0..maxTypes := 0
+
+    /* dummy types */
+    var dummyUseCount : array -maxDummyTypes .. -1 of int
+
+    /* Type Range Bounds Table */
+    var typeRangeTable: array 1..maxTypeRanges of
+	    record
+		low, up:	ValueIndex
+		flex:		boolean
+	    end record
+
+    var typeRangeTop: 0..maxTypeRanges := 0
+
+    /* Array Index List */
+    var typeArrayIndexList: array 1..maxArrayIndices of TypeIndex
+    var typeArrayIndexTop: 0..maxArrayIndices := 0
+
+    /* Union Map Structures */
+    var unionMap : array 1..maxUnionMapValues of
+	record
+	    labelValue:			ValueIndex
+	    bodyNumber, nextEntry:	int
+	end record
+
+    var unionMapTop := 1
+
+    var unionMapStack   : array 1..maxTypeDepth of 1..maxUnionMapValues
+    var unionMapStackTop: 0..maxTypeDepth := 0
+
+    var lastUnionValueLookup : ValueIndex
+    var lastUnionBody : int
+
+
+    /* BuiltIn Types */
+    var builtInType: array TypeKinds of TypeIndex
+
+
+    /* default sizes: Machine Dependant!!! */
+    const defaultSize := viFour
+
+    /* type ranges */
+    var intRange, natRange : 0..maxTypeRanges
+
+    body procedure PushType % (typex: TypeIndex)
+	if typeTop < maxTypeDepth then
+	    typeTop += 1
+	    if statistics and maxTypeTop < typeTop then
+		maxTypeTop := typeTop
+	    end if
+	    typeStack(typeTop) := typex
+	    if typex < 0 then
+		dummyUseCount(typex) += 1
+	    end if
+	else
+	    Error (eTypeStackOverflow)
+	end if
+    end PushType
+
+
+    procedure PushDummy
+	for i : -maxDummyTypes .. -1
+	    if dummyUseCount(i) = 0 then
+		bind var register t to typeTable(i)
+		t.kind := tNotFound
+		t.attributes :=  TypeAttributeSet()
+		t.firstx := 0
+		t.lastx := 0
+		t.typex := 0
+		t.ssize := viZero
+		PushType(i)
+		return
+	    end if
+	end for
+	Error (eNoFreeDummyTypes)
+    end PushDummy
+
+
+    body procedure PushBuiltInType % (kind: TypeKinds)
+	PushType (builtInType(kind))
+    end PushBuiltInType
+
+
+    body procedure PushNewType % (kind: TypeKinds)
+	if typeTableTop < maxTypes then
+	    typeTableTop += 1
+	    bind var register t to typeTable(typeTableTop)
+	    t.kind := kind
+	    t.attributes := TypeAttributeSet()
+	    t.firstx := 0
+	    t.lastx := 0
+	    t.typex := 0
+	    t.misc := 0
+	    t.misc2 := 0
+	    if kind = tSubrange or kind = tEnumeratedRange then
+		t.ssize := defaultSize
+	    else
+		if kind = tInt then
+		    t.firstx := intRange
+		elsif kind = tNat then
+		    t.firstx := natRange
+		end if
+		t.ssize := viZero
+	    end if
+	    PushType (typeTableTop)
+	else
+	    Error (eTypeTableOverflow)
+	end if
+    end PushNewType
+
+
+    body procedure PushCountIndexType % (offset : int)
+	bind register t to typeTable(typeStack(typeTop))
+	assert t.kind = tArray or t.kind = tFlexArray
+	PushType(typeArrayIndexList(t.lastx-offset+1))
+    end PushCountIndexType
+
+
+    body procedure PushComponentType
+	pre typeTop > 0
+	bind register t to typeTable(typeStack(typeTop))
+	assert t.kind = tArray or t.kind = tCollection or
+	       t.kind = tSet or t.kind = tEnumeratedElement or
+	       t.kind = tFlexArray
+	PushType (t.typex)
+    end PushComponentType
+
+
+    body procedure PushLeftComponentType
+	pre typeTop > 1
+	bind register t to typeTable(typeStack(typeTop-1))
+	assert t.kind = tArray or t.kind = tCollection or
+	       t.kind = tSet or t.kind = tEnumeratedElement or
+	       t.kind = tFlexArray
+	PushType (t.typex)
+    end PushLeftComponentType
+
+
+    body procedure PushResultType
+	pre typeTop > 0
+	bind register t to typeTable(typeStack(typeTop))
+	PushType (t.typex)
+    end PushResultType
+
+
+    body procedure PushLeftResultType
+	pre typeTop > 1
+	bind register t to typeTable(typeStack(typeTop-1))
+	PushType (t.typex)
+    end PushLeftResultType
+
+
+    body procedure PushCharStringDummyType % (v : ValueIndex)
+	PushDummy
+	bind var register t to typeTable(typeStack(typeTop))
+	t.kind := tCharString
+	t.firstx := v
+    end PushCharStringDummyType
+
+
+    procedure FreeDummy (i : int)
+	if i < 0 then
+	    assert dummyUseCount(i) > 0
+	    dummyUseCount(i) -= 1
+	end if
+    end FreeDummy
+
+
+    body procedure PopType
+	pre typeTop > 0
+	const i := typeStack(typeTop)
+	FreeDummy(i)
+	typeTop -= 1
+    end PopType
+
+
+    body procedure ReplaceBuiltInType % (kind: TypeKinds)
+	pre typeTop > 0
+	FreeDummy(typeStack(typeTop))
+	typeStack(typeTop) := builtInType(kind)
+    end ReplaceBuiltInType
+
+
+    body procedure ReplaceComponentType
+	pre typeTop > 0
+	bind register t to typeTable(typeStack(typeTop))
+	assert t.kind = tArray or t.kind = tCollection or t.kind = tSet or
+		t.kind = tEnumeratedElement or t.kind = tFlexArray
+	FreeDummy(typeStack(typeTop))
+	typeStack(typeTop) := t.typex
+    end ReplaceComponentType
+
+
+    body procedure ReplaceResultType
+	pre typeTop > 0
+	FreeDummy(typeStack(typeTop))
+	bind register t to typeTable(typeStack(typeTop))
+	typeStack(typeTop) := t.typex
+    end ReplaceResultType
+
+
+    body procedure ReplaceRootType
+	pre typeTop > 0
+	FreeDummy(typeStack(typeTop))
+	bind register t to typeTable(typeStack(typeTop))
+	assert t.kind = tEnumeratedElement or t.kind = tSubrange
+	typeStack(typeTop) := t.typex
+    end ReplaceRootType;
+
+
+    body procedure TypEnterSymbol % (symbol: SymbolIndex)
+	pre typeTop > 0
+	bind var register t to typeTable(typeStack(typeTop))
+	t.typex := symbol
+    end TypEnterSymbol
+
+
+    body procedure EnterFields % (scope: ScopeIndex)
+	pre typeTop > 0
+	bind var register t to typeTable(typeStack(typeTop))
+	t.lastx := scope
+    end EnterFields
+
+
+    body procedure EnterFormals % (scope: ScopeIndex)
+	pre typeTop > 0
+	bind var register t to typeTable(typeStack(typeTop))
+	t.lastx := scope
+    end EnterFormals
+
+
+    body procedure EnterExports % (scope: ScopeIndex)
+	pre typeTop > 0
+	bind var register t to typeTable(typeStack(typeTop))
+	t.misc := scope
+    end EnterExports
+
+
+    body procedure EnterLeftComponentType
+	pre typeTop >= 2
+	bind var register t to typeTable(typeStack(typeTop-1))
+	assert t.kind = tArray or t.kind = tCollection or t.kind = tSet or
+		t.kind = tEnumeratedElement or t.kind = tFlexArray
+	t.typex := typeStack(typeTop)
+    end EnterLeftComponentType
+
+
+    body procedure EnterLeftResultType
+	pre typeTop >= 2
+	bind var register t to typeTable(typeStack(typeTop-1))
+	t.typex := typeStack(typeTop)
+    end EnterLeftResultType
+
+
+    body procedure EnterLeftRootType
+	pre typeTop >= 2
+	bind var register t to typeTable(typeStack(typeTop-1))
+	assert t.kind = tEnumeratedRange or t.kind = tSubrange
+	t.typex := typeStack(typeTop)
+    end EnterLeftRootType
+
+
+    body procedure EnterLeftTypeSizeFromRight
+	pre typeTop >= 2
+	typeTable(typeStack(typeTop-1)).ssize :=
+		typeTable(typeStack(typeTop)).ssize
+    end EnterLeftTypeSizeFromRight
+
+
+    procedure FindTypeRange (var range: 0..maxTypeRanges, low, up: ValueIndex)
+	range := 0
+	for i : 1.. typeRangeTop
+	    bind register r to typeRangeTable(i)
+	    if r.low = low and r.up = up then
+		range := i
+		exit
+	    end if
+	end for
+
+	if range = 0 then
+	    if typeRangeTop < maxTypeRanges then
+		typeRangeTop += 1
+		bind var register r to typeRangeTable(typeRangeTop)
+		r.low := low
+		r.up := up
+		r.flex  := false
+	    else
+		Error (eTypeRangeTableOverflow)
+	    end if
+	    range := typeRangeTop
+	end if
+    end FindTypeRange
+
+
+    /*
+     * Scan through the type table, looking for a match in kind, and sizes.
+     * If found, just replace that index.
+     * Otherwise, push a new type with those fields.
+     */
+    body proc ReplaceTypeWithSameKindAndStorageSize % (val: ValueIndex)
+	pre typeTop > 0
+	var kind := typeTable(typeStack(typeTop)).kind
+	assert kind = tSubrange or kind = tInt or kind = tNat or kind = tReal or
+	    kind = tEnumeratedRange
+
+	if kind = tSubrange or kind = tEnumeratedRange then
+	    /*
+	     * subrange kinds are unique:  just modify the storage sizes
+	     * and return
+	     */
+	    bind var register t to typeTable(typeStack(typeTop))
+
+	    t.ssize := val
+	    return
+	end if
+	    
+	PopType	% we are replacing the old type
+	for i : 1..typeTableTop
+	    bind register t to typeTable(i)
+	    if t.ssize = val and
+		    (t.kind = kind or
+		    	(kind = tInt and t.kind = tInt4) or
+		    	(kind = tNat and t.kind = tNat4) or
+		    	(kind = tReal and t.kind = tReal8)) then
+		/* we have an exact match */
+		PushType(i)
+		return
+	    end if
+	end for
+	/* no exact match. create a new one */
+	PushNewType(kind)
+	bind var register t to typeTable(typeStack(typeTop))
+
+	t.ssize := val
+	t.attributes := TypeAttributeSet()
+    end ReplaceTypeWithSameKindAndStorageSize
+
+
+    /*
+     * Scan through the type table, looking for a match in kind, and value.
+     * If found, just replace that index.
+     * Otherwise, push a new type with those fields.
+     */
+    body proc ReplaceTypeWithSameKindAndValue % (val: ValueIndex)
+	pre typeTop > 0
+	var kind := typeTable(typeStack(typeTop)).kind
+	assert kind = tCharString
+
+	PopType	% we are replacing the old type
+	for i : 1..typeTableTop
+	    bind register t to typeTable(i)
+	    if t.kind = kind and t.firstx = val then
+		/* we have an exact match */
+		PushType(i)
+		return
+	    end if
+	end for
+	/* no exact match. create a new one */
+	PushNewType(kind)
+	bind var register t to typeTable(typeStack(typeTop))
+
+	t.firstx := val
+    end ReplaceTypeWithSameKindAndValue
+
+
+    var initializing := true
+
+    body procedure EnterRangeBounds % (low, up: ValueIndex, flex : Boolean)
+	pre typeTop > 0
+	bind var register t to typeTable(typeStack(typeTop))
+	assert t.kind = tSubrange or t.kind = tSet or
+	       t.kind = tEnumeratedRange or initializing
+
+	var rIndex: 0..maxTypeRanges
+
+	FindTypeRange (rIndex, low, up)
+	typeRangeTable(rIndex).flex  := flex
+	t.firstx := rIndex
+    end EnterRangeBounds
+
+
+    body procedure TypEnterAttribute % (attribute: TypeAttributes)
+	pre typeTop > 0
+	typeTable(typeStack(typeTop)).attributes += TypeAttributeSet(attribute)
+    end TypEnterAttribute
+
+
+    body procedure TypEnterKind % (kind: TypeKinds)
+	pre typeTop > 0
+	typeTable(typeStack(typeTop)).kind := kind
+    end TypEnterKind
+
+
+    body procedure EnterOpaqueTypeNumber
+	pre typeTop > 0
+	bind var register t to typeTable(typeStack(typeTop))
+
+	/* Save old values */
+	t.misc := t.kind
+	t.misc2  := t.firstx
+
+	/*
+	 * A type's table index can be used as an opaque type number
+	 * since it is unique.
+	 */
+	t.kind := tOpaque
+	t.firstx := typeStack(typeTop)
+    end EnterOpaqueTypeNumber
+
+
+    body procedure UnMakeOpaque
+	pre typeTop > 0
+	bind var register t to typeTable(typeStack(typeTop))
+
+	/* Save old values */
+	const temp := t.kind
+	const temp2 := t.firstx
+
+	/* set the value to the saved values */
+	t.kind := t.misc
+	t.firstx := t.misc2
+
+	t.misc := temp
+	t.misc2  := temp2
+    end UnMakeOpaque
+
+
+    body procedure ReMakeOpaque
+	UnMakeOpaque
+    end ReMakeOpaque
+
+
+    body procedure TypClearAttribute % (attribute: TypeAttributes)
+	pre typeTop > 0
+	typeTable(typeStack(typeTop)).attributes -= TypeAttributeSet(attribute)
+    end TypClearAttribute
+
+
+    body procedure CopyLeftBounds
+	pre (typeTop >= 2)
+	bind var register t1 to typeTable(typeStack(typeTop-1)),
+	         register t2 to typeTable(typeStack(typeTop))
+	assert (t1.kind = tSubrange or t1.kind = tSet) and t2.firstx not = 0
+	t1.firstx := t2.firstx
+    end CopyLeftBounds
+
+
+    body function TypeIndexx % : TypeIndex
+	pre typeTop > 0
+	result typeStack(typeTop)
+    end TypeIndexx
+
+
+    body function TypeCheatSizeLegal % ( s : int) : boolean
+	% This is almost machine dependant
+	% return true if the type cheat size value is valid for the type
+	pre typeTop > 0
+	const kind := typeTable(typeStack(typeTop)).kind
+	if kind = tInt or kind = tNat then
+	    case s of
+		label 1, 2, 4:
+		    result true
+		label :
+		    result false
+	    end case
+	elsif kind = tReal then
+	    case s of
+		label 4, 8:
+		    result true
+		label :
+		    result false
+	    end case
+	else
+	    result false
+	end if
+    end TypeCheatSizeLegal
+
+
+    body function TypeKind % : TypeKinds
+	pre typeTop > 0
+	result typeTable(typeStack(typeTop)).kind
+    end TypeKind
+
+
+    body function LeftTypeKind % : TypeKinds
+	pre typeTop >= 2
+	result typeTable(typeStack(typeTop-1)).kind
+    end LeftTypeKind
+
+
+    body function SameKindsAndSizes % : boolean
+	pre typeTop >= 2
+	bind register t1 to typeTable(typeStack(typeTop)),
+	     register t2 to typeTable(typeStack(typeTop-1))
+	result t1.kind = t2.kind and t1.ssize = t2.ssize
+    end SameKindsAndSizes
+
+
+    body function TypeHasAttribute % (attribute: TypeAttributes) : boolean
+	pre typeTop > 0
+	result attribute in typeTable(typeStack(typeTop)).attributes
+    end TypeHasAttribute
+
+
+    body function LeftTypeHasAttribute % (attribute: TypeAttributes) : boolean
+	pre typeTop > 1
+	result attribute in typeTable(typeStack(typeTop-1)).attributes
+    end LeftTypeHasAttribute
+
+
+    body function TypeSymbol % : SymbolIndex
+	pre typeTop > 0
+	result typeTable(typeStack(typeTop)).typex
+    end TypeSymbol
+
+
+    body function TypeSymbolsSame % : boolean
+	pre typeTop >= 2
+	bind register t1 to typeTable(typeStack(typeTop-1)),
+	     register t2 to typeTable(typeStack(typeTop))
+	assert t1.kind = tPointer and t2.kind = tPointer
+	result t1.typex = t2.typex
+    end TypeSymbolsSame
+
+
+    body function TypeLowerBoundsSame % : boolean
+	pre typeTop >= 2
+	bind register t1 to typeTable(typeStack(typeTop-1)),
+	     register t2 to typeTable(typeStack(typeTop))
+	assert t1.firstx not = 0 and t2.firstx not = 0
+	result typeRangeTable(t1.firstx).low = typeRangeTable(t2.firstx).low
+    end TypeLowerBoundsSame
+
+
+    body function TypeBoundsSame % : boolean
+	pre typeTop >= 2
+	bind register t1 to typeTable(typeStack(typeTop-1)),
+	     register t2 to typeTable(typeStack(typeTop))
+	assert t1.firstx not = 0 and t2.firstx not = 0
+	result t1.firstx = t2.firstx
+    end TypeBoundsSame
+
+
+    body function TypeEnumeratedSame % : boolean
+	pre typeTop >= 2
+	bind register t1 to typeTable(typeStack(typeTop-1)),
+	     register t2 to typeTable(typeStack(typeTop))
+	assert t1.firstx not = 0 and t2.firstx not = 0
+	assert t1.lastx not = 0 and t2.lastx not = 0
+	result t1.firstx = t2.firstx and t1.lastx = t2.lastx
+    end TypeEnumeratedSame
+
+
+    body procedure SameStringBounds % (var v : ValueIndex, var b : boolean)
+	pre typeTop >= 2
+	bind register t1 to typeTable(typeStack(typeTop-1)),
+	     register t2 to typeTable(typeStack(typeTop))
+	assert t1.kind = tString and t2.kind = tString or
+	       t1.kind = tCharString and t2.kind = tCharString
+
+	b := t1.firstx = t2.firstx
+	v := t1.firstx
+    end SameStringBounds
+
+
+    body function TypeOpaqueTypeNumbersSame % : boolean
+	pre typeTop >= 2
+	bind register t1 to typeTable(typeStack(typeTop-1)),
+	     register t2 to typeTable(typeStack(typeTop))
+	assert t1.kind = tOpaque and t2.kind = tOpaque
+	assert t1.firstx not = 0 and t2.firstx not = 0
+	result t1.firstx = t2.firstx
+    end TypeOpaqueTypeNumbersSame
+
+
+    body function TypeLowerBound % : ValueIndex
+	pre typeTop > 0
+	result typeRangeTable(typeTable(typeStack(typeTop)).firstx).low
+    end TypeLowerBound
+
+
+    body function TypeUpperBound % : ValueIndex
+	pre typeTop > 0
+	result typeRangeTable(typeTable(typeStack(typeTop)).firstx).up
+    end TypeUpperBound
+
+
+    body function TypeFormals % : ScopeIndex
+	pre typeTop > 0
+	result typeTable(typeStack(typeTop)).lastx
+    end TypeFormals
+
+
+    body function TypeExports % : ScopeIndex
+	pre typeTop > 0
+	result typeTable(typeStack(typeTop)).misc
+    end TypeExports
+
+
+    body function TypeFields % : ScopeIndex
+	pre typeTop > 0
+	result typeTable(typeStack(typeTop)).lastx
+    end TypeFields
+
+
+    body function SameTypes % : boolean
+	pre typeTop >= 2
+	if typeStack(typeTop-1) = typeStack(typeTop) then
+	    result true
+	else
+	    bind register t1 to typeTable(typeStack(typeTop)),
+		 register t2 to typeTable(typeStack(typeTop-1))
+	    
+	    if t1.kind = t2.kind then
+		case t1.kind of
+		    label tUnion, tRecord:
+			result t1.attributes = t2.attributes and
+			    t1.firstx = t2.firstx and t1.lastx = t2.lastx and
+			    t1.typex = t2.typex and t1.misc = t2.misc and
+			    t1.misc2 = t2.misc2
+		    
+		    label tString:
+			/* check of lastX gets string(255) & string */
+			result t1.firstx = t2.firstx and t1.lastx = t2.lastx
+
+		    label :
+			result false
+		end case
+	    else
+		result false
+	    end if
+	end if
+    end SameTypes
+
+
+    body procedure CopyLeftType
+	pre typeTop >= 2
+	typeTable(typeStack(typeTop-1)) := typeTable(typeStack(typeTop))
+    end CopyLeftType
+
+
+    body procedure SwapTypes
+	pre typeTop >= 2
+	const t := typeStack(typeTop)
+	typeStack(typeTop) := typeStack(typeTop-1)
+	typeStack(typeTop-1) := t
+    end SwapTypes
+
+
+    body procedure SwapSecondAndThirdTypes
+	pre typeTop >= 3
+	const t := typeStack(typeTop-1)
+	typeStack(typeTop-1) := typeStack(typeTop-2)
+	typeStack(typeTop-2) := t
+    end SwapSecondAndThirdTypes
+
+
+    body function TypStackEmpty % : boolean
+	result typeTop = 0
+    end TypStackEmpty
+
+
+    procedure InitializeBuiltInType (kind: TypeKinds, firstx : int)
+	PushNewType (kind)
+	case kind of
+	    label tInt, tInt4, tNat, tNat4, tIntNat,
+	    	  tChar, tSubrange, tCharString, tEnumeratedRange:
+	    	typeTable(typeTableTop).firstx := firstx
+
+	    label tString:
+		/* give a dummy lastx for same types */
+	    	typeTable(typeTableTop).firstx := firstx
+	    	typeTable(typeTableTop).lastx := 1
+
+	    label :
+	end case
+	builtInType (kind) := typeTableTop
+	PopType
+    end InitializeBuiltInType
+
+
+    procedure EnterSizeFields (v : ValueIndex)
+	typeTable(typeTableTop).ssize := v
+    end EnterSizeFields
+    
+    
+    body function TypeFirstArrayIndex % : int
+	bind register t to typeTable(typeStack(typeTop))
+
+	assert t.kind = tArray or t.kind = tFlexArray
+	result t.firstx
+    end TypeFirstArrayIndex
+
+
+    body function TypeLastArrayIndex % : int
+	bind register t to typeTable(typeStack(typeTop))
+
+	assert t.kind = tArray or t.kind = tFlexArray
+	result t.lastx
+    end TypeLastArrayIndex
+
+
+    body function TypeStringBound % : ValueIndex
+	bind register t to typeTable(typeStack(typeTop))
+
+	if t.kind = tChar or t.kind = tSubrange then
+	    /* must be char subrange */
+	    result viOne
+	else
+	    assert t.kind = tString or t.kind = tCharString or
+		   t.kind = tFlexChar
+	    result t.firstx
+	end if
+    end TypeStringBound
+
+
+    body function TypeSize % : ValueIndex
+	result typeTable(typeStack(typeTop)).ssize
+    end TypeSize
+
+
+    body function TypeSetSubrangeLowerBound % : ValueIndex
+	bind register t to typeTable(typeStack(typeTop))
+
+	assert t.kind = tEnumeratedRange or t.kind = tSubrange or t.kind = tSet
+	result typeRangeTable(t.firstx).low
+    end TypeSetSubrangeLowerBound
+
+
+    body function TypeSetSubrangeUpperBound % : ValueIndex
+	bind register t to typeTable(typeStack(typeTop))
+
+	assert t.kind = tEnumeratedRange or t.kind = tSubrange or t.kind = tSet
+	result typeRangeTable(t.firstx).up
+    end TypeSetSubrangeUpperBound
+
+
+    body procedure EnterLeftSetBase
+	bind var register t to typeTable(typeStack(typeTop-1))
+
+	assert t.kind = tSet
+	t.typex := typeStack(typeTop)
+    end EnterLeftSetBase
+
+
+    body procedure EnterFirstArrayIndex
+	bind var register t to typeTable(typeStack(typeTop))
+
+	assert t.kind = tArray or t.kind = tFlexArray
+	t.firstx := typeArrayIndexTop + 1
+    end EnterFirstArrayIndex
+
+
+    body procedure EnterLastArrayIndex
+	bind var register t to typeTable(typeStack(typeTop))
+
+	assert t.kind = tArray or t.kind = tFlexArray
+	t.lastx := typeArrayIndexTop
+    end EnterLastArrayIndex
+
+
+    body procedure EnterUnionTagSymbol % (sIndex : SymbolIndex)
+	bind var register t to typeTable(typeStack(typeTop))
+
+	assert t.kind = tUnion
+	t.typex := sIndex
+    end EnterUnionTagSymbol
+
+
+    body function UnionTag % : SymbolIndex
+	bind register t to typeTable(typeStack(typeTop))
+
+	assert t.kind = tUnion
+	result t.typex
+    end UnionTag
+
+
+    body procedure EnterArrayBound
+	bind register t to typeTable(typeStack(typeTop))
+
+	assert t.kind = tSubrange or t.kind = tEnumeratedRange or
+	       t.kind = tInt /* error condition */
+	if typeArrayIndexTop < maxArrayIndices then
+	    typeArrayIndexTop += 1
+	    typeArrayIndexList(typeArrayIndexTop) := typeStack(typeTop)
+	else
+	    Error(eTypeArrayIndexOverflow)
+	end if
+    end EnterArrayBound
+
+
+    body procedure EnterStringBound % (vIndx : ValueIndex)
+	bind var register t to typeTable(typeStack(typeTop))
+
+	assert t.kind = tString or t.kind = tChar or
+	    t.kind = tCharString or t.kind = tFlexChar
+	t.firstx := vIndx
+    end EnterStringBound
+
+
+    body procedure EnterEnumeratedElementRoot
+	bind var register t to typeTable(typeStack(typeTop)),
+	        register t1 to typeTable(typeStack(typeTop - 1))
+
+	assert t.kind = tEnumeratedElement and t1.kind = tEnumeratedRange
+	t.typex := typeStack(typeTop -1)
+    end EnterEnumeratedElementRoot
+
+
+    body function SameArrayRanges % : boolean
+	const t1 := typeTable(typeStack(typeTop - 1))
+	const t2 := typeTable(typeStack(typeTop))
+	var indexCount := t1.lastx - t1.firstx
+
+	if indexCount not= (t2.lastx - t2.firstx) then
+	    result false
+	else
+	    for i : 0..indexCount
+		if typeTable(typeArrayIndexList(t1.firstx+i)).firstx not=
+			typeTable(typeArrayIndexList(t2.firstx+i)).firstx then
+		    result false
+		elsif typeRangeTable(typeTable(
+			typeArrayIndexList(t1.firstx+i)).firstx).flex then
+		    result false
+		end if
+	    end for
+	end if
+	result true
+    end SameArrayRanges
+
+
+    body function FlexRange % : boolean
+	bind register t to typeTable(typeStack(typeTop))
+	assert t.kind = tSubrange or t.kind = tIntNat or
+	       t.kind = tSet or t.kind = tEnumeratedRange or
+	       t.kind = tInt or t.kind = tInt4 or
+	       t.kind = tNat or t.kind = tNat4
+	result typeRangeTable(t.firstx).flex
+    end FlexRange
+
+    
+    body procedure UnionMapPush
+	/* since unionmap depth == typeStack depth, this always works */
+	unionMapStackTop += 1
+	if unionMapTop >= maxUnionMapValues then
+	    Error(eUnionMapTableOverflow)
+	else
+	    unionMapStack(unionMapStackTop) := unionMapTop
+	    unionMapTop += 1
+	end if
+    end UnionMapPush
+
+
+    body procedure UnionMapPop
+	bind var register u to unionMap(unionMapStack(unionMapStackTop))
+	u.nextEntry := 0
+	u.labelValue := 0
+	u.bodyNumber := 0
+	unionMapStackTop -= 1
+    end UnionMapPop
+
+    
+    body procedure UnionMapEnter % (v : ValueIndex, body : intNo)
+	if unionMapTop >= maxUnionMapValues then
+	    Error(eUnionMapTableOverflow)
+	else
+	    bind var register u to unionMap(unionMapStack(unionMapStackTop))
+	    u.nextEntry  := unionMapTop
+	    u.labelValue := v
+	    u.bodyNumber := bodyNo
+	    unionMapStack(unionMapStackTop) := unionMapTop
+	    unionMapTop += 1
+	end if
+    end UnionMapEnter
+
+
+    body procedure UnionTagValueLegal % (v : ValueIndex, var r : boolean)
+	pre typeTable(typeStack(typeTop)).kind = tUnion
+	/* assert v is on top of value stack */
+	var i := typeTable(typeStack(typeTop)).firstx
+	var lastI := i
+	var lastlastI := i
+	var found := false
+
+	loop
+	    exit when i = 0
+	    if unionMap(i).labelValue = v then
+		found := true
+		exit
+	    end if
+	    lastlastI := lastI
+	    lastI := i
+	    i := unionMap(i).nextEntry
+	end loop
+
+	if found then
+	    lastUnionValueLookup := v
+	    lastUnionBody := unionMap(i).bodyNumber
+	    r := true
+	elsif Value.ValueIndexKind(unionMap(lastlastI).labelValue) =
+	       vRunTime then
+	    lastUnionValueLookup := v
+	    lastUnionBody := unionMap(lastlastI).bodyNumber
+	    r := true
+	else
+	    r := false
+	end if
+    end UnionTagValueLegal
+
+
+    body function UnionBodyValue % (v : ValueIndex) : int
+	pre v = lastUnionValueLookup
+	result lastUnionBody
+    end UnionBodyValue
+
+
+    body procedure EnterUnionMap
+	pre typeTable(typeStack(typeTop)).kind = tUnion
+	typeTable(typeStack(typeTop)).firstx := unionMapStack(unionMapStackTop)
+    end EnterUnionMap
+
+
+    body procedure TypStats
+	put "Types\n\tStack = ", maxTypeTop, "/", maxTypeDepth,
+	    "\n\tTable = ", typeTableTop, "/", maxTypes
+	put "\tRange Table = ", typeRangeTop, "/", maxTypeRanges,
+	    "\tArray Index Table = ", typeArrayIndexTop, "/", maxArrayIndices
+    end TypStats
+
+
+    procedure PrintTypeKinds (k:TypeKinds)
+	if k >= firstTypeKind and k <= lastTypeKind then
+	    const typeNames : array firstTypeKind..lastTypeKind of string(20) :=
+		init ( "Procedure", "Function", "Process", "Module", "Monitor",
+		       "Array", "FlexArray", "Collection", "Record", "Union",
+		       "EnumeratedRange", "Set", "String", "Char", "Char()",
+		       "FlexChar", "Condition", "EnumeratedElement", "Pointer",
+		       "Boolean", "Int", "Nat", "Real", "Subrange",
+		       "Addressint", "Type", "Opaque", "Int4", "Nat4", "Real8",
+		       "IntNat", "Varying", "NotFound", "Error")
+
+	    put typeNames(k) : 20, "\t" ..
+	else
+	    put "?????" : 20, "\t" ..
+	end if
+    end PrintTypeKinds
+
+
+    procedure PutAttributes(a : TypeAttributeSet)
+	var res := ""
+	const tattrchars := "FCPTRSC"
+	for i : firstTypeAttribute .. lastTypeAttribute
+	    if i in a then
+		res += tattrchars(i+1)
+	    else
+		res += "-"
+	    end if
+	end for
+	put res ..
+    end PutAttributes
+
+
+    procedure DumpStackTable
+	var tt := typeTableTop
+	var ts := typeTop
+	var maxIndex := typeTableTop
+
+	if maxIndex < typeTop then
+	    maxIndex := typeTop
+	end if
+
+	put "\n\tType\t\tTypeTable"
+	put "\tStack\t\tKind                  \tfirstx\tlastx\ttype\tssize\tsssize\tattr"
+	for decreasing i : maxIndex..1
+	    if ts = i then
+		put i:7, "\t", typeStack(i) : 7, "\t" ..
+		ts -= 1
+	    else
+		put "\t\t" ..
+	    end if
+
+	    if tt = i then
+		put i:7, "\t" ..
+		PrintTypeKinds(typeTable(i).kind)
+		put typeTable(i).firstx, "\t", typeTable(i).lastx, "\t",
+		    typeTable(i).typex, "\t", typeTable(i).ssize, "\t" ..
+		PutAttributes(typeTable(i).attributes)
+		tt -= 1
+	    end if
+	    put ""
+	end for
+	put ""
+    end DumpStackTable
+
+
+    body procedure DumpTypes
+	var tr := typeRangeTop
+	var ta := typeArrayIndexTop
+	var tu := unionMapTop-1
+	var maxIndex := tr
+
+	if maxIndex < typeArrayIndexTop then
+	    maxIndex := typeArrayIndexTop
+	end if
+	if maxIndex < unionMapTop then
+	    maxIndex := unionMapTop
+	end if
+
+	DumpStackTable
+
+	put "\n\tTypeRange\t\t\tArray\t\tUnionMap"
+	put "\tlow\tup\tflex\t\tindex\t\tvalue\tbody No\tnext"
+	for decreasing i : maxIndex..1
+	    if tr = i then
+		put i:7, "\t", typeRangeTable(i).low, "\t",
+		    typeRangeTable(i).up ..
+		if typeRangeTable(i).flex then
+		    put "\tFlex\t" ..
+		else
+		    put "\tNotFlex\t" ..
+		end if
+		tr -= 1
+	    else
+		put "\t\t\t\t" ..
+	    end if
+	    if ta = i then
+		put i:7, "\t", typeArrayIndexList(i), "\t\t" ..
+		ta -= 1
+	    else
+		put "\t\t\t" ..
+	    end if
+	    if tu = i then
+		put i:7, "\t", unionMap(i).labelValue, "\t",
+		    unionMap(i).bodyNumber, "\t", unionMap(i).nextEntry
+		tu -= 1
+	    else
+		put ""
+	    end if
+	end for
+	put "\n", repeat("-", 79)
+    end DumpTypes
+
+
+    /* Initialize Null Type */
+    begin
+	bind var register tnull to typeTable(0)
+	tnull.kind := tNotFound
+	tnull.attributes := TypeAttributeSet()
+	tnull.firstx := 0
+	tnull.lastx := 0
+	tnull.typex := 0
+	tnull.misc := 0
+	tnull.misc2 := 0
+    end
+
+    /* Initialize BuiltIn Types */
+    for k : firstTypeKind .. lastTypeKind
+	builtInType(k) := 0
+    end for
+
+    InitializeBuiltInType (tNotFound, viZero)
+    InitializeBuiltInType (tCondition, viZero)
+
+    var rx : 0..maxTypeRanges
+
+    FindTypeRange(rx, viZero, viOne)
+    InitializeBuiltInType (tBoolean, rx)
+
+    FindTypeRange(intRange, viMinLongInt, viMaxLongInt)
+    InitializeBuiltInType (tInt4, intRange)
+    EnterSizeFields(defaultSize)
+
+    InitializeBuiltInType (tIntNat, intRange)
+    EnterSizeFields(viNonManifest)
+
+    InitializeBuiltInType (tInt, intRange)
+    EnterSizeFields(defaultSize)
+
+    FindTypeRange(rx, viMinLongInt, viMaxNat)
+    InitializeBuiltInType (tSubrange, rx)
+    EnterSizeFields(defaultSize)
+
+    /* fix subrange builtin to have integer builtin as "root type" */
+    typeTable(typeTableTop-1).typex := typeTableTop
+
+    FindTypeRange(natRange, viZero, viMaxNat)
+    InitializeBuiltInType (tNat, natRange)
+    EnterSizeFields(defaultSize)
+
+    InitializeBuiltInType (tNat4, natRange)
+    EnterSizeFields(defaultSize)
+
+    InitializeBuiltInType (tAddressInt, natRange)
+    InitializeBuiltInType (tVaryingParameter, natRange)
+
+    InitializeBuiltInType (tString, viDefaultStringSize)
+    InitializeBuiltInType (tCharString, viDefaultStringSize)
+
+    FindTypeRange(rx, viZero, viMaxChar)
+    InitializeBuiltInType (tChar, rx)
+
+    InitializeBuiltInType (tReal, viZero)
+    EnterSizeFields(viEight)
+
+    InitializeBuiltInType (tReal8, rx)
+    EnterSizeFields(viEight)
+
+    initializing := false
+
+    /* set up the dummy types */
+    for i : -maxDummyTypes .. -1
+	dummyUseCount(i) := 0
+    end for
+end Types

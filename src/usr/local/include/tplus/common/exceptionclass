@@ -1,0 +1,40 @@
+/*
+ * Turing Plus Exception Classes
+ */
+
+include "exceptions"		/* include the standard exception types */
+
+/*
+ * Define the exception classes
+ */
+const *excpClassUserException 		:= 0
+
+const *excpClassUninitializedVaraible	:= 1
+const *excpClassArray 			:= 2
+const *excpClassUnionTag 		:= 3
+const *excpClassAssigment 		:= 4
+const *excpClassAssertion 		:= 5
+const *excpClassParameterResult 	:= 6
+const *excpClassCollection 		:= 7
+const *excpClassSet 			:= 8
+const *excpClassAliasing 		:= 9
+const *excpClassMisc	 		:= 10
+const *excpClassPredefinedRoutine 	:= 11
+const *excpClassString 			:= 12
+const *excpClassMemory 			:= 13
+const *excpClassStringConversion 	:= 14
+const *excpClassUnimplementedFeature 	:= 15
+const *excpClassIoIllegalGetItem 	:= 16
+const *excpClassIoIllegalOperation	:= 17
+const *excpClassIoImplicitOpenError 	:= 18
+const *excpClassIoReadPastEof 		:= 19
+const *excpClassDomainError 		:= 20
+const *excpClassOverflow 		:= 21
+const *excpClassUnderflow 		:= 22
+
+type *ExceptionClass : excpClassUserException .. excpClassUnderflow
+/*
+ * Mapping between exceptions and exception classes
+ */
+
+external function exceptionToClass ( execptionNumber : int) : ExceptionClass

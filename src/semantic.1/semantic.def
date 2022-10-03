@@ -1,0 +1,58 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+%
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+%
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+const *indirect := 0
+const *direct := 1
+
+/* Actual Attributes Values */
+type *ActualsAttributes : aaVar .. aaSubscript : 1
+
+/* Identifiers */
+type  *IdentifierIndex : 0..maxIdents : 2
+
+/* Scope Indices */
+type *ScopeIndex : 0..maxSavedScopes : 2
+type *SymbolKinds : firstSymbolKind..lastSymbolKind : 2
+
+/* Symbol Attributes */
+type *SymbolAttributes : firstSymbolAttribute..lastSymbolAttribute : 1
+type *SymbolAttributeSet : set of SymbolAttributes
+
+const *symbolNames : array firstSymbolKind .. lastSymbolKind of string(20) :=
+    init ( "Variable", "ReadonlyVariable", "Constant", "Type", "Collection",
+	   "ReadOnlyCollection", "Procedure", "ProcedureCall", "Function",
+	   "FunctionCall", "Module", "ReadOnlyModule", "Monitor",
+	   "ReadOnlyMonitor", "Process", "ProcessCall", "EnumeratedElement",
+	   "Result", "Init", "Tag", "Export",  "Forward", "Invisible", 
+	   "Undefined", "NotFound")
+
+
+/* Symbol Table Indices */
+type *SymbolIndex : -maxDummySymbols .. maxSymbols : 2
+
+/* Type Kinds */
+type *TypeKinds : firstTypeKind..lastTypeKind : 1
+
+/* Type Attributes */
+type *TypeAttributes : firstTypeAttribute..lastTypeAttribute : 1
+
+/* Type Table Indices */
+type *TypeIndex : 0 .. maxTypes : 2
+
+/* Value representing a null union body */
+const *nullBody := 0

@@ -1,0 +1,2 @@
+This module is the interface to all external routines (non T+) called
+from within TL.

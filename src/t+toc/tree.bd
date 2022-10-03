@@ -1,0 +1,434 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+% 
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+% 
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+/*
+ *    Turing Plus to C translator
+ *    Module:Parse Tree Construction & Manipulation Module 
+ *    By:    Mark Mendell
+ *    Date:  28 Oct 1986
+ *    From:
+ *
+ *	Turing Source Level Global Optimizer
+ *	Module:Parse Tree Construction & Manipulation Module 
+ *	By:    Peter Ashwood-Smith
+ *	Date:  May 1986.
+ */
+
+body "tree.st" module Tree
+    grant var Expression, var Token, var tNode
+
+/*
+ * Array and Top marker used to define the work hold stack on which 
+ * temporary results are placed when building trees from postfix calls.
+ */
+    var workStack : array 1 .. treeStackSize of TreePointer
+    var workStackTop : int := 0
+
+/*
+ * Procedure to push a pointer on to the hold stack. This is used   
+ * when building the tree in prefix form to hold intermediate subtrees.
+ */
+    procedure Push (x : TreePointer)
+	if workStackTop >= treeStackSize then
+	    Error (treeStackOverflow, nil(tNode), fatalError)
+	end if
+	if workStackTop < 0 then
+	    Error (treeStackInvalidTop, nil(tNode), fatalError)
+	end if
+	workStackTop += 1
+	workStack (workStackTop) := x
+    end Push
+
+/*
+ * Procedure to pop a pointer off the hold stack. This is used when 
+ * when building the tree in prefix form to hold intermediate subtrees.
+ */
+    procedure Pop (var x : TreePointer)
+	if workStackTop < 1 then
+	    Error (treeStackUnderflow, nil(tNode), fatalError)
+	end if
+	if workStackTop > treeStackSize then
+	    Error (treeStackInvalidTop, nil(tNode), fatalError)
+	end if
+	x := workStack (workStackTop)
+	workStackTop -= 1
+    end Pop
+
+/*
+ * Procedure to return the top of the hold stack. This is used when 
+ * when building the tree in prefix form to hold intermediate subtrees.
+ */
+    procedure Top (var x : TreePointer)
+	if workStackTop > treeStackSize or workStackTop < 1 then
+	    Error (treeStackInvalidTop, nil(tNode), fatalError)
+	end if
+	x := workStack (workStackTop)
+    end Top
+
+/*
+ * Function to tell us if the stack is empty or not. Just test top=0
+ */
+    function TheStackIsNotEmpty : boolean
+	result not (workStackTop = 0)
+    end TheStackIsNotEmpty
+
+/*
+ * Procedure to make sure a node makes sense, if not Error
+ * is invoked with failCode. This procedure is called to check that
+ * the tree access functions are being used correctly. Also check for
+ * unknown node kinds which may slip by tree builder if it were buggy.
+ */
+    procedure CheckValidNode (t : TreePointer, failCode : int)
+	if t = nil (tNode) then
+	    put :0, "nil node: "
+	    Error (failCode, nil(tNode), fatalError)
+	end if
+	if tNode (t).operatorNumber < FirstToken or
+		tNode (t).operatorNumber > LastToken then
+	    put :0, "illegal token number: ", tNode (t).operatorNumber
+	    Error (failCode, t, fatalError)
+	elsif tNode (t).nodeKind = NodeKinds.Unknown then
+	    put :0, "unknown node: "
+	    Error (failCode, t, fatalError)
+	end if
+    end CheckValidNode
+
+/*
+ * Procedure to init the module to a good start up configuration.   
+ * We reset the stack top, and all the PutAway table indexcies.
+ */
+    body procedure Init
+	workStackTop := 0
+    end Init
+
+/*
+ * Procedure to force the start of a new internal node with operator
+ * op and leaf value e and nodeKind, k
+ */
+    procedure PushNewOpNode (op : int, e : ExpressionPointer, k : NodeKinds)
+	var register t : TreePointer
+	new tNode, t
+	tNode (t).operatorNumber := op
+	tNode (t).leaf := e
+	tNode (t).nodeKind := k
+	tNode (t).operand := nil (tNode)
+	tNode (t).sibling := nil (tNode)
+	tNode (t).lineNumber := currentLineNumber
+	tNode (t).fileNumber := currentFileNumber
+	tNode (t).transformed := false
+	Push (t)
+    end PushNewOpNode
+
+/*
+ * Procedure to force the end of the children of closest enclosing   
+ * statement node that is not yet built. We just pop the stack and
+ * join each node together because they are siblings. We stop when
+ * we get to a node whose nodeKind is Unknown. This is the root that
+ * the caller wants as parent for the rest of the trees. We link them
+ * into the operand of this node and push it back. We then set 
+ * the nodeKind to either SimpleLeaf or OperatorNode depending on
+ * wether the node does infact have any children.
+ */
+    body procedure EndSubtree
+	var temp, last : TreePointer
+	last := nil (tNode)
+	loop
+	    /* make last kids */
+	    Pop (temp)
+	    exit when tNode (temp).nodeKind = NodeKinds.Unknown
+	    tNode (temp).sibling := last
+	    last := temp
+	end loop 
+	/* kids in last */
+	tNode (temp).operand := last /* make op node */
+	if tNode (temp).operand = nil (tNode) then
+	    tNode (temp).nodeKind := NodeKinds.SimpleLeaf
+	else
+	    tNode (temp).nodeKind := NodeKinds.OperatorNode
+	end if
+	Push (temp) /* put it back */
+    end EndSubtree
+
+/*
+ * Procedure End, the end of a construction of a parse tree and  
+ * the user has made all the calls to Tree.StartXXX and to the   
+ * Tree.EndStatement. He/she now wants the parse tree to be given
+ * back and placed in the var parameter provided. 
+ */
+    body procedure End % (var t : TreePointer)
+	Pop (t)
+    end End
+
+/*
+ * Procedure AssertStackIsEmpty - will check that the stack has 
+ * no elements in it. If it is non empty we die. This is used by 
+ * the walker.ssl program to check when the parse tree is complete
+ * that no subtrees are left dangling on the work stack, a condition
+ * that occasionally cropped up while debugging. If the stack is not
+ * empty we dump the contents of the stack one tree at a time to the
+ * debugging stream 's' passed to us via the walker.mod.
+ */
+    body procedure AssertStackIsEmpty % (s:int)
+	var t : TreePointer
+	if TheStackIsNotEmpty then
+	    put : s, "DUMP OF EXTRANEOUS TREES ON TREE STACK STARTS"
+	    loop
+		exit when not TheStackIsNotEmpty /* sorry, not^2! */
+		Pop (t)
+		put : s, "   Next Extraneous Tree"
+		Dump (t, 10, s)
+	    end loop
+	    Error (treeBadCallSequence, nil(tNode), fatalError)
+	end if
+    end AssertStackIsEmpty
+
+/*
+ * This is major window into the Tree Module. These procedures are all
+ * exported. They are called to request installation of subtrees into 
+ * the parse tree for the current node, to terminate this node and to 
+ * add leaves to this tree. Expression. NilExpr returns a Nil pointer.
+ * Start New Subtree pushes a node with unknown node kind because we
+ * will establish this after the EndSubtree linkup is done. nodeKind
+ * Unknown is used to mark the stopping point in this construction.
+ */
+    body procedure StartNewSubtree % (lab : int)
+	PushNewOpNode (lab, nil(eNode), NodeKinds.Unknown)
+    end StartNewSubtree
+
+/*
+ * Copy the node t1 to t2 all fields are copied just basically a simple
+ * assignment. (not sure if causing inconsistency by not Nil'ing out the
+ * next sibling field but know this property is used in at least one 
+ * module).
+ */
+    body procedure CopyNode % (t1 : TreePointer, var t2:TreePointer)
+	new tNode, t2
+	tNode (t2) := tNode (t1)
+    end CopyNode
+
+/*
+ * Copy the tree t1 to t2 recursively.
+ */
+    body procedure Copy % (t1 : TreePointer, var t2:TreePointer)
+	var last, Scan, temp1, temp2 : TreePointer
+	if t1 = nil (tNode) then
+	    t2 := nil (tNode)
+	else
+	    new tNode, t2
+	    tNode (t2).operatorNumber := tNode (t1).operatorNumber
+	    tNode (t2).nodeKind := tNode (t1).nodeKind
+	    tNode (t2).transformed := tNode (t1).transformed
+	    tNode (t2).lineNumber := tNode(t1).lineNumber
+	    tNode (t2).fileNumber := tNode(t1).fileNumber
+	    tNode (t2).transformed := false
+	    if tNode (t1).leaf not= nil(eNode) then
+		Expression.Copy (tNode (t1).leaf, tNode (t2).leaf)
+	    else
+		tNode (t2).leaf := nil(eNode)
+	    end if
+	    temp1 := tNode (t1).operand
+	    Copy (temp1, temp2)
+	    tNode (t2).operand := temp2
+	    last := temp2
+	    Scan := temp1
+	    if Scan not= nil (tNode) then
+		loop
+		    Scan := tNode (Scan).sibling
+		    exit when Scan = nil (tNode)
+		    Copy (Scan, temp2)
+		    tNode (last).sibling := temp2
+		    last := temp2
+		end loop
+		tNode (last).sibling := nil (tNode)
+	    end if
+	end if
+    end Copy
+
+/*
+ * A useful routine that makes a copy of the tree argument and pushes this
+ * tree on the construction stack. It is useful if we are building a tree
+ * and want a subtree to be a duplicate of another. 
+ */
+    body procedure EnterCopy % (t : TreePointer)
+	var temp : TreePointer
+	Copy (t, temp)
+	Push (temp)
+    end EnterCopy
+
+/*
+ * Next come the more access functions which are used to construct the 
+ * leaves of the tree. They all call PushNewOpNode to get their work done
+ * in a similar manner as the above access function.  EnterExpression
+ * Just calls to have an expression leaf built. If the node 'e' is nil we
+ * do nothing. This allows the TransferExpressionToTreeLeaf operation in
+ * the SSL to proceed without error in cases where an <EXPR> was expected
+ * but none was actually put there. This occurs for procedures that are
+ * called without any parameters.
+ */
+    body procedure EnterExpression % (e : ExpressionPointer)
+	if e not= nil(eNode) then
+	    PushNewOpNode (0, e, NodeKinds.ExpressionLeaf)
+	end if
+    end EnterExpression
+
+/*
+ * Build a simple leaf node, not an expression leaf but a simple token 
+ * leaf like aElseIf etc.
+ */
+    body procedure EnterSimpleLeaf % (l : int)
+	PushNewOpNode (l, nil(eNode), NodeKinds.SimpleLeaf)
+    end EnterSimpleLeaf
+
+/*
+ * Simply exchange the top two tree pointers in the stack. Just 
+ * pop them and push them back in the reverse order.
+ */
+    body procedure SwapTopTwoTrees
+	var t1, t2 : TreePointer
+	Pop (t1)
+	Pop (t2)
+
+	Push (t1)
+	Push (t2)
+    end SwapTopTwoTrees
+
+
+    body function IsLeafNode %(t:TreePointer) :boolean
+#if DEBUG then
+	handler (dummy)
+	    quit <
+	end handler
+#end if
+	CheckValidNode (t, treeBadIsLeafOperand)
+	result tNode (t).nodeKind not= NodeKinds.OperatorNode
+    end IsLeafNode
+
+
+    body function IsExprNode % (t:TreePointer) :boolean
+#if DEBUG then
+	handler (dummy)
+	    quit <
+	end handler
+#end if
+	CheckValidNode (t, treeBadIsExprOperand)
+	result tNode (t).nodeKind = NodeKinds.ExpressionLeaf
+    end IsExprNode
+
+
+/*
+ * Free the Parse tree, simply traverses the tree in a postorder fashion.
+ * Must be postorder so that we can free the nodes from the leaves upwards.
+ * Otherwise we could get corrupted by the memory manager. We also free up
+ * any memory being used by the expression module to store the expr tree.
+ */
+    body procedure Free % (t : TreePointer)
+	var x : TreePointer
+	if t not= nil (tNode) then
+	    Free (tNode (t).operand)
+	    Free (tNode (t).sibling)
+	    Expression.Free (tNode (t).leaf)
+	    x := t
+	    free tNode, x
+	end if
+    end Free
+
+/*
+ * Procedure to create a new node with operator number 'n'. We make sure
+ * all the fields are set to a reasonable start configuration.
+ */
+    body procedure NewNode % (var t:TreePointer, n:int)
+	new tNode, t
+	const nilT := nil (tNode)
+	bind var register tn to tNode(t)
+
+	tn.operatorNumber := n
+	tn.nodeKind := NodeKinds.OperatorNode
+	tn.leaf := nil(eNode)
+	tn.operand := nilT
+	tn.sibling := nilT
+	tn.lineNumber := currentLineNumber
+	tn.fileNumber := currentFileNumber
+	tn.transformed := false
+    end NewNode
+
+/*
+ * DumpTop will dump the top tree in the construction stack to the 
+ * stream 'stream'. Mostly for debugging purposes during S/SL run.
+ */
+    body procedure DumpTop % (stream:int)
+	var x : TreePointer
+	put : stream, "Tree Dump:"
+	Top (x)
+	Dump (x, 4, stream)
+    end DumpTop
+
+/*
+ * Dump will simply dump a tree giving it an indent so that it can be 
+ * read more easily. We provide the indent to the caller so that he can
+ * format it on a page with other info. If a node is nil we dump nothing
+ * otherwise we check to see if it is a leaf, if so we print the simple
+ * leaf data, otherwise it is an operation node so we print the operation
+ * number and then print each of the operands indented by 2 extra spaces.
+ */
+    body procedure Dump % (t : TreePointer, indent, stream : int)
+#if DEBUG then
+	handler (quitCode)
+	    if quitCode = excpSIGINT then
+		quit >
+	    else
+		put : stream, repeat (" ", indent), "*** Tree Dump Abort ***"
+	    end if
+	end handler
+#end if
+	var l : TreePointer
+	if t not= nil (tNode) then
+	    case tNode (t).nodeKind of
+		label NodeKinds.ExpressionLeaf :
+		    Expression.Dump (tNode (t).leaf, indent, stream)
+
+		label NodeKinds.SimpleLeaf :
+		    put : stream, repeat (" ", indent), "Tree leaf [",
+			Token.TokenToString (tNode (t).operatorNumber), "]"
+
+		label NodeKinds.OperatorNode :
+		    put : stream, repeat (" ", indent), "Tree Node [",
+			Token.TokenToString (tNode (t).operatorNumber), "]"
+		    l := tNode (t).operand
+		    loop
+			exit when l = nil (tNode)
+			Dump (l, indent + 2, stream)
+			l := tNode (l).sibling
+		    end loop
+
+		label NodeKinds.Unknown :
+		    put : stream, "*** UNDETERMINED WITH LABEL [",
+			Token.TokenToString (tNode (t).operatorNumber), "] ***"
+		
+		label :
+		    put : stream, "*** undefined ***"
+		    return
+	    end case
+	end if
+    end Dump
+
+
+    /* Allow routines before us to use dump and copy */
+    TreeDump := Dump
+    TreeCopy := Copy
+
+end Tree

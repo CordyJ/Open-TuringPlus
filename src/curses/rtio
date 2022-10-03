@@ -1,0 +1,122 @@
+%
+%	Computer Systems Research Group
+%   	University of Toronto
+  
+% 	Turing Plus Unbuffered Terminal Input Package  V1.00
+%   	Author:	Jim Cordy
+%   	Date:	January 1984
+
+% Copyright (C) 1984  The University of Toronto
+
+% This module provides unbuffered real-time terminal input
+% with or without echo.
+% This module should be included in the user's program
+% using the include statement:
+
+%	include "%rtio"
+
+% and compiled with the production Turing compiler (pttc).
+
+% Unbuffered input terminal in Turing only makes good
+% sense in single character mode.  Thus, once nobuffer
+% has been called, only get statements with 
+% explicit length specifiers are truly meaningful.
+% Get statements should be of the form "get variable:length".
+% For true real-time interaction, the length should be
+% restricted to 1.
+
+% If you insist on using token or line-oriented input
+% while in unbuffered mode, you should understand the
+% following details: 
+
+% A token-oriented get will not complete until the blank
+% or newline character following the input is typed by
+% the user.  This character will not be read as part
+% of the token, and will be the first character read by
+% the next get.  The only exception to this rule is
+% quoted string input, which will be completed as soon
+% as the ending quote (") is typed by the user,
+% and which will absorb the quote as part of the input.
+
+% A line-oriented get will not complete until the newline
+% character following the input is typed by the user.
+% This character will not be read as part of the input line,
+% but will also be skipped before the next get.
+
+% Facilities provided are as follows:
+
+%	procedure crmode	- put the input terminal in
+%				  no buffer mode;  should be
+%				  called before using hasch
+
+%	procedure nocrmode	- put the input terminal back in
+%				  buffer mode;  should be called
+%				  before program exit if crmode
+%				  was used
+
+%	procedure noecho	- put the input terminal in
+%				  no echo mode
+
+%	procedure echo		- put the input terminal back in
+%				  echo mode;  should be called
+%				  before program exit if noecho
+%				  was used
+
+%	function hasch: boolean	- returns true if there is a 
+%				  character ready from the 
+%				  input terminal;  not meaningful
+%				  unless crmode has been called
+
+type TTYSET : set of 0 .. 31
+type TTYtype :
+    record
+	filler : int
+	flags : TTYSET
+    end record
+
+const *ECHOmode := TTYSET (3,19)
+const *CBREAKmode := TTYSET (1,17)
+
+var tty : TTYtype
+
+external procedure gtty (l: int, var t : TTYtype)
+external procedure stty (l: int, var t : TTYtype) 
+
+procedure crmode 
+    % set the input terminal to unbuffered mode
+    gtty (1, tty)
+    tty.flags += CBREAKmode
+    stty (1, tty)
+end crmode
+
+procedure nocrmode 
+    % reset the input terminal to buffered mode
+    gtty (1, tty)
+    tty.flags -= CBREAKmode
+    stty (1, tty)
+end nocrmode
+ 
+procedure noecho 
+    % set the input terminal to no echo mode
+    gtty (1, tty)
+    tty.flags -= ECHOmode 
+    stty (1, tty)
+end noecho
+
+procedure echo 
+    % reset the input terminal to echo mode
+    gtty (1, tty)
+    tty.flags += ECHOmode 
+    stty (1, tty)
+end echo
+
+external procedure ioctl(f, i : int, var n : int) 
+const *FIONREAD := 16#40000000 + /* int.size */ 4 shl 16 + ord ('f') shl 8 + 127
+const *ttyinput := 0
+
+function hasch : boolean 
+    var nchars := 0
+
+    ioctl (ttyinput, FIONREAD, nchars)
+    result nchars > 0
+end hasch

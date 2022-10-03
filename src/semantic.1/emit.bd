@@ -1,0 +1,202 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+% 
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+% 
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+body "emit.st" module Emit
+    /*
+     *  Module:	Semantic Pass 1 Emit Mechanism V1.00
+     *	Author:	Mark Mendell & Stephen Perelgut
+     *	Date:	13 Aug 86
+     */
+
+
+    /* Output Buffering */
+    var emitBuffer:		char(maxEmitBufferChars)
+    var emitBufferPtr:		0..maxEmitBufferChars := 0
+    var maxEmitBufferPtr:	0..maxEmitBufferChars := 0
+
+    var isDirect := true
+
+    type *char2 : char(2)
+    type *char4 : char(4)
+
+    procedure EmitByteToBuffer (val: int1)
+	pre not isDirect
+
+	if emitBufferPtr < maxEmitBufferChars then
+	    emitBufferPtr += 1
+	    if statistics and maxEmitBufferPtr < emitBufferPtr then
+		maxEmitBufferPtr := emitBufferPtr
+	    end if
+	    #emitBuffer(emitBufferPtr) := val
+	else
+	    Error (eEmitBufferOverflow)
+	end if
+    end EmitByteToBuffer
+
+
+    procedure EmitIntToBuffer (val: int2)
+	pre not isDirect
+
+	if emitBufferPtr+1 < maxEmitBufferChars then
+	    emitBufferPtr += 1
+	    emitBuffer(emitBufferPtr) := type (char2, val)(1)
+	    emitBufferPtr += 1
+	    emitBuffer(emitBufferPtr) := type (char2, val)(2)
+	    if statistics and maxEmitBufferPtr < emitBufferPtr then
+		maxEmitBufferPtr := emitBufferPtr
+	    end if
+	else
+	    Error (eEmitBufferOverflow)
+	end if
+    end EmitIntToBuffer
+
+
+    procedure EmitLongToBuffer (val: int4)
+	pre not isDirect
+
+	if emitBufferPtr+3 < maxEmitBufferChars then
+	    emitBufferPtr += 1
+	    emitBuffer(emitBufferPtr) := type (char4, val)(1)
+	    emitBufferPtr += 1
+	    emitBuffer(emitBufferPtr) := type (char4, val)(2)
+	    emitBufferPtr += 1
+	    emitBuffer(emitBufferPtr) := type (char4, val)(3)
+	    emitBufferPtr += 1
+	    emitBuffer(emitBufferPtr) := type (char4, val)(4)
+	    if statistics and maxEmitBufferPtr < emitBufferPtr then
+		maxEmitBufferPtr := emitBufferPtr
+	    end if
+	else
+	    Error (eEmitBufferOverflow)
+	end if
+    end EmitLongToBuffer
+
+
+    body procedure EmitOutputToken % (emittedToken: OutputTokens)
+	/* Emit an output token */
+	if isDirect then
+	    /* Check for a deferred new line */
+	    if emitNewLineNumber then
+		emitNewLineNumber := false
+		var t : nat1 := aNewLine
+		write :outStream, t, lineNumber
+	    end if
+	    var t : nat1 := emittedToken
+	    write :outStream, t
+	else
+	    /* Check for a deferred new line */
+	    if emitNewLineNumber then
+		emitNewLineNumber := false
+		EmitByteToBuffer(aNewLine)
+		EmitIntToBuffer(lineNumber)
+	    end if
+	    EmitByteToBuffer (emittedToken)
+	end if
+	if tracing then
+	    put :traceFile, "### Output token: ", emittedToken
+	end if
+    end EmitOutputToken
+
+
+    body procedure EmitByte % (val: int1)
+	/* Emit an integer value */
+	if isDirect then
+	    write :outStream, val
+	else
+	    EmitByteToBuffer (val)
+	end if
+    end EmitByte
+
+
+    body procedure EmitInt % (val: int2)
+	/* Emit an integer value */
+	if isDirect then
+	    write :outStream, val
+	else
+	    EmitIntToBuffer (val)
+	end if
+    end EmitInt
+
+
+    body procedure EmitLong % (val: int4)
+	/* Emit an integer value */
+	if isDirect then
+	    write :outStream, val
+	else
+	    EmitLongToBuffer (val)
+	end if
+    end EmitLong
+
+
+    body procedure EmitString % (slen : int, s : char(*))
+	/* Emit a string value */
+	EmitInt (slen)
+	for i : 1..slen
+	    EmitByte(#s(i))
+	end for
+    end EmitString
+
+
+    body procedure SetDirect
+	pre not isDirect
+
+	isDirect := true
+    end SetDirect
+
+
+    body procedure ClearDirect
+	pre isDirect
+
+	isDirect := false
+    end ClearDirect
+
+
+    body procedure EmitBufferPush
+	pre isDirect
+
+	isDirect := false
+    end EmitBufferPush
+
+
+    body procedure EmitBufferPop
+	pre not isDirect
+
+	isDirect := true
+	emitBufferPtr := 0
+    end EmitBufferPop
+
+
+    body procedure EmitBufferEmit
+	pre not isDirect
+
+	if emitBufferPtr > 0 then
+	    write : outStream, emitBuffer : emitBufferPtr
+	end if
+    end EmitBufferEmit
+
+
+    body function EmiStackEmpty % : boolean 
+	result isDirect
+    end EmiStackEmpty
+
+
+    body procedure EmitStats
+	put "Emit\n\tEmitBuffer = ", maxEmitBufferPtr, "/", maxEmitBufferChars
+    end EmitStats
+
+end Emit

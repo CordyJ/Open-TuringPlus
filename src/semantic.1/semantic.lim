@@ -1,0 +1,135 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+%
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+%
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+%   Computer Systems Research Group
+%   University of Toronto
+%   File:    Turing Plus Semantic Pass 1 Limits V1.00
+%   Author:  M. Mendell
+%   Date:    12 March 1986
+
+#if BIG then
+    /* Identifiers */
+    const *maxIdents := 4099
+
+    /* Actuals Lists */
+    const *maxActualsLevel := 200	/* max routine call nesting */
+    const *maxActuals := 200		/* total number of reference 
+					      actuals currently active  */
+    const *maxActualSymbols := 200	/* total number of symbols
+					      in all currently active
+					      reference actuals	    */
+    /* Count Stack */
+    const *maxCountValue := 2147483640
+    const *maxCounts := 200		/* max scope nesting */
+
+    /* Loop Stack */
+    const *maxLoops := 14		/* max loop nesting */
+
+    /* Scope Stack and Table */
+    const *maxScopeLevel := maxCounts*2 + 1 /* max scope nesting */
+    const *maxSavedScopes := 2500	/* max saved scope lists */
+
+    /* Symbol Stack and Table */
+    const *maxSymbols := 6000		/* max total declared symbols */
+    const *maxSymbolDepth := 200	/* max nested symbol references */
+    const *maxDummySymbols := 20	/* max nested dummy symbols */
+
+    /* Type Stack and Table */
+    const *maxTypes := 1500		/* max total declared types */
+    const *maxTypeDepth := 200		/* max nested type references */
+
+    /* Emit Buffer */
+    const *maxEmitBufferChars := 1000	/* maximum tokens that can be buffered*/
+
+    /* Ident Chars */
+    const *maxIdentChars :=  45000	/* max identifier chars - from scanner*/
+#elsif PC then
+    /* Identifiers */
+    const *maxIdents := 1201
+
+    /* Actuals Lists */
+    const *maxActualsLevel := 35	/* max routine call nesting */
+    const *maxActuals := 20		/* total number of reference 
+					      actuals currently active  */
+    const *maxActualSymbols := 40	/* total number of symbols
+					      in all currently active
+					      reference actuals	    */
+
+    /* Count Stack */
+    const *maxCountValue := 2147483640
+    const *maxCounts := 10		/* max scope nesting */
+
+    /* Loop Stack */
+    const *maxLoops := 7		/* max loop nesting */
+
+    /* Scope Stack and Table */
+    const *maxScopeLevel := maxCounts*2+1 /* max scope nesting */
+    const *maxSavedScopes := 250	/* max saved scope lists */
+
+    /* Symbol Stack and Table */
+    const *maxSymbols := 750		/* max total declared symbols */
+    const *maxSymbolDepth := 20		/* max nested symbol references */
+    const *maxDummySymbols := 5		/* max nested dummy symbols */
+
+    /* Type Stack and Table */
+    const *maxTypes := 500		/* max total declared types */
+    const *maxTypeDepth := 21		/* max nested type references */
+
+    /* Emit Buffer */
+    const *maxEmitBufferChars := 125	/* maximum tokens that can be buffered*/
+
+    /* Ident Chars */
+    const *maxIdentChars :=  15000	/* max identifier chars - from scanner*/
+#else
+    /* Identifiers */
+    const *maxIdents := 1201
+
+    /* Actuals Lists */
+    const *maxActualsLevel := 100	/* max routine call nesting */
+    const *maxActuals := 50		/* total number of reference 
+					      actuals currently active  */
+    const *maxActualSymbols := 100	/* total number of symbols
+					      in all currently active
+					      reference actuals	    */
+
+    /* Count Stack */
+    const *maxCountValue := 2147483640
+    const *maxCounts := 20		/* max scope nesting */
+
+    /* Loop Stack */
+    const *maxLoops := 7		/* max loop nesting */
+
+    /* Scope Stack and Table */
+    const *maxScopeLevel := maxCounts*2+1 /* max scope nesting */
+    const *maxSavedScopes := 900	/* max saved scope lists */
+
+    /* Symbol Stack and Table */
+    const *maxSymbols := 2000		/* max total declared symbols */
+    const *maxSymbolDepth := 40		/* max nested symbol references */
+    const *maxDummySymbols := 10	/* max nested dummy symbols */
+
+    /* Type Stack and Table */
+    const *maxTypes := 1000		/* max total declared types */
+    const *maxTypeDepth := 40		/* max nested type references */
+
+    /* Emit Buffer */
+    const *maxEmitBufferChars := 250	/* maximum tokens that can be buffered*/
+
+    /* Ident Chars */
+    const *maxIdentChars :=  15000	/* max identifier chars - from scanner*/
+#end if

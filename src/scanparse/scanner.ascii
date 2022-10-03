@@ -1,0 +1,86 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+%
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+%
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+/* Character Class Map */
+const charClass: array ordFirstChar..ordLastChar of CharClasses :=
+   init (/*nul*/ cEOF, /*soh*/ cIllegal, /*stx*/ cIllegal, /*etx*/ cIllegal,
+	/*eot*/ cIllegal,	/*enq*/ cIllegal,	/*ack*/ cIllegal,	/*bel*/ cIllegal,
+	/*bs*/ cIllegal,	/*tab*/ cWhiteSpace, /*nl*/ cEOL,	/*vt*/ cIllegal,
+	/*ff*/ cWhiteSpace, /*cr*/ cWhiteSpace, /*so*/ cIllegal,/*si*/ cIllegal,
+	/*dle*/ cIllegal,	/*dc1*/ cIllegal,	/*dc2*/ cIllegal,	/*dc3*/ cIllegal,
+	/*dc4*/ cIllegal,	/*nak*/ cIllegal,	/*syn*/ cIllegal,	/*etb*/ cIllegal,
+	/*can*/ cIllegal,	/*em*/ cIllegal,	/*sub*/ cWhiteSpace,	/*esc*/ cIllegal,
+	/*fs*/ cIllegal,	/*gs*/ cIllegal,	/*rs*/ cIllegal,	/*us*/ cIllegal,
+	/*sp*/ cWhiteSpace, /*!*/ cBang,	/*"*/ cQuote,	/*#*/ cHash,
+	/*$*/ cIllegal,	/*%*/ cPercent,	/*&*/ cAmpersand,	/*'*/ cSingleQuote,
+	/*(*/ cParen,	/*)*/ cEndParen,	/* * */ cStar,	/*+*/ cPlus,
+	/*,*/ cComma,	/*-*/ cMinus,	/*.*/ cDot,	/* / */ cSlash,
+	/*0*/ cDigit,	/*1*/ cDigit,	/*2*/ cDigit,	/*3*/ cDigit,
+	/*4*/ cDigit,	/*5*/ cDigit,	/*6*/ cDigit,	/*7*/ cDigit,
+	/*8*/ cDigit,	/*9*/ cDigit,	/*:*/ cColon,	/*;*/ cSemiColon,
+	/*<*/ cLess,	/*=*/ cEqual,	/*>*/ cGreater,	/*?*/ cQuestion,
+	/*@*/ cAt,	/*A*/ cLetter,	/*B*/ cLetter,	/*C*/ cLetter,
+	/*D*/ cLetter,	/*E*/ cLetter,	/*F*/ cLetter,	/*G*/ cLetter,
+	/*H*/ cLetter,	/*I*/ cLetter,	/*J*/ cLetter,	/*K*/ cLetter,
+	/*L*/ cLetter,	/*M*/ cLetter,	/*N*/ cLetter,	/*O*/ cLetter,
+	/*P*/ cLetter,	/*Q*/ cLetter,	/*R*/ cLetter,	/*S*/ cLetter,
+	/*T*/ cLetter,	/*U*/ cLetter,	/*V*/ cLetter,	/*W*/ cLetter,
+	/*X*/ cLetter,	/*Y*/ cLetter,	/*Z*/ cLetter,	/*[*/ cBracket,
+	/*\*/ cBackslash,	/*]*/ cEndBracket, /*^*/ cCaret,	/*_*/ cUnderscore,
+	/*`*/ cIllegal,	/*a*/ cLetter,	/*b*/ cLetter,	/*c*/ cLetter,
+	/*d*/ cLetter,	/*e*/ cLetter,	/*f*/ cLetter,	/*g*/ cLetter,
+	/*h*/ cLetter,	/*i*/ cLetter,	/*j*/ cLetter,	/*k*/ cLetter,
+	/*l*/ cLetter,	/*m*/ cLetter,	/*n*/ cLetter,	/*o*/ cLetter,
+	/*p*/ cLetter,	/*q*/ cLetter,	/*r*/ cLetter,	/*s*/ cLetter,
+	/*t*/ cLetter,	/*u*/ cLetter,	/*v*/ cLetter,	/*w*/ cLetter,
+	/*x*/ cLetter,	/*y*/ cLetter,	/*z*/ cLetter,	/*brace*/ cBrace,
+	/*|*/ cBar, /*endbrace*/ cEndBrace, /*~*/ cTilde, /*del*/ cIllegal,
+
+	/* characters above 127 -- illegal */
+	cIllegal,	cIllegal,	cIllegal,	cIllegal,
+	cIllegal,	cIllegal,	cIllegal,	cIllegal,
+	cIllegal,	cIllegal,	cIllegal,	cIllegal,
+	cIllegal,	cIllegal,	cIllegal,	cIllegal,
+	cIllegal,	cIllegal,	cIllegal,	cIllegal,
+	cIllegal,	cIllegal,	cIllegal,	cIllegal,
+	cIllegal,	cIllegal,	cIllegal,	cIllegal,
+	cIllegal,	cIllegal,	cIllegal,	cIllegal,
+	cIllegal,	cIllegal,	cIllegal,	cIllegal,
+	cIllegal,	cIllegal,	cIllegal,	cIllegal,
+	cIllegal,	cIllegal,	cIllegal,	cIllegal,
+	cIllegal,	cIllegal,	cIllegal,	cIllegal,
+	cIllegal,	cIllegal,	cIllegal,	cIllegal,
+	cIllegal,	cIllegal,	cIllegal,	cIllegal,
+	cIllegal,	cIllegal,	cIllegal,	cIllegal,
+	cIllegal,	cIllegal,	cIllegal,	cIllegal,
+	cIllegal,	cIllegal,	cIllegal,	cIllegal,
+	cIllegal,	cIllegal,	cIllegal,	cIllegal,
+	cIllegal,	cIllegal,	cIllegal,	cIllegal,
+	cIllegal,	cIllegal,	cIllegal,	cIllegal,
+	cIllegal,	cIllegal,	cIllegal,	cIllegal,
+	cIllegal,	cIllegal,	cIllegal,	cIllegal,
+	cIllegal,	cIllegal,	cIllegal,	cIllegal,
+	cIllegal,	cIllegal,	cIllegal,	cIllegal,
+	cIllegal,	cIllegal,	cIllegal,	cIllegal,
+	cIllegal,	cIllegal,	cIllegal,	cIllegal,
+	cIllegal,	cIllegal,	cIllegal,	cIllegal,
+	cIllegal,	cIllegal,	cIllegal,	cIllegal,
+	cIllegal,	cIllegal,	cIllegal,	cIllegal,
+	cIllegal,	cIllegal,	cIllegal,	cIllegal,
+	cIllegal,	cIllegal,	cIllegal,	cIllegal,
+	cIllegal,	cIllegal,	cIllegal,	cIllegal)

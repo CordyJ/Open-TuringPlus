@@ -1,0 +1,43 @@
+This directory contains the machine-independent implementations of the
+Turing Plus C translatory support library routines.
+
+The various routines are as follows:
+
+TLC.ch		(internal)
+	The TLC parent module.
+
+TLCALL.ch	(pLargeSetAllFcn)
+	Initialize a large set to set(all)
+
+TLCCLR.ch	(pLargeSetClearFcn)
+	Initialize a large set to set()
+
+TLCCON.ch	(pLargeSetConstructorFcn)
+	Set an element in a large set
+
+TLCDIF.ch	(pLargeSetDifferenceFcn)
+	Perform a large set -
+
+TLCEQ.ch	(pLargeSetEqualFcn)
+	Return true if the large set arg1 = arg2
+
+TLCGEQ.ch	(pLargeSetGreaterEqualFcn)
+	Return true if the large set arg1 >= arg2
+
+TLCIN.ch	(pLargeSetInFcn)
+	Return true if the element is in the set
+
+TLCINT.ch	(pLargeSetIntersectionFcn)
+	Perform a large set *
+
+TLCLEQ.ch	(pLargeSetLessEqualFcn)
+	Return true if the large set arg1 <= arg2
+
+TLCNEQ.ch	(pLargeSetNotEqualFcn)
+	Return true if the large set arg1 not= arg2
+
+TLCUN.ch	(pLargeSetUnionFcn)
+	Perform a large set +
+
+TLCXOR.ch	(pLargeSetXorFcn)
+	Perform a large set xor

@@ -1,0 +1,5057 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+%
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+%
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+%	Computer Systems Research Group
+%	University of Toronto
+%
+%	File:	Turing Plus Parser  V1.0
+%	Author:	M. Mendell & S. Perelgut
+%		From:	Turing Parser V2.05
+%		Author:	S. Perelgut & J.R. Cordy
+%	Date:	June 1985
+
+input:
+    % Compound tokens:
+    % Compound tokens each have an associated value.
+    firstInputToken
+    firstCompoundToken = firstInputToken
+
+    tIdent	'Ident'	% a predefined identifier where an identifier
+			% is required will be accepted by the parser.
+	    = firstInputToken
+    tPredefinedId
+    tStringLit	'StringLit'
+    tCharLit	'CharLit'
+    tIntegerLit	'IntegerLit'
+    tRealLit	'RealLit'
+    lastCompoundToken = tRealLit
+
+    % Keyword Tokens
+    tKeyword
+    tAddressInt	'addressint' = tKeyword
+    tAll	'all'
+    tAnd	'and'
+    tArray	'array'
+    tAsm	'asm'
+    tAssert	'assert'
+    tBegin	'begin'
+    tBind	'bind'
+    tBits	'bits'
+    tBody	'body'
+    tBoolean	'boolean'
+    tCase	'case'
+    tChar	'char'
+    tChecked	'checked'
+    tChild	'child'
+    tClose	'close'
+    tCollection	'collection'
+    tCondition	'condition'
+    tConst	'const'
+    tDecreasing	'decreasing'
+    tDeferred	'deferred'
+    tDiv	'div'
+    tElse	'else'
+    tElsif	'elsif'
+    tEnd	'end'
+    tEndCase	% *** not used **
+    tEndFor	% *** not used **
+    tEndIf	% *** not used **
+    tEndLoop	% *** not used **
+    tEnum	'enum'
+    tExit	'exit'
+    tExport	'export'
+    tExternal	'external'
+    tFalse	'false'
+    tFcn	'fcn'
+    tFor	'for'
+    tFork	'fork'
+    tForward	'forward'
+    tFree	'free'
+    tFunction	'function'
+    tGet	'get'
+    tGrant	'grant'
+    tHandler	'handler'
+    tIf		'if'
+    tImport	'import'
+    tIn		'in'
+    tInclude	'include'
+    tInit	'init'
+    tInt	'int'
+    tInt1	'int1'
+    tInt2	'int2'
+    tInt4	'int4'
+    tInvariant	'invariant'
+    tLabel	'label'
+    tLoop	'loop'
+    tMod	'mod'
+    tModule	'module'
+    tMonitor	'monitor'
+    tNat	'nat'
+    tNat1	'nat1'
+    tNat2	'nat2'
+    tNat4	'nat4'
+    tNew	'new'
+    tNot	'not'
+    tOf		'of'
+    tOpaque	'opaque'
+    tOpen	'open'
+    tOr		'or'
+    tPacked	'packed'
+    tParent	'parent'
+    tPause	'pause'
+    tPervasive	'pervasive'
+    tPointer	'pointer'
+    tPost	'post'
+    tPre	'pre'
+    tPriority	'priority'
+    tProc	'proc'
+    tProcedure	'procedure'
+    tProcess	'process'
+    tPut	'put'
+    tQuit	'quit'
+    tRead	'read'
+    tReal	'real'
+    tReal4	'real4'
+    tReal8	'real8'
+    tRecord	'record'
+    tRegister	'register'
+    tResult	'result'
+    tReturn	'return'
+    tSeek	'seek'
+    tSet	'set'
+    tShl	'shl'
+    tShr	'shr'
+    tSignal	'signal'
+    tSkip	'skip'
+    tString	'string'
+    tStub	'stub'
+    tTag	'tag'
+    tTell	'tell'
+    tThen	'then'
+    tTimeout	'timeout'
+    tTo		'to'
+    tTrue	'true'
+    tType	'type'
+    tUnchecked	'unchecked'
+    tUnion	'union'
+    tUnqualified 'unqualified'
+    tVar	'var'
+    tWait	'wait'
+    tWhen	'when'
+    tWrite	'write'
+    tXor	'xor'
+    lastKeywordToken = tXor
+
+    % Special Symbols
+    tPlus	'+'
+    tMinus	'-'
+    tStar	'*'
+    tSlash	'/'
+    tLess	'<'
+    tGreater	'>'
+    tEqual	'='
+    tDot	'.'
+    tColon	':'
+    tComma	','
+    tSemiColon	';'
+    tParen	'('
+    tEndParen	')'
+    tBracket	'['
+    tEndBracket	']'
+    tBrace	'{'
+    tEndBrace	'}'
+    tBar	'|'
+    tAmpersand	'&'
+    tTilde	'~'
+    tBang	'!'
+    tQuestion	'?'
+    tDollar	'$'
+    tStarStar	'**'
+    tDotDot	'..'
+    tAssign	':='
+    tLessEqual	'<='
+    tGreaterEqual	'>='
+    tImply	'=>'
+    tShortExit	'>>'
+    tShortReturnResult	'>>>'
+    tAt		'@'
+    tHash	'#'
+
+    % Meta Tokens handled by the input filter
+    tEndCompilationUnit
+    tNewFile
+    tNewLine	'<NL>'
+    tEndOfFile	'<EOF>'
+    tDummyTokenForStart	'<dummy>'
+
+    lastInputToken = tDummyTokenForStart;
+
+
+output:
+    % Compound Tokens
+    firstOutputToken
+
+    aIdent = firstOutputToken
+    aPredefinedId
+    aIntegerLit
+    aStringLit
+    aCharLit
+    aRealLit
+    aDataDescriptor		% used in the allocator and coder passes
+    aRoutineIndex		% used by the allocator and coder passes
+    aIdentText
+    aStabInformation		% used in the allocator and coder passes
+    aEndSubstring		% output from the semantic pass
+
+    % Other Tokens
+    firstNonCompoundToken = 20
+    aAdd	= firstNonCompoundToken	% leave room for more compound tokens
+    aAddressint
+    aAbs			% output from the semantic pass
+    aAliasCheck			% output from the semantic pass
+    aAll
+    aAllocate
+    aAnd
+    aAndEqual
+    aArray
+    aAsm
+    aAssert
+    aAssign
+    aAssignInverted		% added by the allocator
+    aAt
+    aBegin
+    aBeginAsm
+    aBind
+    aBits
+    aBody
+    aBoolean
+    aBooleanAndEqual
+    aBooleanOrEqual
+    aByReference		% used by the allocator and coder passes
+    aCall			% output from the semantic pass
+    aCallVariable		% output from the allocator pass
+    aCase
+    aCaseBody
+    aChar
+    aChild
+    aChecked
+    aClose
+    aCollection
+    aColon
+    aCompile			% compile the following code
+    aConcatenate		% output from the semantic pass
+    aConcatenateAssign		% output from the semantic pass
+    aCondition
+    aConst
+    aDeallocate			% output from the allocator pass
+    aDecreasing
+    aDeferred
+    aDiv
+    aDivEqual
+    aDivideReal
+    aElse
+    aElsif
+    aEndAsm
+    aEndAliasCheck		% output from the semantic pass
+    aEndArrayIndexList
+    aEndBegin
+    aEndBind
+    aEndCase
+    aEndCaseBody
+    aEndEnum
+    aEndExport
+    aEndExpression
+    aEndExpressionList
+    aEndFor
+    aEndGet
+    aEndGrant
+    aEndIf
+    aEndImport
+    aEndInit
+    aEndLoop
+    aEndModule
+    aEndMonitor
+    aEndOpen
+    aEndPut
+    aEndRead
+    aEndRecord
+    aEndResult
+    aEndSubprogramBody
+    aEndSubs
+    aEndUnion
+    aEndUnionLabelBody
+    aEndWrite
+    aEnum
+    aEqual
+    aExit
+    aExitWhen
+    aExponentiate
+    aExponentiateEqual
+    aExport
+    aExternal
+    aExternalAddress
+    aFalse
+    aField
+    aFor
+    aFork
+    aForkAddress
+    aForkStackSize
+    aForkStatus
+    aForRange
+    aForward
+    aFree
+    aFunction
+    aGet
+    aGrant
+    aGreater
+    aGreaterEqual
+    aHandler
+    aHash
+    aIf
+    aImply
+    aImport
+    aIn
+    aInfixAnd
+    aInfixBooleanCompare	% output from the semantic pass
+    aInfixCompare
+    aInfixImply
+    aInfixOr
+    aInit
+    aInt
+    aInterruptNumber
+    aInvariant
+    aIs
+    aLabel
+    aLess
+    aLessEqual
+    aLogicalAnd
+    aLogicalOr
+    aLogicalXor
+    aLoop
+    aMax			% output from the semantic pass
+    aMin			% output from the semantic pass
+    aMinus
+    aMinusEqual
+    aMissingStub
+    aMod
+    aModEqual
+    aModule
+    aMonitor
+    aMonitorPriority
+    aMultiply
+    aNat
+    aNew
+    aNil			% output from the allocator pass
+    aNoAlias			% output from the semantic pass
+    aNoEnclosure		% output from the semantic pass
+    aNonManifest		% output from the semantic pass
+    aNonScalar			% output from the semantic pass
+    aNot
+    aNotEqual
+    aNotIn
+    aOpaque
+    aOpen
+    aOr
+    aOrEqual
+    aOtherwise
+    aPacked
+    aParent
+    aPause
+    aPervasive
+    aPlus
+    aPlusEqual
+    aPointer
+    aPost
+    aPre
+    aPriority
+    aProcedure
+    aProcess
+    aProcessStackSize
+    aPut
+    aPutContinue
+    aQuit
+    aQuitReason
+    aRangeCheck			% output from the semantic pass
+    aRangeCheck2		% output from the semantic pass
+    aRead
+    aReadWriteSize
+    aReadWriteSizeResult
+    aReadWriteStatus
+    aReal
+    aRealDivEqual
+    aRecord
+    aRecordElementType
+    aRegister
+    aResult
+    aReturn
+    aSeek
+    aSet
+    aSetDifference		% output from the semantic pass
+    aSetDifferenceAssign	% output from the semantic pass
+    aSetGreaterEqual		% output from the semantic pass
+    aSetIntersection		% output from the semantic pass
+    aSetIntersectionAssign	% output from the semantic pass
+    aSetLessEqual		% output from the semantic pass
+    aSetUnion			% output from the semantic pass
+    aSetUnionAssign		% output from the semantic pass
+    aSetXor
+    aSetXorAssign
+    aShiftLeft
+    aShiftLeftEqual
+    aShiftRight
+    aShiftRightEqual
+    aSignal
+    aSkip
+    aStar
+    aStarEqual
+    aStorageSize
+    aStreamNumber
+    aString
+    aStringSizeBound
+    aStub
+    aSubrange
+    aSubs
+    aSubstring
+    aSubtract
+    aTag
+    aTagCheck			% output from the semantic pass
+    aTell
+    aTimeout
+    aTrue
+    aType
+    aTypeCheat
+    aTypeCheatSize
+    aUnchecked
+    aUninitialize
+    aUnion
+    aUnionLabelBody
+    aUnqualified
+    aVar
+    aVarInit
+    aVaryingParameter
+    aWait
+    aWaitPriorityOrTimeout
+    aWrite
+    aXor
+    aXorEqual
+
+    % Meta Tokens
+    aFileName	= 252	% leave room for more tokens
+    aNewLine
+    aNewFile
+    aEndOfFile
+
+    tSyntaxError = -1	% for error recovery
+
+    lastOutputToken = aEndOfFile;
+
+error:
+    firstErrorCode		= 0
+    eNoError			= firstErrorCode
+
+    firstWarningCode		= 10
+
+
+    % Previous Line Warnings
+    eMissingForwardImport	= 11
+    eSyntaxErrorInsert
+    eSyntaxErrorReplace
+
+    lastWarningCode		= eSyntaxErrorReplace
+
+    % Previous Line Non-fatal Errors
+    eChildMismatchParent
+    eNoProgramAfterParent
+    eNullOverideName
+    eSyntaxErrorMismatchedEnd
+    eParentDoesNotIncludeChild
+    ePrematureEndOfFile
+
+    lastPreviousLineErrorCode = ePrematureEndOfFile
+
+    % Non-fatal Errors
+    eSyntaxError
+    eExtraneousProgramText
+    eStubSyntaxError
+    eOnlyCollectionVarsInStub
+    lastNonFatalErrorCode	= eOnlyCollectionVarsInStub
+    ;
+
+
+type Boolean:
+    no = 0
+    yes = 1
+    starBound = yes;
+
+
+mechanism Emit:
+    oSaveIdent		% save an identifier or predefined
+			% identifier until lookahead
+			% determines the identifier's purpose
+
+    oEmitSavedIdent	% emit the saved identifier or predefined ident
+
+    oEmitIdent		% emit an identifier (or predefined identifier)
+			% as determined by the last token read
+
+    oEmitIntegerLit	% emit int literal value
+    oEmitRealLit	% emit real literal value
+    oEmitStringLit	% emit string literal value
+    oEmitCharLit	% emit char literal value
+    oEmitLine		% emit a new line directive
+    oEmitIdentText	% emit the identifier text
+    oEmitTypeSizeAsIntegerLit
+			% emit the size of the current token's type
+			% (eg. tInt2 -> 2) as an integer lit
+			% Must be an explicitly sized type (eg. not tInt).
+    oEmitFakeParent	% emit a string lit to dummy up a parent filename
+    ;
+
+mechanism SeparateCompilation:
+
+    oSeparateCompilationEnterAlternateFileAndMark
+					% Switch to the file given in the
+					% string literal, and mark it with
+					% the current file as the alternate
+
+    oSeparateCompilationIsAlternateFile >> Boolean
+					% Is this file an alternate?
+
+    oSeparateCompilationSwitchToAlternateFile
+					% switch back to the alternate file
+					% from the "main stub file"
+
+    oSeparateCompilationExitProgram	% Exit the program in the middle of
+					% the compilation, because the file
+					% that we are compiling has been parsed
+
+    oSeparateCompilationEnterParent	% Change to the file in the current
+					% string literal, as a parent
+
+    oSeparateCompilationExitParent	% Exit the current file, back to the
+					% file that invoked it as a parent
+
+    oSeparateCompilationEnterChild	% Change to the file in the current
+					% string literal, as a child
+
+    oSeparateCompilationExitChild	% Exit the current file, back to the
+					% file that invoked it as a child
+
+    oSeparateCompilationChildMatchesParent >> Boolean
+					% Does the file name in the current
+					% string literal match the parent that
+					% it came from?
+
+    oSeparateCompilationSetOriginalFile % Mark the current file as the file
+					% that is being compiled
+
+    oSeparateCompilationIsOriginalFile >> Boolean
+					% Is this the original file that must
+					% be compiled?
+
+    oSeparateCompilationIsParent >> Boolean
+					% Is this a parent file?
+
+    oSeparateCompilationIsChildThatCalledMe >> Boolean
+					% Is this the child that called me as
+					% a parent?
+
+    oSeparateCompilationDisableScannerLookahead
+					% When the next token is accepted,
+					% do NOT scan ahead for the next token.
+					% This is used to mesh the separate
+					% compilation file manipulation with
+					% the scanner's include files.
+
+    oSeparateCompilationMarkModuleStub	% Mark the current compilation unit as
+					% being a module stub.  Saves file name
+					% and ident.
+
+    oSeparateCompilationIsMarkedModuleStub >> Boolean
+					% Return yes if the current
+					% compilation unit refers to a marked
+					% module stub
+
+    oSeparateCompilationEmitMarkedStubIdent
+					% Emit the saved module stub ident
+
+    oSeparateCompilationDisableOutput	% disable output token emission
+
+    oSeparateCompilationEnableOutput	% enable output token emission
+    ;
+
+
+%
+% Handle the external "stringLit" subprogram names
+%
+mechanism External:
+
+    oExternalSetOverideName		% set the external overide name to
+					% the current string literal
+
+    oExternalSetNoOveride		% no overide was specified
+
+    oExternalOverideName >> Boolean	% yes if there was an overide name
+
+    oExternalEmitOverideName		% emit the overide name as a stringlit
+
+    ;
+
+rules
+
+
+Compilation:
+    oEmitLine '<dummy>' .aFileName	% sync on a new line
+					% ensure that the original file is set
+    oSeparateCompilationSetOriginalFile
+    '<dummy>'
+    oEmitLine		% sync on a new line
+
+    % a compilation is one of:
+    %		[GRANT grantList]
+    %		program
+    %
+    %		[PARENT stringLit]
+    %		STUB moduleOrMonitorStub
+    %		[BODY moduleOrMonitorBody]
+    %
+    %		[PARENT stringLit]
+    %		STUB extendedSubprogramHeader
+    %		[BODY subprogramImplementation]
+    %
+    %		BODY stringLit moduleOrMonitorBody
+    %
+    %		BODY subprogramImplementation
+    %		program
+    %
+    [
+	| 'grant':
+	    % This is a program
+	    .aCompile
+	    @GrantList
+	    @Program
+	| 'parent':
+	    @Parent
+	| 'stub':
+	    @Stub
+	| 'body':
+	    % may be one of the alternate bodies
+	    [ *
+		| 'StringLit':
+		    oSeparateCompilationDisableScannerLookahead
+		| *:
+	    ]
+	    [
+		| 'StringLit':
+		    % Must include the "main definition stub"
+		    oSeparateCompilationEnterAlternateFileAndMark
+		    oEmitLine		% sync on a new line
+		    [
+			| 'parent':
+			    @Parent
+			| 'stub':
+			    @Stub
+		    ]
+		| *:
+		    % must be a body procedure or fcn, followed by program
+		    .aCompile
+		    .aBody
+		    @SubprogramImplementation
+		    ';' oEmitLine
+		    @Program
+	    ]
+	| *:
+	    % everything else must be a program
+	    .aCompile
+	    @Program
+    ];
+
+
+Parent:
+    .aParent
+    oSeparateCompilationDisableScannerLookahead
+    'StringLit'
+    oSeparateCompilationEnterParent
+    oEmitLine		% sync on a new line
+
+    % a parent parent is one of:
+    %		[GRANT grantList]
+    %		program
+    %
+    %		[PARENT stringLit]
+    %		STUB moduleOrMonitorStub
+    %		[BODY moduleOrMonitorBody]
+    %
+    %		[PARENT stringLit]
+    %		STUB extendedSubprogramHeader
+    %		[BODY subprogramImplementation]
+    %
+    %		BODY stringLit moduleOrMonitorBody
+    %
+    [
+	| 'grant':
+	    % This is a program
+	    @GrantList
+	    @Program
+	| 'parent':
+	    @Parent
+	| 'stub':
+	    @Stub
+	| 'body':
+	    @Alternate
+	| *:
+	    % everything else must be a program
+	    @Program
+    ]
+    %
+    % If we get here, then we have run off the end of the parent
+    % without matching the child
+    %
+    #eParentDoesNotIncludeChild
+    oSeparateCompilationExitProgram;
+
+
+Alternate:
+    oSeparateCompilationDisableScannerLookahead
+    'StringLit'
+    oSeparateCompilationEnterAlternateFileAndMark
+    oEmitLine		% sync on a new line
+
+    % an alternate is one of:
+    %		[PARENT stringLit]
+    %		STUB moduleOrMonitorStub
+    %		[BODY moduleOrMonitorBody]
+    %
+    %		[PARENT stringLit]
+    %		STUB extendedSubprogramHeader
+    %		[BODY subprogramImplementation]
+    %
+    [
+	| 'parent':
+	    @Parent
+	| 'stub':
+	    @Stub
+    ];
+
+
+Child:
+    .aChild
+    oSeparateCompilationDisableScannerLookahead
+    'StringLit'
+
+    % a child is one of:
+    %		[PARENT stringLit]
+    %		STUB moduleOrMonitorStub
+    %		[BODY moduleOrMonitorBody]
+    %
+    %		[PARENT stringLit]
+    %		STUB extendedSubprogramHeader
+    %		[BODY subprogramImplementation]
+    %
+    [ oSeparateCompilationIsChildThatCalledMe
+	| yes:
+	    oSeparateCompilationExitParent
+	    oEmitLine		% sync on a new line
+	    % Emit the aParent that got us here in the first place.
+	    .aParent
+	    [
+		| 'stub':
+		    @Stub
+		| *:
+		    #eNoProgramAfterParent
+		    oSeparateCompilationExitProgram
+	    ]
+	| *:
+	    oSeparateCompilationEnterChild
+	    oEmitLine		% sync on a new line
+	    [
+		| 'parent':
+		    .aParent
+		    'StringLit'
+		    [ oSeparateCompilationChildMatchesParent
+			| yes:
+			| *:
+			    #eChildMismatchParent
+		    ]
+		    '<NL>' oEmitLine
+		    [
+			| 'stub':
+			    @Stub
+			| *:
+			    #eNoProgramAfterParent
+		    ]
+		| 'stub':
+		    @Stub
+	    ]
+	    oSeparateCompilationExitChild
+	    oEmitLine		% sync on a new line
+    ];
+
+
+StubChild:
+    .aChild
+    oSeparateCompilationDisableScannerLookahead
+    'StringLit'
+
+    % a child is one of:
+    %		[PARENT stringLit]
+    %		STUB moduleOrMonitorStub
+    %		[BODY moduleOrMonitorBody]
+    %
+    %		[PARENT stringLit]
+    %		STUB extendedSubprogramHeader
+    %		[BODY subprogramImplementation]
+    %
+    oSeparateCompilationEnterChild
+    oEmitLine		% sync on a new line
+    [
+	| 'parent':
+	    .aParent
+	    'StringLit'
+	    [ oSeparateCompilationChildMatchesParent
+		| yes:
+		| *:
+		    #eChildMismatchParent
+	    ]
+	    '<NL>' oEmitLine
+	    [
+		| 'stub':
+		    @Stub
+		| *:
+		    #eNoProgramAfterParent
+	    ]
+	| 'stub':
+	    @Stub
+    ]
+    oSeparateCompilationExitChild
+    oEmitLine		% sync on a new line
+    ;
+
+
+OptionalGrant:
+    [
+	| 'grant':
+	    @GrantList
+	| *:
+    ];
+
+
+GrantList:
+    [
+	| '(':
+	    [
+		| ')':
+		    % empty grant list; just ignore it
+		| *:
+		    .aGrant
+		    @GrantListList
+		    ')'
+		    .aEndGrant
+	    ]
+	| *:
+	    .aGrant
+	    @GrantListList
+	    .aEndGrant
+    ]
+    '<NL>' oEmitLine;
+
+
+GrantListList:
+    {
+	oEmitLine
+	[
+	    | 'var':
+		.aVar
+	    | *:
+	]
+	'Ident' oEmitIdent
+	[
+	    | ',':
+	    | *:
+		>>
+	]
+    };
+
+
+Stub:
+    [ oSeparateCompilationIsOriginalFile
+	| yes:
+	    .aCompile
+	| *:
+    ]
+    [ oSeparateCompilationIsMarkedModuleStub
+	| yes:
+	    .aMissingStub
+	    .aIdent oSeparateCompilationEmitMarkedStubIdent
+	| *:
+    ]
+    .aStub
+    [
+	| 'module':
+	    .aModule
+	    @ModuleStub
+	    'end' .aEndModule
+	    'Ident' oEmitIdent
+	    @EndOfStub
+	    oSeparateCompilationEnableOutput
+	    '<NL>' oEmitLine
+	    [ oSeparateCompilationIsOriginalFile
+		| yes:
+		    [ oSeparateCompilationIsAlternateFile
+			| yes:
+			    oSeparateCompilationSwitchToAlternateFile
+			    oEmitLine		% sync on a new line
+			    @ModuleBody
+			| *:
+			    [
+				| 'body':
+				    @ModuleBody
+				| *:
+			    ]
+		    ]
+		    .aEndOfFile
+		    oSeparateCompilationExitProgram
+		| *:
+		    [ oSeparateCompilationIsParent
+			| yes:
+			    [
+				| 'body':
+				    @ModuleBody
+				| *:
+				    #eParentDoesNotIncludeChild
+				    oSeparateCompilationExitProgram
+			    ]
+			| *:
+			    [ oSeparateCompilationIsAlternateFile
+				| yes:
+				    oSeparateCompilationSwitchToAlternateFile
+				    oEmitLine		% sync on a new line
+				    @ModuleBody
+				| *:
+			    ]
+		    ]
+	    ]
+	| 'monitor':
+	    .aMonitor
+	    @MonitorStub
+	    'end' .aEndMonitor
+	    'Ident' oEmitIdent
+	    @EndOfStub
+	    oSeparateCompilationEnableOutput
+	    '<NL>' oEmitLine
+	    [ oSeparateCompilationIsOriginalFile
+		| yes:
+		    [ oSeparateCompilationIsAlternateFile
+			| yes:
+			    oSeparateCompilationSwitchToAlternateFile
+			    oEmitLine		% sync on a new line
+			    @MonitorBody
+			| *:
+			    [
+				| 'body':
+				    @MonitorBody
+				| *:
+			    ]
+		    ]
+		    .aEndOfFile
+		    oSeparateCompilationExitProgram
+		| *:
+		    [ oSeparateCompilationIsParent
+			| yes:
+			    [
+				| 'body':
+				    @MonitorBody
+				| *:
+				    #eParentDoesNotIncludeChild
+				    oSeparateCompilationExitProgram
+			    ]
+			| *:
+			    [ oSeparateCompilationIsAlternateFile
+				| yes:
+				    oSeparateCompilationSwitchToAlternateFile
+				    oEmitLine		% sync on a new line
+				    @MonitorBody
+				| *:
+			    ]
+		    ]
+	    ]
+	| 'procedure', 'proc':
+	    % extended subprogram header
+	    [ oSeparateCompilationIsOriginalFile
+		| yes:
+		    [ oSeparateCompilationIsAlternateFile
+			| yes:
+			    @ProcedureHeader
+			    @OptionalImport
+			    @EndOfStub
+			    oSeparateCompilationSwitchToAlternateFile
+			    oEmitLine		% sync on a new line
+			    .aIs
+			    @SubprogramImplementation
+			| *:
+			    @ProcedureHeader
+			    @OptionalImport
+			    @EndOfStub
+			    @OptionalImplementation
+		    ]
+		    '<NL>' oEmitLine
+		    .aEndOfFile
+		    oSeparateCompilationExitProgram
+		| *:
+		    @ProcedureHeader
+		    @OptionalImport
+		    @EndOfStub
+	    ]
+	| 'function', 'fcn':
+	    % extended subprogram header
+	    [ oSeparateCompilationIsOriginalFile
+		| yes:
+		    [ oSeparateCompilationIsAlternateFile
+			| yes:
+			    @FunctionHeader
+			    @OptionalImport
+			    @EndOfStub
+			    oSeparateCompilationSwitchToAlternateFile
+			    oEmitLine		% sync on a new line
+			    .aIs
+			    @SubprogramImplementation
+			| *:
+			    @FunctionHeader
+			    @OptionalImport
+			    @EndOfStub
+			    @OptionalImplementation
+		    ]
+		    '<NL>' oEmitLine
+		    .aEndOfFile
+		    oSeparateCompilationExitProgram
+		| *:
+		    @FunctionHeader
+		    @OptionalImport
+		    @EndOfStub
+	    ]
+    ];
+
+
+ModuleStub:
+    'Ident' oEmitIdent oEmitIdentText
+    oSeparateCompilationMarkModuleStub
+    @OptionalImport
+    @OptionalExport
+    @DeclarationsInModuleStub
+    ;
+
+
+MonitorStub:
+    'Ident' oEmitIdent oEmitIdentText
+    oSeparateCompilationMarkModuleStub
+    @OptionalImport
+    @OptionalExport
+    @DeclarationsInMonitorStub
+    ;
+
+
+OptionalImplementation:
+    [
+	| 'body':
+	    .aIs
+	    @SubprogramImplementation
+	| *:
+    ];
+
+
+EndOfStub:
+    [ *
+	| 'body', '<EOF>', tEndCompilationUnit:
+	| *:
+	    #eStubSyntaxError
+    ];
+
+
+SubprogramImplementation:
+    [
+	| 'procedure', 'proc':
+	    .aProcedure
+	| 'function', 'fcn':
+	    .aFunction
+    ]
+    'Ident' oEmitIdent
+    '<NL>' oEmitLine
+    @SubprogramBody
+    ;
+
+
+DeclarationsInModuleStub:
+    {
+	[
+	    | 'const':
+		@ConstantDeclarationInModule
+	    | 'type':
+		@TypeDeclaration
+	    | 'external':
+		.aExternal
+		[
+		    | 'StringLit':
+			oExternalSetOverideName
+		    | *:
+			oExternalSetNoOveride
+		]
+		[
+		    | 'procedure', 'proc':
+			@ExternalProcedureDeclaration
+		    | 'function', 'fcn':
+			@ExternalFunctionDeclaration
+		]
+	    | 'procedure', 'proc':
+		@ProcedureHeader
+	    | 'function', 'fcn':
+		@FunctionHeader
+	    | 'var':
+		% must be a collection declaration
+		.aVar
+		@IdListWithIdentText
+		':'
+		[
+		    | 'unchecked':
+			'collection' .aCollection .aUnchecked
+			'of'
+			[
+			    | 'forward':
+				.aForward
+				'Ident' oEmitIdent
+			    | *:
+				@TypeSpec
+			]
+		    | 'collection':
+			.aCollection
+			'of'
+			[
+			    | 'forward':
+				.aForward
+				'Ident' oEmitIdent
+			    | *:
+				@TypeSpec
+			]
+		    | *:
+			#eOnlyCollectionVarsInStub
+		]
+	    | 'child':
+		@StubChild
+	    | *:
+		>>
+	]
+	';' oEmitLine
+    };
+
+
+DeclarationsInMonitorStub:
+    {
+	[
+	    | 'const':
+		@ConstantDeclarationInModule
+	    | 'type':
+		@TypeDeclaration
+	    | 'procedure', 'proc':
+		@ProcedureHeader
+	    | 'function', 'fcn':
+		@FunctionHeader
+	    | 'var':
+		% must be a collection declaration
+		.aVar
+		@IdListWithIdentText
+		':'
+		[
+		    | 'unchecked':
+			'collection' .aCollection .aUnchecked
+			'of'
+			[
+			    | 'forward':
+				.aForward
+				'Ident' oEmitIdent
+			    | *:
+				@TypeSpec
+			]
+		    | 'collection':
+			.aCollection
+			'of'
+			[
+			    | 'forward':
+				.aForward
+				'Ident' oEmitIdent
+			    | *:
+				@TypeSpec
+			]
+		    | *:
+			#eOnlyCollectionVarsInStub
+		]
+	    | 'child':
+		@StubChild
+	    | *:
+		>>
+	]
+	';' oEmitLine
+    };
+
+
+ModuleBody:
+    .aBody
+    'module' .aModule
+    'Ident' oEmitIdent oEmitIdentText
+    '<NL>' oEmitLine
+    @OptionalGrant
+    @OptionalPre
+    @DeclarationsAndStatementsInModule
+    @OptionalInvariant
+    @DeclarationsAndStatementsInModule
+    @OptionalPost
+    'end' .aEndModule
+    'Ident' oEmitIdent
+    '<NL>' oEmitLine;
+
+
+MonitorBody:
+    .aBody
+    'monitor' .aMonitor
+    'Ident' oEmitIdent oEmitIdentText
+    [
+	| ':':
+	    .aMonitorPriority
+	    @Expression
+	| *:
+    ]
+    '<NL>' oEmitLine
+    @OptionalGrant
+    @OptionalPre
+    @DeclarationsAndStatementsInMonitor
+    @OptionalInvariant
+    @DeclarationsAndStatementsInMonitor
+    @OptionalPost
+    'end' .aEndMonitor
+    'Ident' oEmitIdent
+    '<NL>' oEmitLine;
+
+
+Program:
+    % In order to provide good syntax error recovery
+    % from serious syntax errors, we don't stop parsing
+    % declarations and statements until we reach a solid
+    % indicator that the list is done.
+
+    {
+	% This choice should still be ordered by
+	% relative frequency for performance.
+
+	[
+	    | 'Ident':
+		@Selectors
+		@OptionalAssignment
+	    | 'const':
+		@ConstantDeclarationInModule
+	    | 'var':
+		@VariableDeclarationInModule
+	    | 'type':
+		[
+		    | '(':
+			.aTypeCheat
+			@TypeCheatSpec
+			','
+			@Reference
+			.aEndExpression
+			')'
+			@ComponentSelectors
+			@OptionalAssignment
+		    | *:
+			@TypeDeclaration
+		]
+	    | 'procedure', 'proc':
+		@ProcedureDeclaration
+	    | 'function', 'fcn':
+		@FunctionDeclaration
+	    | 'forward':
+		.aForward
+		[
+		    | 'procedure', 'proc':
+			@ForwardProcedureDeclaration
+		    | 'function', 'fcn':
+			@ForwardFunctionDeclaration
+		]
+	    | 'external':
+		@ExternalDeclaration
+	    | 'child':
+		@Child
+	    | 'body':
+		.aBody
+		@SubprogramImplementation
+	    | 'module':
+		@ModuleDeclaration
+	    | 'monitor':
+		@MonitorDeclaration
+	    | 'process':
+		@ProcessDeclaration
+	    | 'if':
+		@LongFormIfStatement
+	    | 'loop':
+		@LongFormLoopStatement
+	    | 'exit':
+		[
+		    | 'when':
+			.aExitWhen
+			@Expression
+		    | *:
+			.aExit
+		]
+	    | '>>':
+		[
+		    | ':':
+			.aExitWhen
+			@Expression
+		    | *:
+			.aExit
+		]
+	    | 'case':
+		@CaseStatement
+	    | 'for':
+		@LongFormForStatement
+	    | 'begin':
+		.aBegin
+		oEmitLine
+		@DeclarationsAndStatementsInSubprogram
+		'end' .aEndBegin
+	    | 'assert':
+		.aAssert
+		@Expression
+	    | 'return', '>>>':
+		.aReturn
+	    | 'put', '!':
+		@PutStatement
+	    | 'get', '?':
+		@GetStatement
+
+	    | 'int':
+		.aTypeCheat
+		.aInt
+		@RestOfIndirection
+		@Assignment
+	    | 'int1', 'int2', 'int4':
+		.aTypeCheat
+		.aInt
+		.aStorageSize
+		oEmitTypeSizeAsIntegerLit
+		.aEndExpression
+		@RestOfIndirection
+		@Assignment
+	    | 'real':
+		.aTypeCheat
+		.aReal
+		@RestOfIndirection
+		@Assignment
+	    | 'real4', 'real8':
+		.aTypeCheat
+		.aReal
+		.aStorageSize
+		oEmitTypeSizeAsIntegerLit
+		.aEndExpression
+		@RestOfIndirection
+		@Assignment
+	    | 'boolean':
+		.aTypeCheat
+		.aBoolean
+		@RestOfIndirection
+		@Assignment
+	    | 'string':
+		.aTypeCheat
+		.aString
+		@OptionalStringSize
+		@RestOfIndirection
+		@Assignment
+	    | 'char':
+		.aTypeCheat
+		.aChar
+		@OptionalStringSize
+		@RestOfIndirection
+		@ComponentSelectors
+		@Assignment
+	    | 'nat':
+		.aTypeCheat
+		.aNat
+		@RestOfIndirection
+		@Assignment
+	    | 'nat1', 'nat2', 'nat4':
+		.aTypeCheat
+		.aNat
+		.aStorageSize
+		oEmitTypeSizeAsIntegerLit
+		.aEndExpression
+		@RestOfIndirection
+		@Assignment
+	    | 'addressint':
+		.aTypeCheat
+		.aAddressInt
+		@RestOfIndirection
+		@Assignment
+
+	    | '#':
+		@Reference
+		.aHash
+		@Assignment
+	    | 'bits':
+		.aBits
+		'('
+		@Reference
+		','
+		@BitsRange
+		')'
+		@Assignment
+	    | '[':
+		@ShortFormIfStatement
+	    | '{':
+		[
+		    | '+':
+			.aFor
+			@IncreasingForRange
+			@ShortFormForStatement
+		    | '-':
+			.aFor
+			.aDecreasing
+			@DecreasingForRange
+			@ShortFormForStatement
+		    | *:
+			@ShortFormLoopStatement
+		]
+	    | 'new':
+		.aNew
+		'Ident' oEmitIdent
+		[
+		    | '.':
+			.aField
+			'Ident' oEmitIdent
+		    | *:
+		]
+		','
+		@VariableReference
+	    | 'free':
+		.aFree
+		'Ident' oEmitIdent
+		[
+		    | '.':
+			.aField
+			'Ident' oEmitIdent
+		    | *:
+		]
+		','
+		@VariableReference
+	    | 'tag':
+		.aTag
+		@VariableReference
+		','
+		@Expression
+	    | 'read':
+		@ReadStatement
+	    | 'write':
+		@WriteStatement
+	    | 'seek':
+		@SeekStatement
+	    | 'tell':
+		@TellStatement
+	    | 'open':
+		@OpenStatement
+	    | 'close':
+		@CloseStatement
+	    | 'quit':
+		@QuitStatement
+	    | 'fork':
+		@ForkStatement
+	    | 'pause':
+		@PauseStatement
+	    | 'asm':
+		@AssemblerStatement
+
+	    | 'unchecked':
+		.aUnchecked
+	    | 'checked':
+		.aChecked
+
+	    | ';':
+		% null statement
+	    | *:
+		[ *
+		    | '<EOF>', tEndCompilationUnit:
+			% legitimate end of program, so exit
+			>>
+		    | *:
+			% recover cleanly from serious syntax errors
+			'Ident'		% force error
+			% now continue parsing scope
+		]
+	]
+	';' oEmitLine
+    };
+
+
+RestOfIndirection:
+    '@'
+    .aAt
+    '('
+    @ExpressionParen
+    ')';
+
+
+OptionalAssignment:
+    % handle a procedure call, or an assignment operator
+    [
+	| ':=':
+	    .aAssign
+	| '+':
+	    '=' .aPlusEqual
+	| '-':
+	    '=' .aMinusEqual
+	| 'xor':
+	    '=' .aXorEqual
+	| '*':
+	    '=' .aStarEqual
+	| '/':
+	    '=' .aRealDivEqual
+	| 'div':
+	    '=' .aDivEqual
+	| 'mod':
+	    '=' .aModEqual
+	| 'shl':
+	    '=' .aShiftLeftEqual
+	| 'shr':
+	    '=' .aShiftRightEqual
+	| '**':
+	    '=' .aExponentiateEqual
+	| 'and':
+	    '=' .aAndEqual
+	| 'or':
+	    '=' .aOrEqual
+	| *:
+	    % procedure call
+	    >>
+    ]
+    @Expression
+    ;
+
+
+Assignment:
+    [
+	| ':=':
+	    .aAssign
+	| '+':
+	    '=' .aPlusEqual
+	| '-':
+	    '=' .aMinusEqual
+	| 'xor':
+	    '=' .aXorEqual
+	| '*':
+	    '=' .aStarEqual
+	| '/':
+	    '=' .aRealDivEqual
+	| 'div':
+	    '=' .aDivEqual
+	| 'mod':
+	    '=' .aModEqual
+	| 'shl':
+	    '=' .aShiftLeftEqual
+	| 'shr':
+	    '=' .aShiftRightEqual
+	| '**':
+	    '=' .aExponentiateEqual
+	| 'and':
+	    '=' .aAndEqual
+	| 'or':
+	    '=' .aOrEqual
+    ]
+    @Expression
+    ;
+
+
+ExternalDeclaration:
+    .aExternal
+    % either a variable declaration or an external subprogram
+    [
+	| 'StringLit':
+	    oExternalSetOverideName
+	    [
+		| 'procedure', 'proc':
+		    @ExternalProcedureDeclaration
+		| 'function', 'fcn':
+		    @ExternalFunctionDeclaration
+		| 'var':
+		    .aExternalAddress
+		    oExternalEmitOverideName
+		    @SubExpression
+		    .aEndExpression
+		    @ExternalVariableDeclaration
+	    ]
+	| *:
+	    oExternalSetNoOveride
+	    [
+		| 'procedure', 'proc':
+		    @ExternalProcedureDeclaration
+		| 'function', 'fcn':
+		    @ExternalFunctionDeclaration
+		| 'var':
+		    @ExternalVariableListDeclaration
+		| *:
+		    .aExternalAddress
+		    @Expression
+		    'var'
+		    @ExternalVariableDeclaration
+	    ]
+    ];
+
+
+DeclarationsAndStatementsInModule:
+    % In order to provide good syntax error recovery
+    % from serious syntax errors, we don't stop parsing
+    % declarations and statements until we reach a solid
+    % indicator that the list is done.
+
+    {
+	% This choice should still be ordered by
+	% relative frequency for performance.
+
+	[
+	    | 'Ident':
+		@Selectors
+		@OptionalAssignment
+	    | 'const':
+		@ConstantDeclarationInModule
+	    | 'var':
+		@VariableDeclarationInModule
+	    | 'type':
+		[
+		    | '(':
+			.aTypeCheat
+			@TypeCheatSpec
+			','
+			@Reference
+			.aEndExpression
+			')'
+			@ComponentSelectors
+			@OptionalAssignment
+		    | *:
+			@TypeDeclaration
+		]
+	    | 'procedure', 'proc':
+		@ProcedureDeclaration
+	    | 'function', 'fcn':
+		@FunctionDeclaration
+	    | 'forward':
+		.aForward
+		[
+		    | 'procedure', 'proc':
+			@ForwardProcedureDeclaration
+		    | 'function', 'fcn':
+			@ForwardFunctionDeclaration
+		]
+	    | 'external':
+		@ExternalDeclaration
+	    | 'child':
+		@Child
+	    | 'body':
+		.aBody
+		@SubprogramImplementation
+	    | 'module':
+		@ModuleDeclaration
+	    | 'monitor':
+		@MonitorDeclaration
+	    | 'process':
+		@ProcessDeclaration
+	    | 'if':
+		@LongFormIfStatement
+	    | 'loop':
+		@LongFormLoopStatement
+	    | 'exit':
+		[
+		    | 'when':
+			.aExitWhen
+			@Expression
+		    | *:
+			.aExit
+		]
+	    | '>>':
+		[
+		    | ':':
+			.aExitWhen
+			@Expression
+		    | *:
+			.aExit
+		]
+	    | 'case':
+		@CaseStatement
+	    | 'for':
+		@LongFormForStatement
+	    | 'begin':
+		.aBegin
+		oEmitLine
+		@DeclarationsAndStatementsInSubprogram
+		'end' .aEndBegin
+	    | 'assert':
+		.aAssert
+		@Expression
+	    | 'put', '!':
+		@PutStatement
+	    | 'get', '?':
+		@GetStatement
+
+	    | 'int':
+		.aTypeCheat
+		.aInt
+		@RestOfIndirection
+		@Assignment
+	    | 'int1', 'int2', 'int4':
+		.aTypeCheat
+		.aInt
+		.aStorageSize
+		oEmitTypeSizeAsIntegerLit
+		.aEndExpression
+		@RestOfIndirection
+		@Assignment
+	    | 'real':
+		.aTypeCheat
+		.aReal
+		@RestOfIndirection
+		@Assignment
+	    | 'real4', 'real8':
+		.aTypeCheat
+		.aReal
+		.aStorageSize
+		oEmitTypeSizeAsIntegerLit
+		.aEndExpression
+		@RestOfIndirection
+		@Assignment
+	    | 'boolean':
+		.aTypeCheat
+		.aBoolean
+		@RestOfIndirection
+		@Assignment
+	    | 'string':
+		.aTypeCheat
+		.aString
+		@OptionalStringSize
+		@RestOfIndirection
+		@Assignment
+	    | 'char':
+		.aTypeCheat
+		.aChar
+		@OptionalStringSize
+		@RestOfIndirection
+		@ComponentSelectors
+		@Assignment
+	    | 'nat':
+		.aTypeCheat
+		.aNat
+		@RestOfIndirection
+		@Assignment
+	    | 'nat1', 'nat2', 'nat4':
+		.aTypeCheat
+		.aNat
+		.aStorageSize
+		oEmitTypeSizeAsIntegerLit
+		.aEndExpression
+		@RestOfIndirection
+		@Assignment
+	    | 'addressint':
+		.aTypeCheat
+		.aAddressInt
+		@RestOfIndirection
+		@Assignment
+
+	    | '#':
+		@Reference
+		.aHash
+		@Assignment
+	    | 'bits':
+		.aBits
+		'('
+		@Reference
+		','
+		@BitsRange
+		')'
+		@Assignment
+	    | '[':
+		@ShortFormIfStatement
+	    | '{':
+		[
+		    | '+':
+			.aFor
+			@IncreasingForRange
+			@ShortFormForStatement
+		    | '-':
+			.aFor
+			.aDecreasing
+			@DecreasingForRange
+			@ShortFormForStatement
+		    | *:
+			@ShortFormLoopStatement
+		]
+	    | 'new':
+		.aNew
+		'Ident' oEmitIdent
+		[
+		    | '.':
+			.aField
+			'Ident' oEmitIdent
+		    | *:
+		]
+		','
+		@VariableReference
+	    | 'free':
+		.aFree
+		'Ident' oEmitIdent
+		[
+		    | '.':
+			.aField
+			'Ident' oEmitIdent
+		    | *:
+		]
+		','
+		@VariableReference
+	    | 'tag':
+		.aTag
+		@VariableReference
+		','
+		@Expression
+	    | 'read':
+		@ReadStatement
+	    | 'write':
+		@WriteStatement
+	    | 'seek':
+		@SeekStatement
+	    | 'tell':
+		@TellStatement
+	    | 'open':
+		@OpenStatement
+	    | 'close':
+		@CloseStatement
+	    | 'quit':
+		@QuitStatement
+	    | 'fork':
+		@ForkStatement
+	    | 'pause':
+		@PauseStatement
+	    | 'asm':
+		@AssemblerStatement
+
+	    | 'unchecked':
+		.aUnchecked
+	    | 'checked':
+		.aChecked
+
+	    | ';':
+		% null statement
+	    | *:
+		[ *
+		    | 'end', 'invariant', 'post', tEndCompilationUnit,
+		      '<EOF>':
+			% legitimate end of scope, so exit
+			>>
+		    | *:
+			% recover cleanly from serious syntax errors
+			'Ident'		% force error
+			% now continue parsing scope
+		]
+	]
+	';' oEmitLine
+    };
+
+
+
+DeclarationsAndStatementsInMonitor:
+    % In order to provide good syntax error recovery
+    % from serious syntax errors, we don't stop parsing
+    % declarations and statements until we reach a solid
+    % indicator that the list is done.
+
+    {
+	% This choice should still be ordered by
+	% relative frequency for performance.
+
+	[
+	    | 'Ident':
+		@Selectors
+		@OptionalAssignment
+	    | 'const':
+		@ConstantDeclarationInModule
+	    | 'var':
+		@VariableDeclarationInMonitor
+	    | 'type':
+		[
+		    | '(':
+			.aTypeCheat
+			@TypeCheatSpec
+			','
+			@Reference
+			.aEndExpression
+			')'
+			@ComponentSelectors
+			@OptionalAssignment
+		    | *:
+			@TypeDeclaration
+		]
+	    | 'procedure', 'proc':
+		@ProcedureOrInterruptProcedureDeclaration
+	    | 'function', 'fcn':
+		@FunctionDeclaration
+	    | 'forward':
+		.aForward
+		[
+		    | 'procedure', 'proc':
+			@ForwardProcedureDeclaration
+		    | 'function', 'fcn':
+			@ForwardFunctionDeclaration
+		]
+	    | 'external':
+		@ExternalDeclaration
+	    | 'child':
+		@Child
+	    | 'body':
+		.aBody
+		@SubprogramImplementation
+	    | 'if':
+		@LongFormIfStatement
+	    | 'loop':
+		@LongFormLoopStatement
+	    | 'exit':
+		[
+		    | 'when':
+			.aExitWhen
+			@Expression
+		    | *:
+			.aExit
+		]
+	    | '>>':
+		[
+		    | ':':
+			.aExitWhen
+			@Expression
+		    | *:
+			.aExit
+		]
+	    | 'case':
+		@CaseStatement
+	    | 'for':
+		@LongFormForStatement
+	    | 'begin':
+		.aBegin
+		oEmitLine
+		@DeclarationsAndStatementsInSubprogram
+		'end' .aEndBegin
+	    | 'assert':
+		.aAssert
+		@Expression
+	    | 'put', '!':
+		@PutStatement
+	    | 'get', '?':
+		@GetStatement
+
+	    | 'int':
+		.aTypeCheat
+		.aInt
+		@RestOfIndirection
+		@Assignment
+	    | 'int1', 'int2', 'int4':
+		.aTypeCheat
+		.aInt
+		.aStorageSize
+		oEmitTypeSizeAsIntegerLit
+		.aEndExpression
+		@RestOfIndirection
+		@Assignment
+	    | 'real':
+		.aTypeCheat
+		.aReal
+		@RestOfIndirection
+		@Assignment
+	    | 'real4', 'real8':
+		.aTypeCheat
+		.aReal
+		.aStorageSize
+		oEmitTypeSizeAsIntegerLit
+		.aEndExpression
+		@RestOfIndirection
+		@Assignment
+	    | 'boolean':
+		.aTypeCheat
+		.aBoolean
+		@RestOfIndirection
+		@Assignment
+	    | 'string':
+		.aTypeCheat
+		.aString
+		@OptionalStringSize
+		@RestOfIndirection
+		@Assignment
+	    | 'char':
+		.aTypeCheat
+		.aChar
+		@OptionalStringSize
+		@RestOfIndirection
+		@ComponentSelectors
+		@Assignment
+	    | 'nat':
+		.aTypeCheat
+		.aNat
+		@RestOfIndirection
+		@Assignment
+	    | 'nat1', 'nat2', 'nat4':
+		.aTypeCheat
+		.aNat
+		.aStorageSize
+		oEmitTypeSizeAsIntegerLit
+		.aEndExpression
+		@RestOfIndirection
+		@Assignment
+	    | 'addressint':
+		.aTypeCheat
+		.aAddressInt
+		@RestOfIndirection
+		@Assignment
+
+	    | '#':
+		@Reference
+		.aHash
+		@Assignment
+	    | 'bits':
+		.aBits
+		'('
+		@Reference
+		','
+		@BitsRange
+		')'
+		@Assignment
+	    | '[':
+		@ShortFormIfStatement
+	    | '{':
+		[
+		    | '+':
+			.aFor
+			@IncreasingForRange
+			@ShortFormForStatement
+		    | '-':
+			.aFor
+			.aDecreasing
+			@DecreasingForRange
+			@ShortFormForStatement
+		    | *:
+			@ShortFormLoopStatement
+		]
+	    | 'new':
+		.aNew
+		'Ident' oEmitIdent
+		[
+		    | '.':
+			.aField
+			'Ident' oEmitIdent
+		    | *:
+		]
+		','
+		@VariableReference
+	    | 'free':
+		.aFree
+		'Ident' oEmitIdent
+		[
+		    | '.':
+			.aField
+			'Ident' oEmitIdent
+		    | *:
+		]
+		','
+		@VariableReference
+	    | 'tag':
+		.aTag
+		@VariableReference
+		','
+		@Expression
+	    | 'read':
+		@ReadStatement
+	    | 'write':
+		@WriteStatement
+	    | 'seek':
+		@SeekStatement
+	    | 'tell':
+		@TellStatement
+	    | 'open':
+		@OpenStatement
+	    | 'close':
+		@CloseStatement
+	    | 'quit':
+		@QuitStatement
+	    | 'fork':
+		@ForkStatement
+	    | 'pause':
+		@PauseStatement
+	    | 'asm':
+		@AssemblerStatement
+
+	    | 'unchecked':
+		.aUnchecked
+	    | 'checked':
+		.aChecked
+
+	    | ';':
+		% null statement
+	    | *:
+		[ *
+		    | 'end', 'invariant', 'post', tEndCompilationUnit,
+		      '<EOF>':
+			% legitimate end of scope, so exit
+			>>
+		    | *:
+			% recover cleanly from serious syntax errors
+			'Ident'		% force error
+			% now continue parsing scope
+		]
+	]
+	';' oEmitLine
+    };
+
+
+
+DeclarationsAndStatementsInSubprogram:
+    % In order to provide good syntax error recovery
+    % from serious syntax errors, we don't stop parsing
+    % declarations and statements until we reach a solid
+    % indicator that the list is done.
+
+    {
+	% This choice should still be ordered by
+	% relative frequency for performance.
+
+	[
+	    % Ident must be the first choice for
+	    % clean syntax error recovery;
+	    % fortunately it is also the most
+	    % frequent statement!
+
+	    | 'Ident':
+		@Selectors
+		@OptionalAssignment
+	    | 'const':
+		@ConstantDeclarationInSubprogram
+	    | 'var':
+		@VariableDeclarationInSubprogram
+	    | 'external':
+		@ExternalDeclaration
+	    | 'bind':
+		@BindDeclaration
+	    | 'type':
+		[
+		    | '(':
+			.aTypeCheat
+			@TypeCheatSpec
+			','
+			@Reference
+			.aEndExpression
+			')'
+			@ComponentSelectors
+			@OptionalAssignment
+		    | *:
+			@TypeDeclaration
+		]
+	    | 'if':
+		@LongFormIfStatement
+	    | 'loop':
+		@LongFormLoopStatement
+	    | 'exit':
+		[
+		    | 'when':
+			.aExitWhen
+			@Expression
+		    | *:
+			.aExit
+		]
+	    | '>>':
+		[
+		    | ':':
+			.aExitWhen
+			@Expression
+		    | *:
+			.aExit
+		]
+	    | 'case':
+		@CaseStatement
+	    | 'for':
+		@LongFormForStatement
+	    | 'begin':
+		.aBegin
+		oEmitLine
+		@DeclarationsAndStatementsInSubprogram
+		'end' .aEndBegin
+	    | 'assert':
+		.aAssert
+		@Expression
+	    | 'return':
+		.aReturn
+	    | 'result':
+		.aResult
+		@Expression
+	    | '>>>':
+		[
+		    | ':':
+			.aResult
+			@Expression
+		    | *:
+			.aReturn
+		]
+	    | 'put', '!':
+		@PutStatement
+	    | 'get', '?':
+		@GetStatement
+
+	    | 'int':
+		.aTypeCheat
+		.aInt
+		@RestOfIndirection
+		@Assignment
+	    | 'int1', 'int2', 'int4':
+		.aTypeCheat
+		.aInt
+		.aStorageSize
+		oEmitTypeSizeAsIntegerLit
+		.aEndExpression
+		@RestOfIndirection
+		@Assignment
+	    | 'real':
+		.aTypeCheat
+		.aReal
+		@RestOfIndirection
+		@Assignment
+	    | 'real4', 'real8':
+		.aTypeCheat
+		.aReal
+		.aStorageSize
+		oEmitTypeSizeAsIntegerLit
+		.aEndExpression
+		@RestOfIndirection
+		@Assignment
+	    | 'boolean':
+		.aTypeCheat
+		.aBoolean
+		@RestOfIndirection
+		@Assignment
+	    | 'string':
+		.aTypeCheat
+		.aString
+		@OptionalStringSize
+		@RestOfIndirection
+		@Assignment
+	    | 'char':
+		.aTypeCheat
+		.aChar
+		@OptionalStringSize
+		@RestOfIndirection
+		@ComponentSelectors
+		@Assignment
+	    | 'nat':
+		.aTypeCheat
+		.aNat
+		@RestOfIndirection
+		@Assignment
+	    | 'nat1', 'nat2', 'nat4':
+		.aTypeCheat
+		.aNat
+		.aStorageSize
+		oEmitTypeSizeAsIntegerLit
+		.aEndExpression
+		@RestOfIndirection
+		@Assignment
+	    | 'addressint':
+		.aTypeCheat
+		.aAddressInt
+		@RestOfIndirection
+		@Assignment
+
+	    | '#':
+		@Reference
+		.aHash
+		@Assignment
+	    | 'bits':
+		.aBits
+		'('
+		@Reference
+		','
+		@BitsRange
+		')'
+		@Assignment
+	    | '[':
+		@ShortFormIfStatement
+	    | '{':
+		[
+		    | '+':
+			.aFor
+			@IncreasingForRange
+			@ShortFormForStatement
+		    | '-':
+			.aFor
+			.aDecreasing
+			@DecreasingForRange
+			@ShortFormForStatement
+		    | *:
+			@ShortFormLoopStatement
+		]
+	    | 'new':
+		.aNew
+		'Ident' oEmitIdent
+		[
+		    | '.':
+			.aField
+			'Ident' oEmitIdent
+		    | *:
+		]
+		','
+		@VariableReference
+	    | 'free':
+		.aFree
+		'Ident' oEmitIdent
+		[
+		    | '.':
+			.aField
+			'Ident' oEmitIdent
+		    | *:
+		]
+		','
+		@VariableReference
+	    | 'tag':
+		.aTag
+		@VariableReference
+		','
+		@Expression
+	    | 'read':
+		@ReadStatement
+	    | 'write':
+		@WriteStatement
+	    | 'seek':
+		@SeekStatement
+	    | 'tell':
+		@TellStatement
+	    | 'open':
+		@OpenStatement
+	    | 'close':
+		@CloseStatement
+	    | 'quit':
+		@QuitStatement
+	    | 'fork':
+		@ForkStatement
+	    | 'signal':
+		@SignalStatement
+	    | 'wait':
+		@WaitStatement
+	    | 'pause':
+		@PauseStatement
+	    | 'asm':
+		@AssemblerStatement
+
+	    | 'unchecked':
+		.aUnchecked
+	    | 'checked':
+		.aChecked
+
+	    | ';':
+		% null statement
+	    | *:
+		[ *
+		    | 'end', 'else', 'elsif', 'invariant', 'label',
+			    '|', ']', '}', tEndCompilationUnit,
+			    '<EOF>':
+			% legitimate end of scope, so exit
+			>>
+		    | *:
+			% recover cleanly from serious syntax errors
+			'Ident'		% force error
+			% now continue parsing scope
+		]
+	]
+	';' oEmitLine
+    };
+
+
+
+ConstantDeclarationInModule:
+    .aConst
+    @OptionalPervasiveSpec
+    'Ident' oEmitIdent oEmitIdentText
+    [
+	| ':=':
+	    @Expression
+	| ':':
+	    .aType
+	    @TypeSpec
+	    ':='
+	    [
+		| 'init':
+		    .aInit
+		    '('
+		    @InitializingValueList
+		    ')'
+		    .aEndInit
+		| *:
+		    @Expression
+	    ]
+    ];
+
+
+
+ConstantDeclarationInSubprogram:
+    .aConst
+    @OptionalPervasiveSpec
+    @OptionalRegisterSpec
+    'Ident' oEmitIdent oEmitIdentText
+    [
+	| ':=':
+	    @Expression
+	| ':':
+	    .aType
+	    @TypeSpec
+	    ':='
+	    [
+		| 'init':
+		    .aInit
+		    '('
+		    @InitializingValueList
+		    ')'
+		    .aEndInit
+		| *:
+		    @Expression
+	    ]
+    ];
+
+
+
+InitializingValueList:
+    {
+	oEmitLine
+	@InitializingValue
+	[
+	    | ',':
+	    | *:
+		>>
+	]
+    };
+
+
+
+InitializingValue:
+    [
+	| 'init':
+	    .aInit
+	    '('
+	    @InitializingValueList
+	    ')'
+	    .aEndInit
+	| *:
+	    @ExpressionCommaParen
+    ];
+
+
+
+OptionalPervasiveSpec:
+    [
+	| 'pervasive', '*':
+	    .aPervasive
+	| *:
+    ];
+
+
+OptionalRegisterSpec:
+    [
+	| 'register':
+	    .aRegister
+	| *:
+    ];
+
+
+OptionalVariableInit:
+    [
+	| ':=':
+	    [
+		| 'init':
+		    .aInit
+		    '('
+		    @InitializingValueList
+		    ')'
+		    .aEndInit
+		| *:
+		    .aVarInit
+		    @Expression
+	    ]
+	| *:
+    ];
+
+
+
+VariableDeclarationInModule:
+    .aVar
+    @IdListWithIdentText
+    [
+	| ':':
+	    [
+		| 'unchecked':
+		    'collection' .aCollection .aUnchecked
+		    'of'
+		    [
+			| 'forward':
+			    .aForward
+			    'Ident' oEmitIdent
+			| *:
+			    @TypeSpec
+		    ]
+		| 'collection':
+		    .aCollection
+		    'of'
+		    [
+			| 'forward':
+			    .aForward
+			    'Ident' oEmitIdent
+			| *:
+			    @TypeSpec
+		    ]
+		| *:
+		    .aType
+		    @TypeSpec
+		    @OptionalVariableInit
+	    ]
+	| ':=':
+	    .aVarInit
+	    @Expression
+    ];
+
+
+
+ExternalVariableDeclaration:
+    .aVar
+    'Ident' oEmitIdent oEmitIdentText
+    [
+	| ':':
+	    .aType
+	    @TypeSpec
+	    @OptionalVariableInit
+	| ':=':
+	    .aVarInit
+	    @Expression
+    ];
+
+
+
+ExternalVariableListDeclaration:
+    .aVar
+    @IdListWithIdentText
+    [
+	| ':':
+	    .aType
+	    @TypeSpec
+	    @OptionalVariableInit
+	| ':=':
+	    .aVarInit
+	    @Expression
+    ];
+
+
+
+VariableDeclarationInSubprogram:
+    .aVar
+    [
+	| 'register':
+	    .aRegister
+	| *:
+    ]
+    @IdListWithIdentText
+    [
+	| ':':
+	    .aType
+	    @TypeSpec
+	    @OptionalVariableInit
+	| ':=':
+	    .aVarInit
+	    @Expression
+    ];
+
+
+
+VariableDeclarationInMonitor:
+    .aVar
+    @IdListWithIdentText
+    [
+	| ':':
+	    [
+		| 'condition':
+		    .aType
+		    @ConditionType
+		| 'unchecked':
+		    'collection' .aCollection .aUnchecked
+		    'of'
+		    [
+			| 'forward':
+			    .aForward
+			    'Ident' oEmitIdent
+			| *:
+			    @TypeSpec
+		    ]
+		| 'collection':
+		    .aCollection
+		    'of'
+		    [
+			| 'forward':
+			    .aForward
+			    'Ident' oEmitIdent
+			| *:
+			    @TypeSpec
+		    ]
+		| 'array':
+		    .aType
+		    .aArray
+		    {
+			@IndexType
+			[
+			    | ',':
+			    | *:
+				>
+			]
+		    }
+		    .aEndArrayIndexList
+		    'of'
+		    [
+			| 'condition':
+			    @ConditionType
+			| *:
+			    @TypeSpec
+			    @OptionalVariableInit
+		    ]
+		| *:
+		    .aType
+		    @TypeSpec
+		    @OptionalVariableInit
+	    ]
+	| ':=':
+	    .aVarInit
+	    @Expression
+    ];
+
+
+ConditionType:
+    .aCondition
+    [
+	| 'priority':
+	    .aPriority
+	| 'deferred':
+	    .aDeferred
+	| 'timeout':
+	    .aTimeout
+	| *:
+    ];
+
+
+IdList:
+    {
+	oEmitLine
+	'Ident' oEmitIdent
+	[
+	    | ',':
+	    | *:
+		>>
+	]
+    };
+
+
+
+IdListWithIdentText:
+    {
+	oEmitLine
+	'Ident' oEmitIdent oEmitIdentText
+	[
+	    | ',':
+	    | *:
+		>>
+	]
+    };
+
+
+
+BindDeclaration:
+    .aBind
+    {
+	[
+	    | 'var':
+		.aVar
+	    | *:
+	]
+	[
+	    | 'register':
+		.aRegister
+	    | *:
+	]
+	'Ident' oEmitIdent
+	'to'
+	@VariableReference
+	[
+	    | ',':
+		oEmitLine
+	    | *:
+		>
+	]
+    }
+    .aEndBind
+    ;
+
+
+
+TypeDeclaration:
+    .aType
+    @OptionalPervasiveSpec
+    'Ident' oEmitIdent
+    ':'
+    @TypeSpec
+    ;
+
+
+
+TypeSpec:
+    [
+	| 'int':
+	    .aInt
+	| 'int1', 'int2', 'int4':
+	    .aInt
+	    .aStorageSize
+	    oEmitTypeSizeAsIntegerLit
+	    .aEndExpression
+	| 'real':
+	    .aReal
+	| 'real4', 'real8':
+	    .aReal
+	    .aStorageSize
+	    oEmitTypeSizeAsIntegerLit
+	    .aEndExpression
+	| 'boolean':
+	    .aBoolean
+	| 'string':
+	    .aString
+	    @OptionalStringSize
+	| 'enum':
+	    .aEnum
+	    '('
+	    @IdList
+	    ')'
+	    .aEndEnum
+	    @OptionalStorageSize
+	| 'nat':
+	    .aNat
+	| 'nat1', 'nat2', 'nat4':
+	    .aNat
+	    .aStorageSize
+	    oEmitTypeSizeAsIntegerLit
+	    .aEndExpression
+	| 'char':
+	    .aChar
+	    @OptionalStringSize
+	| 'addressint':
+	    .aAddressInt
+	| 'packed':
+	    .aPacked
+	    [
+		| 'array':
+		    .aArray
+		    {
+			@IndexType
+			[
+			    | ',':
+			    | *:
+				>
+			]
+		    }
+		    .aEndArrayIndexList
+		    'of'
+		    @TypeSpec
+		| 'union':
+		    @UnionTypeSpec
+		| 'record':
+		    @RecordTypeSpec
+		| 'enum':
+		    .aEnum
+		    '('
+		    @IdList
+		    ')'
+		    .aEndEnum
+		| *:
+		    .aSubrange
+		    @ExpressionDotDot
+		    '..'
+		    @Expression
+	    ]
+
+	| 'array':
+	    .aArray
+	    {
+		@IndexType
+		[
+		    | ',':
+		    | *:
+			>
+		]
+	    }
+	    .aEndArrayIndexList
+	    'of'
+	    @TypeSpec
+	| '{':
+	    .aArray
+	    {
+		@IndexType
+		[
+		    | ',':
+		    | *:
+			>
+		]
+	    }
+	    '}'
+	    .aEndArrayIndexList
+	    @TypeSpec
+	| 'set':
+	    .aSet
+	    'of'
+	    @BaseType
+	| 'record':
+	    @RecordTypeSpec
+	| 'union':
+	    @UnionTypeSpec
+	| 'pointer':
+	    .aPointer
+	    'to'
+	    'Ident' oEmitIdent
+	| 'procedure', 'proc':
+	    @ProcedureHeader
+	| 'function', 'fcn':
+	    @FunctionTypeHeader
+	| *:
+	    @NamedOrSubrangeTypeSpec
+    ];
+
+
+
+OptionalStringSize:
+    [
+	| '(':
+	    .aStringSizeBound
+	    @Expression
+	    ')'
+	| *:
+    ];
+
+
+OptionalStorageSize:
+    [
+	| ':':
+	    .aStorageSize
+	    @Expression
+	| *:
+    ];
+
+
+BaseType:
+    @IndexType;
+
+
+
+IndexType:
+    [
+	| 'enum':
+	    .aEnum
+	    '('
+	    @IdList
+	    ')'
+	    .aEndEnum
+	    @OptionalStorageSize
+	| *:
+	    @NamedOrSubrangeTypeSpec
+    ];
+
+
+
+RecordTypeSpec:
+    .aRecord
+    oEmitLine
+    {
+	@IdList
+	':'
+	.aRecordElementType
+	@TypeSpec
+	';' oEmitLine
+	[
+	    | 'end':
+		'record' .aEndRecord
+		>>
+	    | *:
+	]
+    };
+
+
+
+UnionTypeSpec:
+    .aUnion
+    [
+	| 'Ident':
+	    oEmitIdent
+	| *:
+    ]
+    ':'
+    .aType
+    @IndexType
+    'of'
+    '<NL>' oEmitLine
+    [ *
+	| 'label':
+	    @UnionLabel
+	| '|':
+	    @UnionBar
+	| *:
+	    @UnionLabel
+    ]
+    'end' 'union' .aEndUnion
+    ;
+
+
+UnionLabel:
+    {[
+	| 'label':
+	    .aLabel
+	    [
+		| ':':
+		    % Is the otherwise case
+		    .aOtherWise
+		    '<NL>' oEmitLine
+		    [ *
+			| 'Ident':
+			    .aUnionLabelBody
+			    {[
+				| 'Ident':
+				    oEmitIdent
+				    [
+					| ',':
+					    @IdList
+					| *:
+				    ]
+				    .aRecordElementType
+				    ':'
+				    @TypeSpec
+				    ';' oEmitLine
+				| *:
+				    >
+			    ]}
+			    .aEndUnionLabelBody
+			| *:
+		    ]
+		    >>	% must be last alternative
+		| *:
+		    @ExpressionList
+		    ':'
+		    '<NL>' oEmitLine
+		    [ *
+			| 'Ident':
+			    .aUnionLabelBody
+			    {[
+				| 'Ident':
+				    oEmitIdent
+				    [
+					| ',':
+					    @IdList
+					| *:
+				    ]
+				    .aRecordElementType
+				    ':'
+				    @TypeSpec
+				    ';' oEmitLine
+				| *:
+				    >
+			    ]}
+			    .aEndUnionLabelBody
+			| *:
+		    ]
+	    ]
+	| *:
+	    % Should be end union
+	    >>
+    ]};
+
+
+UnionBar:
+    {[
+	| '|':
+	    .aLabel
+	    [
+		| ':':
+		    % Is the otherwise case
+		    .aOtherWise
+		    '<NL>' oEmitLine
+		    [ *
+			| 'Ident':
+			    .aUnionLabelBody
+			    {[
+				| 'Ident':
+				    oEmitIdent
+				    [
+					| ',':
+					    @IdList
+					| *:
+				    ]
+				    .aRecordElementType
+				    ':'
+				    @TypeSpec
+				    ';' oEmitLine
+				| *:
+				    >
+			    ]}
+			    .aEndUnionLabelBody
+			| *:
+		    ]
+		    >>	% must be last alternative
+		| *:
+		    @ExpressionList
+		    ':'
+		    '<NL>' oEmitLine
+		    [ *
+			| 'Ident':
+			    .aUnionLabelBody
+			    {[
+				| 'Ident':
+				    oEmitIdent
+				    [
+					| ',':
+					    @IdList
+					| *:
+				    ]
+				    .aRecordElementType
+				    ':'
+				    @TypeSpec
+				    ';' oEmitLine
+				| *:
+				    >
+			    ]}
+			    .aEndUnionLabelBody
+			| *:
+		    ]
+	    ]
+	| *:
+	    % Should be end union
+	    >>
+    ]};
+
+
+NamedOrSubrangeTypeSpec:
+    [
+	| 'Ident':
+	    oSaveIdent
+	    [
+		| '.':
+		    'Ident'
+		    [
+			| '..':
+			    .aSubrange
+			    oEmitSavedIdent
+			    .aField
+			    oEmitIdent
+			    .aEndExpression
+			    @Expression
+			    @OptionalStorageSize
+			| *:
+			    [ *
+				| '(', '.', '+', '-', '*', '/', 'div', 'mod',
+					'**', '=', '>', '<', '<=', '>=', 'not',
+					'~', 'and', '&', 'or', '=>', 'in',
+					'xor', 'shr', 'shl':
+				    .aSubrange
+				    oEmitSavedIdent
+				    .aField
+				    oEmitIdent
+				    @RestOfExpression
+				    '..'
+				    @Expression
+				    @OptionalStorageSize
+				| *:
+				    oEmitSavedIdent
+				    .aField
+				    oEmitIdent
+			    ]
+		    ]
+		| '..':
+		    .aSubrange
+		    oEmitIdent
+		    .aEndExpression
+		    @Expression
+		    @OptionalStorageSize
+		| *:
+		    [ *
+			| '(', '.', '+', '-', '*', '/', 'div', 'mod',
+				'**', '=', '>', '<', '<=', '>=', 'not',
+				'~', 'and', '&', 'or', '=>', 'in',
+				'xor', 'shr', 'shl':
+			    .aSubrange
+			    oEmitIdent
+			    @RestOfExpression
+			    '..'
+			    @Expression
+			    @OptionalStorageSize
+			| *:
+			    oEmitIdent
+		    ]
+	    ]
+	| *:
+	    .aSubrange
+	    @ExpressionDotDot
+	    '..'
+	    @Expression
+	    @OptionalStorageSize
+    ];
+
+BitsRange:
+    @ExpressionDotDotParen
+    [
+	| '..':
+	    .aSubrange
+	    @Expression
+	| *:
+    ];
+
+
+NamedOrSubrangeArrayIndexType >> Boolean:
+    % returns true if upper bound is '*'
+    [
+	| 'Ident':
+	    oSaveIdent
+	    [
+		| '.':
+		    'Ident'
+		    [
+			| '..':
+			    .aSubrange
+			    oEmitSavedIdent
+			    .aField
+			    oEmitIdent
+			    .aEndExpression
+			    [
+				| '*':
+				    .aStar
+				    >> yes
+				| *:
+			    ]
+			    @Expression
+			| *:
+			    [ *
+				| '(', '.', '+', '-', '*', '/', 'div', 'mod',
+					'**', '=', '>', '<', '<=', '>=', 'not',
+					'~', 'and', '&', 'or', '=>', 'in',
+					'xor', 'shr', 'shl':
+				    .aSubrange
+				    oEmitSavedIdent
+				    .aField
+				    oEmitIdent
+				    @RestOfExpression
+				    '..'
+				    [
+					| '*':
+					    .aStar
+					    >> yes
+					| *:
+				    ]
+				    @Expression
+				| *:
+				    oEmitSavedIdent
+				    .aField
+				    oEmitIdent
+			    ]
+		    ]
+		| '..':
+		    .aSubrange
+		    oEmitIdent
+		    .aEndExpression
+		    [
+			| '*':
+			    .aStar
+			    >> yes
+			| *:
+		    ]
+		    @Expression
+		| *:
+		    [ *
+			| '(', '.', '+', '-', '*', '/', 'div', 'mod',
+				'**', '=', '>', '<', '<=', '>=', 'not',
+				'~', 'and', '&', 'or', '=>', 'in',
+				'xor', 'shr', 'shl':
+			    .aSubrange
+			    oEmitIdent
+			    @RestOfExpression
+			    '..'
+			    [
+				| '*':
+				    .aStar
+				    >> yes
+				| *:
+			    ]
+			    @Expression
+			| *:
+			    oEmitIdent
+		    ]
+	    ]
+	| *:
+	    .aSubrange
+	    @ExpressionDotDot
+	    '..'
+	    [
+		| '*':
+		    .aStar
+		    >> yes
+		| *:
+	    ]
+	    @Expression
+    ]
+    >> no;
+
+
+
+ProcedureHeader:
+    .aProcedure
+    'Ident' oEmitIdent oEmitIdentText
+    [
+	| '(':
+	    .aSubs
+	    @ParameterList
+	    ')'
+	    .aEndSubs
+	| *:
+    ]
+    '<NL>' oEmitLine;
+
+
+ProcedureOrInterruptProcedureHeader:
+    .aProcedure
+    'Ident' oEmitIdent oEmitIdentText
+    [
+	| '(':
+	    .aSubs
+	    @ParameterList
+	    ')'
+	    .aEndSubs
+	| ':':
+	    .aInterruptNumber
+	    @Expression
+	| *:
+    ]
+    '<NL>' oEmitLine;
+
+
+
+FunctionHeader:
+    .aFunction
+    'Ident' oEmitIdent oEmitIdentText
+    [
+	| '(':
+	    .aSubs
+	    @ParameterList
+	    ')'
+	    .aEndSubs
+	| *:
+    ]
+    oEmitLine
+    [
+	| 'Ident':
+	    oEmitIdent
+	| *:
+    ]
+    ':'
+    .aType
+    @TypeSpec
+    '<NL>' oEmitLine;
+
+
+FunctionTypeHeader:
+    .aFunction
+    'Ident' oEmitIdent oEmitIdentText
+    '('
+    .aSubs
+    @ParameterList
+    ')'
+    .aEndSubs
+    oEmitLine
+    [
+	| 'Ident':
+	    oEmitIdent
+	| *:
+    ]
+    ':'
+    .aType
+    @TypeSpec
+    '<NL>' oEmitLine;
+
+
+
+ProcessHeader:
+    .aProcess
+    'Ident' oEmitIdent oEmitIdentText
+    [
+	| '(':
+	    .aSubs
+	    @ParameterList
+	    ')'
+	    .aEndSubs
+	| *:
+    ]
+    oEmitLine
+    [
+	| ':':
+	    .aProcessStackSize
+	    @Expression
+	| *:
+    ]
+    '<NL>' oEmitLine;
+
+
+
+
+OptionalExport:
+    [
+	| 'export':
+	    [
+		| '(':
+		    [
+			| ')':
+			    % empty export list, just ignore it
+			| *:
+			    .aExport
+			    @ExportList
+			    ')'
+			    .aEndExport
+		    ]
+		| *:
+		    .aExport
+		    @ExportList
+		    .aEndExport
+	    ]
+	    '<NL>' oEmitLine
+	| *:
+    ];
+
+
+OptionalImport:
+    [
+	| 'import':
+	    .aImport
+	    [
+		| '(':
+		    [
+			| ')':
+			| *:
+			    @ImportList
+			    ')'
+		    ]
+		| *:
+		    @ImportList
+	    ]
+	    .aEndImport
+	    '<NL>' oEmitLine
+	| *:
+    ];
+
+
+
+ImportList:
+    {
+	oEmitLine
+	[
+	    | 'var':
+		.aVar
+	    | *:
+	]
+	'Ident' oEmitIdent
+	[
+	    | ',':
+	    | *:
+		>>
+	]
+    };
+
+
+
+ExportList:
+    {
+	oEmitLine
+	[
+	    | 'opaque':
+		.aOpaque
+	    | *:
+	]
+	[
+	    | 'unqualified':
+		.aUnqualified
+	    | 'not':
+		'.'
+		.aUnqualified
+	    | '~':
+		'.'
+		.aUnqualified
+	    | *:
+	]
+	'Ident' oEmitIdent
+	[
+	    | ',':
+	    | *:
+		>>
+	]
+    };
+
+
+ForwardImport:
+    [
+	| 'import':
+	    .aImport
+	    [
+		| '(':
+		    [
+			| ')':
+			| *:
+			    @ForwardImportList
+			    ')'
+		    ]
+		| *:
+		    @ForwardImportList
+	    ]
+	    .aEndImport
+	| *:
+	    %% No longer considered an error - JRC 16.2.03
+	    %% #eMissingForwardImport
+    ];
+
+
+
+ForwardImportList:
+    {
+	[
+	    | 'var':
+		.aVar
+	    | 'forward':
+		.aForward
+	    | *:
+	]
+	'Ident' oEmitIdent
+	[
+	    | ',':
+	    | *:
+		>>
+	]
+    };
+
+
+
+ProcedureDeclaration:
+    @ProcedureHeader
+    @OptionalImport
+    @SubprogramBody;
+
+
+ProcedureOrInterruptProcedureDeclaration:
+    @ProcedureOrInterruptProcedureHeader
+    @OptionalImport
+    @SubprogramBody;
+
+
+FunctionDeclaration:
+    @FunctionHeader
+    @OptionalImport
+    @SubprogramBody;
+
+
+ProcessDeclaration:
+    @ProcessHeader
+    @OptionalImport
+    @SubprogramBody;
+
+
+
+ForwardProcedureDeclaration:
+    @ProcedureHeader
+    @ForwardImport;
+
+
+
+ForwardFunctionDeclaration:
+    @FunctionHeader
+    @ForwardImport;
+
+
+
+ExternalProcedureDeclaration:
+    .aProcedure
+    'Ident' oEmitIdent oEmitIdentText
+    [ oExternalOverideName
+	| yes:
+	    .aExternalAddress
+	    oExternalEmitOverideName
+	| *:
+    ]
+    [
+	| '(':
+	    .aSubs
+	    @ParameterList
+	    ')'
+	    .aEndSubs
+	| *:
+    ];
+
+
+ExternalFunctionDeclaration:
+    .aFunction
+    'Ident' oEmitIdent oEmitIdentText
+    [ oExternalOverideName
+	| yes:
+	    .aExternalAddress
+	    oExternalEmitOverideName
+	| *:
+    ]
+    [
+	| '(':
+	    .aSubs
+	    @ParameterList
+	    ')'
+	    .aEndSubs
+	| *:
+    ]
+    oEmitLine
+    [
+	| 'Ident':
+	    oEmitIdent
+	| *:
+    ]
+    ':'
+    .aType
+    @TypeSpec
+    ;
+
+
+ParameterList:
+    % last parameter ONLY can be    ID: ..
+    {
+	oEmitLine
+	[
+	    | 'var':
+		% can't be varying parameter
+		.aVar
+		@OptionalRegisterSpec
+		@IdList
+		':'
+		.aType
+		@ParameterType
+	    | 'procedure', 'proc':
+		@ProcedureHeader
+	    | 'function', 'fcn':
+		@FunctionHeader
+	    | 'register':
+		% can't be varying parameter
+		.aRegister
+		@IdList
+		':'
+		.aType
+		@ParameterType
+	    | 'Ident':
+		oEmitIdent
+		[
+		    | ',':
+			% can't be varying parameter
+			@IdList
+			':'
+			.aType
+			@ParameterType
+		    | *:
+			':'
+			.aType
+			[
+			    | '..':
+				.aVaryingParameter
+				>>
+			    | *:
+				% isn't varying parameter
+				@ParameterType
+			]
+		]
+	    | *:
+		% actually, just to get a good error message
+		@IdList
+		':'
+		.aType
+		@ParameterType
+	]
+	[
+	    | ',':
+	    | *:
+		>>
+	]
+    };
+
+
+
+OptionalStarredStringBound:
+    [
+	| '(':
+	    .aStringSizeBound
+	    [
+		| '*':
+		    .aStar
+		| *:
+		    @ExpressionParen
+	    ]
+	    ')'
+	| *:
+    ];
+
+
+
+ShortFormParameterArrayType:
+    [ @NamedOrSubrangeArrayIndexType
+	| starBound:
+	    {
+		[
+		    | ',':
+		    | *:
+			>
+		]
+		.aSubrange
+		@ExpressionDotDot
+		'..' '*' .aStar
+	    }
+	    '}'
+	    .aEndArrayIndexList
+	    [
+		| 'string':
+		    .aString
+		    @OptionalStarredStringBound
+		| 'char':
+		    .aChar
+		    @OptionalStarredStringBound
+		| *:
+		    @TypeSpec
+	    ]
+	| *:
+	    {
+		[
+		    | ',':
+		    | *:
+			>
+		]
+		@IndexType
+	    }
+	    '}'
+	    .aEndArrayIndexList
+	    [
+		| 'string':
+		    .aString
+		    @OptionalStringSize
+		| 'char':
+		    .aChar
+		    @OptionalStringSize
+		| *:
+		    @TypeSpec
+	    ]
+    ];
+
+
+ParameterArrayType:
+    [ @NamedOrSubrangeArrayIndexType
+	| starBound:
+	    {
+		[
+		    | ',':
+		    | *:
+			>
+		]
+		.aSubrange
+		@ExpressionDotDot
+		'..' '*' .aStar
+	    }
+	    .aEndArrayIndexList
+	    'of'
+	    [
+		| 'string':
+		    .aString
+		    @OptionalStarredStringBound
+		| 'char':
+		    .aChar
+		    @OptionalStarredStringBound
+		| *:
+		    @TypeSpec
+	    ]
+	| *:
+	    {
+		[
+		    | ',':
+		    | *:
+			>
+		]
+		@IndexType
+	    }
+	    .aEndArrayIndexList
+	    'of'
+	    [
+		| 'string':
+		    .aString
+		    @OptionalStringSize
+		| 'char':
+		    .aChar
+		    @OptionalStringSize
+		| *:
+		    @TypeSpec
+	    ]
+    ];
+
+
+
+ParameterType:
+    [
+	| 'array':
+	    .aArray
+	    @ParameterArrayType
+	| '{':
+	    .aArray
+	    @ShortFormParameterArrayType
+	| 'string':
+	    .aString
+	    @OptionalStarredStringBound
+	| 'char':
+	    .aChar
+	    @OptionalStarredStringBound
+	| 'type':
+	    .aType
+	    @TypeSpec
+	| *:
+	    @TypeSpec
+    ];
+
+
+
+SubprogramBody:
+    @OptionalPre
+    @OptionalInit
+    @OptionalPost
+    @OptionalExceptionHandler
+    @DeclarationsAndStatementsInSubprogram
+    'end' .aEndSubprogramBody
+    'Ident' oEmitIdent
+    ;
+
+
+OptionalPre:
+    [
+	| 'pre':
+	    .aPre
+	    @Expression
+	    '<NL>' oEmitLine
+	| *:
+    ];
+
+
+OptionalInvariant:
+    [
+	| 'invariant':
+	    .aInvariant
+	    @Expression
+	    '<NL>' oEmitLine
+	| *:
+    ];
+
+
+OptionalInit:
+    [
+	| 'init':
+	    .aInit
+	    {
+		oEmitLine
+		'Ident' oEmitIdent
+		':='
+		@Expression
+		[
+		    | ',':
+		    | *:
+			>
+		]
+	    }
+	    .aEndInit
+	    '<NL>' oEmitLine
+	| *:
+    ];
+
+
+OptionalPost:
+    [
+	| 'post':
+	    .aPost
+	    @Expression
+	    '<NL>' oEmitLine
+	| *:
+    ];
+
+
+OptionalExceptionHandler:
+    [
+	| 'handler':
+	    .aHandler
+	    '('
+	    'Ident' oEmitIdent
+	    ')'
+	    '<NL>' oEmitLine
+	    @DeclarationsAndStatementsInSubprogram
+	    'end' 'handler' .aEndSubprogramBody
+	    '<NL>' oEmitLine
+	| *:
+    ];
+
+
+ModuleDeclaration:
+    .aModule
+    'Ident' oEmitIdent oEmitIdentText
+    '<NL>' oEmitLine
+    @OptionalImport
+    @OptionalExport
+    @OptionalGrant
+    @OptionalPre
+    @DeclarationsAndStatementsInModule
+    @OptionalInvariant
+    @DeclarationsAndStatementsInModule
+    @OptionalPost
+    'end' .aEndModule
+    'Ident' oEmitIdent
+    ;
+
+
+MonitorDeclaration:
+    .aMonitor
+    'Ident' oEmitIdent oEmitIdentText
+    [
+	| ':':
+	    .aMonitorPriority
+	    @Expression
+	| *:
+    ]
+    '<NL>' oEmitLine
+    @OptionalImport
+    @OptionalExport
+    @OptionalGrant
+    @OptionalPre
+    @DeclarationsAndStatementsInMonitor
+    @OptionalInvariant
+    @DeclarationsAndStatementsInMonitor
+    @OptionalPost
+    'end' .aEndMonitor
+    'Ident' oEmitIdent
+    ;
+
+
+
+LongFormIfStatement:
+    .aIf
+    {
+	@ExpressionThen
+	'then'
+	'<NL>' oEmitLine
+	@DeclarationsAndStatementsInSubprogram
+	[
+	    | 'elsif':
+		.aElsif
+	    | 'else':
+		.aElse
+		'<NL>' oEmitLine
+		@DeclarationsAndStatementsInSubprogram
+		>
+	    | *:
+		>
+	]
+    }
+    'end' 'if' .aEndIf
+    ;
+
+
+
+ShortFormIfStatement:
+    .aIf
+    {
+	@ExpressionColon
+	':'
+	'<NL>' oEmitLine
+	@DeclarationsAndStatementsInSubprogram
+	[
+	    | '|':
+		[
+		    | ':':		% else clause
+			.aElse
+			'<NL>' oEmitLine
+			@DeclarationsAndStatementsInSubprogram
+			>
+		    | *:		% elseif clause
+			.aElsIf
+		]
+	    | *:
+		>
+	]
+    }
+    ']' .aEndIf
+    ;
+
+
+
+LongFormLoopStatement:
+    .aLoop
+    '<NL>' oEmitLine
+    @OptionalInvariant
+    @DeclarationsAndStatementsInSubprogram
+    'end' 'loop' .aEndLoop
+    ;
+
+
+
+ShortFormLoopStatement:
+    .aLoop
+    '<NL>' oEmitLine
+    @OptionalInvariant
+    @DeclarationsAndStatementsInSubprogram
+    '}' .aEndLoop
+    ;
+
+
+
+CaseStatement:
+    .aCase
+    @ExpressionOf
+    'of'
+    '<NL>' oEmitLine
+    [
+	| 'label':
+	    @LongFormCaseStatement
+	| '|':
+	    @ShortFormCaseStatement
+    ]
+    'end' 'case' .aEndCase
+    ;
+
+
+
+LongFormCaseStatement:
+    {
+	@ExpressionList
+	':'
+	'<NL>' oEmitLine
+	.aCaseBody
+	@DeclarationsAndStatementsInSubprogram
+	.aEndCaseBody
+	[
+	    | 'label':
+		[
+		    | ':':		% otherwise case
+			.aOtherwise
+			'<NL>' oEmitLine
+			@DeclarationsAndStatementsInSubprogram
+			>>
+		    | *:
+		]
+	    | *:
+		>>
+	]
+    };
+
+
+
+ShortFormCaseStatement:
+    {
+	@ExpressionList
+	':'
+	'<NL>' oEmitLine
+	.aCaseBody
+	@DeclarationsAndStatementsInSubprogram
+	.aEndCaseBody
+	[
+	    | '|':
+		[
+		    | ':':		% otherwise case
+			.aOtherwise
+			'<NL>' oEmitLine
+			@DeclarationsAndStatementsInSubprogram
+			>>
+		    | *:
+		]
+	    | *:
+		>>
+	]
+    };
+
+
+
+LongFormForStatement:
+    .aFor
+    [
+	| 'decreasing':
+	    .aDecreasing
+	    @DecreasingForRange
+	| *:
+	    @IncreasingForRange
+    ]
+    @OptionalInvariant
+    @DeclarationsAndStatementsInSubprogram
+    'end' 'for' .aEndFor
+    ;
+
+
+
+ShortFormForStatement:
+    @OptionalInvariant
+    @DeclarationsAndStatementsInSubprogram
+    '}' .aEndFor
+    ;
+
+
+IncreasingForRange:
+    [
+	| 'Ident':
+	    oEmitIdent
+	| *:
+    ]
+    ':'
+    .aForRange
+    @NamedOrSubrangeTypeSpec
+    '<NL>' oEmitLine;
+
+
+DecreasingForRange:
+    [
+	| 'Ident':
+	    oEmitIdent
+	| *:
+    ]
+    ':'
+    .aForRange
+    .aSubrange
+    @ExpressionDotDot
+    '..'
+    @Expression
+    '<NL>' oEmitLine;
+
+
+PutStatement:
+    .aPut
+    [
+	| ':':
+	    .aStreamNumber
+	    @ExpressionComma
+	    ','
+	| *:
+    ]
+    {
+	@PutListItem
+	[
+	    | ',':
+	    | *:
+		>
+	]
+    }
+    [
+	| '..':
+	    .aPutContinue
+	| *:
+    ]
+    .aEndPut
+    ;
+
+
+
+PutListItem:
+    oEmitLine
+    [
+	| 'skip':
+	    .aSkip
+	| *:
+	    @ExpressionCommaColon
+	    [
+		| ':':
+		    .aColon
+		    @ExpressionCommaColon
+		    [
+			| ':':
+			    .aColon
+			    @ExpressionCommaColon
+			    [
+				| ':':
+				    .aColon
+				    @ExpressionComma
+				| *:
+			    ]
+			| *:
+		    ]
+		| *:
+	    ]
+    ];
+
+
+
+GetStatement:
+    .aGet
+    [
+	| ':':
+	    .aStreamNumber
+	    @ExpressionComma
+	    ','
+	| *:
+    ]
+    {
+	@GetItem
+	[
+	    | ',':
+	    | *:
+		>
+	]
+    }
+    .aEndGet
+    ;
+
+
+
+GetItem:
+    oEmitLine
+    [
+	| 'skip':
+	    .aSkip
+	| *:
+	    @VariableReference
+	    [
+		| ':':
+		    .aColon
+		    [
+			| '*':
+			    .aStar
+			| *:
+			    @ExpressionComma
+		    ]
+		| *:
+	    ]
+    ];
+
+
+OpenStatement:
+    .aOpen
+    [
+	| ':':
+	    @Reference
+	    ','
+	    @Expression
+	    ','
+	    @IoCapability
+	    {[
+		| ',':
+		    @IoCapability
+		| *:
+		    >
+	    ]}
+	| '(':
+	    @Reference
+	    ','
+	    @Expression
+	    ','
+	    @Expression
+	    ')'
+    ]
+    .aEndOpen
+    ;
+
+
+IoCapability:
+    [
+	| 'get':
+	    .aGet
+	| 'put':
+	    .aPut
+	| 'read':
+	    .aRead
+	| 'write':
+	    .aWrite
+	| 'seek':
+	    .aSeek
+	| 'mod':
+	    .aMod
+    ];
+
+
+CloseStatement:
+    .aClose
+    [
+	| ':':
+	    @Expression
+	| '(':
+	    @Expression
+	    ')'
+    ];
+
+
+ReadStatement:
+    .aRead
+    @ReadOrWriteStatement
+    .aEndRead
+    ;
+
+
+WriteStatement:
+    .aWrite
+    @ReadOrWriteStatement
+    .aEndWrite
+    ;
+
+
+ReadOrWriteStatement:
+    ':'
+    @Expression
+    [
+	| ':':
+	    .aReadWriteStatus
+	    @Reference
+	| *:
+    ]
+    ','
+    @ReadWriteItem
+    {[
+	| ',':
+	    @ReadWriteItem
+	| *:
+	    >>
+    ]};
+
+
+ReadWriteItem:
+    oEmitLine
+    @Reference
+    [
+	 | ':':
+	    .aReadWriteSize
+	    @Expression
+	    [
+		| ':':
+		    .aReadWriteSizeResult
+		    @Reference
+		| *:
+	    ]
+	| *:
+    ];
+
+
+SeekStatement:
+    .aSeek
+    ':'
+    @Expression
+    ','
+    [
+	| '*':
+	    .aStar
+	| *:
+	    @Expression
+    ];
+
+
+TellStatement:
+    .aTell
+    ':'
+    @Expression
+    ','
+    @Reference
+    ;
+
+
+QuitStatement:
+    .aQuit
+    [
+	| '>':
+	    .aGreater
+	| '<':
+	    .aLess
+	| *:
+    ]
+    [
+	| ':':
+	    .aQuitReason
+	    @Expression
+	| *:
+    ];
+
+
+ForkStatement:
+    .aFork
+    'Ident' oEmitIdent
+    [
+	| '.':
+	    .aField
+	    'Ident' oEmitIdent
+	| *:
+    ]
+    [
+	| '(':
+	    .aSubs
+	    @ExpressionList
+	    ')'
+	    .aEndSubs
+	| *:
+    ]
+    [
+	| ':':
+	    .aForkStatus
+	    @Reference
+	    [
+		| ',':
+		    .aForkStackSize
+		    @Expression
+		    [
+			| ',':
+			    .aForkAddress
+			    @Reference
+			| *:
+		    ]
+		| *:
+	    ]
+	| *:
+    ];
+
+
+AssemblerStatement:
+    .aAsm
+    @Expression
+    [
+	| ':':
+	    .aLabel
+	    @Expression
+	| *:
+    ]
+    .aBeginAsm
+    {[
+	| ',':
+	    oEmitLine
+	    @Expression
+	| *:
+	    >
+    ]}
+    .aEndAsm
+    ;
+
+
+SignalStatement:
+    .aSignal
+    @VariableReference
+    ;
+
+
+WaitStatement:
+    .aWait
+    @VariableReference
+    [
+	| ',':
+	    .aWaitPriorityOrTimeout
+	    @Expression
+	| *:
+    ];
+
+
+PauseStatement:
+    .aPause
+    @Expression
+    ;
+
+VariableReference:
+    @Reference;
+
+
+
+Reference:
+    [
+	| 'Ident':
+	    @Selectors
+	| '#':
+	    @Reference
+	    .aHash
+	| 'int':
+	    .aTypeCheat
+	    .aInt
+	    @RestOfIndirection
+	| 'int1', 'int2', 'int4':
+	    .aTypeCheat
+	    .aInt
+	    .aStorageSize
+	    oEmitTypeSizeAsIntegerLit
+	    .aEndExpression
+	    @RestOfIndirection
+	| 'real':
+	    .aTypeCheat
+	    .aReal
+	    @RestOfIndirection
+	| 'real4', 'real8':
+	    .aTypeCheat
+	    .aReal
+	    .aStorageSize
+	    oEmitTypeSizeAsIntegerLit
+	    .aEndExpression
+	    @RestOfIndirection
+	| 'boolean':
+	    .aTypeCheat
+	    .aBoolean
+	    @RestOfIndirection
+	| 'string':
+	    .aTypeCheat
+	    .aString
+	    @OptionalStringSize
+	    @RestOfIndirection
+	| 'char':
+	    .aTypeCheat
+	    .aChar
+	    @OptionalStringSize
+	    @RestOfIndirection
+	    @ComponentSelectors
+	| 'nat':
+	    .aTypeCheat
+	    .aNat
+	    @RestOfIndirection
+	| 'nat1', 'nat2', 'nat4':
+	    .aTypeCheat
+	    .aNat
+	    .aStorageSize
+	    oEmitTypeSizeAsIntegerLit
+	    .aEndExpression
+	    @RestOfIndirection
+	| 'addressint':
+	    .aTypeCheat
+	    .aAddressInt
+	    @RestOfIndirection
+	| 'type':
+	    .aTypeCheat
+	    '('
+	    @TypeCheatSpec
+	    ','
+	    @Reference
+	    .aEndExpression
+	    ')'
+	    @ComponentSelectors
+    ];
+
+
+TypeCheatSpec:
+    [
+	| 'int':
+	    .aInt
+	| 'int1', 'int2', 'int4':
+	    .aInt
+	    .aStorageSize
+	    oEmitTypeSizeAsIntegerLit
+	    .aEndExpression
+	| 'real':
+	    .aReal
+	| 'real4', 'real8':
+	    .aReal
+	    .aStorageSize
+	    oEmitTypeSizeAsIntegerLit
+	    .aEndExpression
+	| 'boolean':
+	    .aBoolean
+	| 'string':
+	    .aString
+	    @OptionalStringSize
+	| 'char':
+	    .aChar
+	    @OptionalStringSize
+	| 'nat':
+	    .aNat
+	| 'nat1', 'nat2', 'nat4':
+	    .aNat
+	    .aStorageSize
+	    oEmitTypeSizeAsIntegerLit
+	    .aEndExpression
+	| 'addressint':
+	    .aAddressInt
+	| 'Ident':
+	    oEmitIdent
+	    [
+		| '.':
+		    .aField
+		    'Ident' oEmitIdent
+		| *:
+	    ]
+    ];
+
+
+Selectors:
+    oSaveIdent
+    [ *
+	| '.':
+	    '.'
+	    'Ident'
+	    [ *
+		| '@':
+		    .aTypeCheat
+		    oEmitSavedIdent
+		    .aField
+		    oEmitIdent
+		    @RestOfIndirection
+		| *:
+		    oEmitSavedIdent
+		    .aField
+		    oEmitIdent
+	    ]
+	| '@':
+	    .aTypeCheat
+	    oEmitSavedIdent
+	    @RestOfIndirection
+	| *:
+	    oEmitSavedIdent
+    ]
+    @ComponentSelectors;
+
+
+ComponentSelectors:
+    {[
+	| '(':
+	    .aSubs
+	    @ExpressionList
+	    ')'
+	    .aEndSubs
+	| '.':
+	    .aField
+	    'Ident' oEmitIdent
+	| *:
+	    >>
+    ]};
+
+
+
+RestOfExpression:
+    % used only in first half of a subrange
+    @Variable
+    @SubExpression
+    .aEndExpression;
+
+
+
+ExpressionList:
+    {
+	oEmitLine
+	@ExpressionCommaColonParen
+	[
+	    | ',':
+	    | *:
+		>
+	]
+    }
+    .aEndExpressionList;
+
+
+
+ExpressionDotDot:
+    @Factor
+    [ *
+	| '..':
+	| *:
+	    @SubExpression
+    ]
+    .aEndExpression;
+
+
+
+ExpressionDotDotParen:
+    @Factor
+    [ *
+	| ')', '..':
+	| *:
+	    @SubExpression
+    ]
+    .aEndExpression;
+
+
+
+ExpressionParen:
+    @Factor
+    [ *
+	| ')':
+	| *:
+	    @SubExpression
+    ]
+    .aEndExpression;
+
+
+
+ExpressionCommaParen:
+    @Factor
+    [ *
+	| ',', ')':
+	| *:
+	    @SubExpression
+    ]
+    .aEndExpression;
+
+
+
+ExpressionComma:
+    @Factor
+    [ *
+	| ',':
+	| *:
+	    @SubExpression
+    ]
+    .aEndExpression;
+
+
+
+ExpressionCommaColon:
+    @Factor
+    [ *
+	| ':', ',':
+	| *:
+	    @SubExpression
+    ]
+    .aEndExpression;
+
+
+
+ExpressionCommaColonParen:
+    @Factor
+    [ *
+	| ')', ',', ':':
+	| *:
+	    @SubExpression
+    ]
+    .aEndExpression;
+
+
+
+ExpressionThen:
+    @Factor
+    [ *
+	| 'then':
+	| *:
+	    @SubExpression
+    ]
+    .aEndExpression;
+
+
+
+ExpressionOf:
+    @Factor
+    [ *
+	| 'of':
+	| *:
+	    @SubExpression
+    ]
+    .aEndExpression;
+
+
+
+ExpressionColon:
+    @Factor
+    [ *
+	| ':':
+	| *:
+	    @SubExpression
+    ]
+    .aEndExpression;
+
+
+
+Expression:
+    @Factor
+    [ *
+	| 'Ident', 'const', 'var', 'if':
+	| *:
+	    @SubExpression
+    ]
+    .aEndExpression;
+
+
+
+SubExpression:
+    @Disjunction
+    {[
+	| '=>':
+	    .aInfixImply
+	    @Factor
+	    @Disjunction
+	    .aImply
+	| *:
+	    >>
+    ]};
+
+
+
+Disjunction:
+    @Conjunction
+    {[
+	| 'or':
+	    .aInfixOr
+	    @Factor
+	    @Conjunction
+	    .aOr
+	| *:
+	    >>
+    ]};
+
+
+
+Conjunction:
+    @Relation
+    {[
+	| 'and', '&':
+	    .aInfixAnd
+	    @Factor
+	    @Relation
+	    .aAnd
+	| *:
+	    >>
+    ]};
+
+
+
+Relation:
+    @Sum
+    {[
+	| '=':
+	    .aInfixCompare
+	    @Factor
+	    @Sum
+	    .aEqual
+	| '<':
+	    .aInfixCompare
+	    @Factor
+	    @Sum
+	    .aLess
+	| '<=':
+	    .aInfixCompare
+	    @Factor
+	    @Sum
+	    .aLessEqual
+	| '>':
+	    .aInfixCompare
+	    @Factor
+	    @Sum
+	    .aGreater
+	| '>=':
+	    .aInfixCompare
+	    @Factor
+	    @Sum
+	    .aGreaterEqual
+	| 'not', '~':
+	    [
+		| '=':
+		    .aInfixCompare
+		    @Factor
+		    @Sum
+		    .aNotEqual
+		| 'in':
+		    .aInfixCompare
+		    @Factor
+		    @Sum
+		    .aNotIn
+	    ]
+	| 'in':
+	    .aInfixCompare
+	    @Factor
+	    @Sum
+	    .aIn
+	| *:
+	    >>
+    ]};
+
+
+
+Sum:
+    @Term
+    {[
+	| '+':
+	    @Factor
+	    @Term
+	    .aAdd
+	| '-':
+	    @Factor
+	    @Term
+	    .aSubtract
+	| 'xor':
+	    @Factor
+	    @Term
+	    .aXor
+	| *:
+	    >>
+    ]};
+
+
+
+Term:
+    @Exponent
+    {[
+	| '*':
+	    @Factor
+	    @Exponent
+	    .aMultiply
+	| '/':
+	    @Factor
+	    @Exponent
+	    .aDivideReal
+	| 'div':
+	    @Factor
+	    @Exponent
+	    .aDiv
+	| 'mod':
+	    @Factor
+	    @Exponent
+	    .aMod
+	| 'shr':
+	    @Factor
+	    @Exponent
+	    .aShiftRight
+	| 'shl':
+	    @Factor
+	    @Exponent
+	    .aShiftLeft
+	| *:
+	    >>
+    ]};
+
+
+
+Exponent:
+    {[
+	| '**':
+	    @Factor
+	    .aExponentiate
+	| *:
+	    >>
+    ]};
+
+
+
+Factor:
+    [
+	| 'Ident':
+	    @VariableOrIndirection
+	| 'IntegerLit':
+	    oEmitIntegerLit
+	| 'RealLit':
+	    oEmitRealLit
+	| 'StringLit':
+	    oEmitStringLit
+	| 'CharLit':
+	    oEmitCharLit
+	| '+':
+	    @Factor
+	    @Exponent
+	    .aPlus
+	| '-':
+	    @Factor
+	    @Exponent
+	    .aMinus
+	| '#':
+	    @Factor
+	    @Exponent
+	    .aHash
+
+	| 'int':
+	    .aTypeCheat
+	    .aInt
+	    @RestOfIndirection
+	| 'int1', 'int2', 'int4':
+	    .aTypeCheat
+	    .aInt
+	    .aStorageSize
+	    oEmitTypeSizeAsIntegerLit
+	    .aEndExpression
+	    @RestOfIndirection
+	| 'real':
+	    .aTypeCheat
+	    .aReal
+	    @RestOfIndirection
+	| 'real4', 'real8':
+	    .aTypeCheat
+	    .aReal
+	    .aStorageSize
+	    oEmitTypeSizeAsIntegerLit
+	    .aEndExpression
+	    @RestOfIndirection
+	| 'boolean':
+	    .aTypeCheat
+	    .aBoolean
+	    @RestOfIndirection
+	| 'string':
+	    .aTypeCheat
+	    .aString
+	    @OptionalStringSize
+	    @RestOfIndirection
+	    @Variable
+	| 'char':
+	    .aTypeCheat
+	    .aChar
+	    @OptionalStringSize
+	    @RestOfIndirection
+	    @Variable
+	| 'nat':
+	    .aTypeCheat
+	    .aNat
+	    @RestOfIndirection
+	| 'nat1', 'nat2', 'nat4':
+	    .aTypeCheat
+	    .aNat
+	    .aStorageSize
+	    oEmitTypeSizeAsIntegerLit
+	    .aEndExpression
+	    @RestOfIndirection
+	| 'addressint':
+	    .aTypeCheat
+	    .aAddressInt
+	    @RestOfIndirection
+
+	| '(':
+	    @Factor
+	    @SubExpression
+	    ')'
+	| 'type':
+	    .aTypeCheat
+	    '('
+	    @TypeCheatSpec
+	    ','
+	    @ExpressionCommaColonParen
+	    [
+		| ':':
+		    .aTypeCheatSize
+		    @ExpressionParen
+		| *:
+	    ]
+	    ')'
+	    @Variable		% not @ComponentSelectors, to handle substring!
+	| 'bits':
+	    .aBits
+	    '('
+	    @ExpressionComma
+	    ','
+	    @BitsRange
+	    ')'
+	| 'not', '~':
+	    @Factor
+	    @Relation
+	    .aNot
+	| 'true':
+	    .aTrue
+	| 'false':
+	    .aFalse
+    ];
+
+
+
+VariableOrIndirection:
+    oSaveIdent
+    [ *
+	| '.':
+	    '.'
+	    'Ident'
+	    [ *
+		| '@':
+		    .aTypeCheat
+		    oEmitSavedIdent
+		    .aField
+		    oEmitIdent
+		    @RestOfIndirection
+		| *:
+		    oEmitSavedIdent
+		    .aField
+		    oEmitIdent
+	    ]
+	| '@':
+	    .aTypeCheat
+	    oEmitSavedIdent
+	    @RestOfIndirection
+	| *:
+	    oEmitSavedIdent
+    ]
+    @Variable;
+
+
+Variable:
+    {[
+	| '(':
+	    .aSubs
+	    [
+		| 'all':
+		    .aAll
+		    ')'
+		    .aEndExpressionList
+		    .aEndSubs
+		    >>
+		| ')':
+		    .aEndExpressionList
+		    .aEndSubs
+		    >>
+		| '*':
+		    % This is s(*[-expn]), or s(*[-expn] .. [*-] expn)
+		    .aStar
+		    @OptionalMinusExpression
+		    [
+			| ')':
+			| '..':
+			    [
+				| '*':
+				    .aStar
+				    @OptionalMinusExpression
+				| *:
+				    @Expression
+			    ]
+			    ')'
+		    ]
+		    .aSubstring
+		    .aEndExpressionList
+		    .aEndSubs
+		    >>
+		| *:
+		    % This is s(expn), or s(expn .. expn|* [-expn])
+		    @ExpressionDotDotParen
+		    [
+			| '..':	% substring
+			    [
+				| '*':
+				    .aStar
+				    @OptionalMinusExpression
+				| *:
+				    @ExpressionParen
+			    ]
+			    .aSubstring
+			    ')'
+			    .aEndExpressionList
+			    .aEndSubs
+			    >>
+			| ',':
+			    @ExpressionList
+			| *:
+			    .aEndExpressionList
+		    ]
+	    ]
+	    ')'
+	    .aEndSubs
+	| '.':
+	    .aField
+	    'Ident' oEmitIdent
+	| *:
+	    >>
+    ]};
+
+
+OptionalMinusExpression:
+    % lookahead for a minus.  This means that there is an expression to
+    % be added to the "*".  This properly handles *-3-4 as *-7
+    [ *
+	| '-':
+	    .aMinus
+	    @Expression
+	| *:
+    ];
+
+end

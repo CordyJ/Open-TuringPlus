@@ -1,0 +1,9332 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+%
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+%
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+%	Computer Systems Research Group
+%	University of Toronto
+%
+%	File:	Turing Plus Pass 2 Semantic S/SL Definitions and Rules	V1.0
+%	Author:	Mark Mendell and Steve Perelgut
+%	Date:	March 6, 1986
+
+input output:
+    % Compound Tokens
+    firstOutputToken
+
+    aIdent = firstOutputToken
+    firstCompoundToken = aIdent
+    aPredefinedId
+    aIntegerLit
+    aStringLit
+    aCharLit
+    aRealLit
+    aDataDescriptor		% used in the allocator and coder passes
+    aRoutineIndex		% used by the allocator and coder passes
+    aIdentText
+    aDebugInformation           % used in the allocator and coder passes
+    aEndSubstring		% output from the semantic pass
+    lastCompoundToken = aEndSubstring
+
+    % Other Tokens
+    firstNonCompoundToken = 20
+    aAdd	= firstNonCompoundToken	% leave room for more compound tokens
+    aAddressint
+    aAbs			% output from the semantic pass
+    aAliasCheck			% output from the semantic pass
+    aAll
+    aAllocate
+    aAnd
+    aAndEqual
+    aArray
+    aAsm
+    aAssert
+    aAssign
+    aAssignInverted		% added by the allocator
+    aAt
+    aBegin
+    aBeginAsm
+    aBind
+    aBits
+    aBody
+    aBoolean
+    aBooleanAndEqual
+    aBooleanOrEqual
+    aByReference		% used by the allocator and coder passes
+    aCall			% output from the semantic pass
+    aCallVariable		% output from the allocator pass
+    aCase
+    aCaseBody
+    aChar
+    aChild
+    aChecked
+    aClose
+    aCollection
+    aColon
+    aCompile			% compile the following code
+    aConcatenate		% output from the semantic pass
+    aConcatenateAssign		% output from the semantic pass
+    aCondition
+    aConst
+    aDeallocate			% output from the allocator pass
+    aDecreasing
+    aDeferred
+    aDiv
+    aDivEqual
+    aDivideReal
+    aElse
+    aElsif
+    aEndAsm
+    aEndAliasCheck		% output from the semantic pass
+    aEndArrayIndexList
+    aEndBegin
+    aEndBind
+    aEndCase
+    aEndCaseBody
+    aEndEnum
+    aEndExport
+    aEndExpression
+    aEndExpressionList
+    aEndFor
+    aEndGet
+    aEndGrant
+    aEndIf
+    aEndImport
+    aEndInit
+    aEndLoop
+    aEndModule
+    aEndMonitor
+    aEndOpen
+    aEndPut
+    aEndRead
+    aEndRecord
+    aEndResult
+    aEndSubprogramBody
+    aEndSubs
+    aEndUnion
+    aEndUnionLabelBody
+    aEndWrite
+    aEnum
+    aEqual
+    aExit
+    aExitWhen
+    aExponentiate
+    aExponentiateEqual
+    aExport
+    aExternal
+    aExternalAddress
+    aFalse
+    aField
+    aFor
+    aFork
+    aForkAddress
+    aForkStackSize
+    aForkStatus
+    aForRange
+    aForward
+    aFree
+    aFunction
+    aGet
+    aGrant
+    aGreater
+    aGreaterEqual
+    aHandler
+    aHash
+    aIf
+    aImply
+    aImport
+    aIn
+    aInfixAnd
+    aInfixBooleanCompare	% output from the semantic pass
+    aInfixCompare
+    aInfixImply
+    aInfixOr
+    aInit
+    aInt
+    aInterruptNumber
+    aInvariant
+    aIs
+    aLabel
+    aLess
+    aLessEqual
+    aLogicalAnd
+    aLogicalOr
+    aLogicalXor
+    aLoop
+    aMax			% output from the semantic pass
+    aMin			% output from the semantic pass
+    aMinus
+    aMinusEqual
+    aMissingStub
+    aMod
+    aModEqual
+    aModule
+    aMonitor
+    aMonitorPriority
+    aMultiply
+    aNat
+    aNew
+    aNil			% output from the allocator pass
+    aNoAlias			% output from the semantic pass
+    aNoEnclosure		% output from the semantic pass
+    aNonManifest		% output from the semantic pass
+    aNonScalar			% output from the semantic pass
+    aNot
+    aNotEqual
+    aNotIn
+    aOpaque
+    aOpen
+    aOr
+    aOrEqual
+    aOtherwise
+    aPacked
+    aParent
+    aPause
+    aPervasive
+    aPlus
+    aPlusEqual
+    aPointer
+    aPost
+    aPre
+    aPriority
+    aProcedure
+    aProcess
+    aProcessStackSize
+    aPut
+    aPutContinue
+    aQuit
+    aQuitReason
+    aRangeCheck			% output from the semantic pass
+    aRangeCheck2		% output from the semantic pass
+    aRead
+    aReadWriteSize
+    aReadWriteSizeResult
+    aReadWriteStatus
+    aReal
+    aRealDivEqual
+    aRecord
+    aRecordElementType
+    aRegister
+    aResult
+    aReturn
+    aSeek
+    aSet
+    aSetDifference		% output from the semantic pass
+    aSetDifferenceAssign	% output from the semantic pass
+    aSetGreaterEqual		% output from the semantic pass
+    aSetIntersection		% output from the semantic pass
+    aSetIntersectionAssign	% output from the semantic pass
+    aSetLessEqual		% output from the semantic pass
+    aSetUnion			% output from the semantic pass
+    aSetUnionAssign		% output from the semantic pass
+    aSetXor
+    aSetXorAssign
+    aShiftLeft
+    aShiftLeftEqual
+    aShiftRight
+    aShiftRightEqual
+    aSignal
+    aSkip
+    aStar
+    aStarEqual
+    aStorageSize
+    aStreamNumber
+    aString
+    aStringSizeBound
+    aStub
+    aSubrange
+    aSubs
+    aSubstring
+    aSubtract
+    aTag
+    aTagCheck			% output from the semantic pass
+    aTell
+    aTimeout
+    aTrue
+    aType
+    aTypeCheat
+    aTypeCheatSize
+    aUnchecked
+    aUninitialize
+    aUnion
+    aUnionLabelBody
+    aUnqualified
+    aVar
+    aVarInit
+    aVaryingParameter
+    aWait
+    aWaitPriorityOrTimeout
+    aWrite
+    aXor
+    aXorEqual
+
+    % Meta Tokens
+    aFileName	= 252	% leave room for more tokens
+    aNewLine
+    aNewFile
+    aEndOfFile
+
+    tSyntaxError = -1	% for error recovery
+
+    lastOutputToken = aEndOfFile;
+
+
+error:
+    firstErrorCode		= 0
+    eNoError			= firstErrorCode
+
+    % Warnings
+    firstWarningCode		= 10
+
+    eIntInt4Equivalence = firstWarningCode
+    eNatNat4Equivalence
+    eRealReal8Equivalence
+    eNegativeConstantUsedInLogicalOperation
+
+    firstNonSeriousErrorCode
+
+    eAssignmentValueOutOfRange = firstNonSeriousErrorCode
+    eConstantValueOutOfRange
+    eDivByZero
+    eIllegalSubstringValue
+    eOpaqueOnlyAppliesToTypes
+    eUnionLabelValueNotInRange
+    eValueActualOutOfRange
+
+    % Severe
+    firstSeriousErrorCode
+
+    eAddrOfCompileTimeConstant = firstSeriousErrorCode
+    eAddrOfRegisterVariable
+    eAsmLabelMustBeString
+    eAsmOpcodeMustBeString
+    eAtExpnMustBeInteger
+    eBadArgToAddr
+    eBadArgToEmpty
+    eBadArgToLower
+    eBadArgToNil
+    eBadArgToSize
+    eBadArgToStringop
+    eBadArgToUpper
+    eBadSetElement
+    eBindToCompileTimeConstant
+    eBitsAssignmentTargetMustBeNat
+    eBitsExpnMustBeInteger
+    eBitsTypeMustBeSubrange
+    eCannotAssignToFlexChar
+    eCannotAssignToFlexArray
+    eCannotInitializeFlexChars
+    eCannotInitializeFlexArrayOrChar
+    eCharBoundMustBeAnIntegerExpn
+    eCaseLabelBadValue
+    eCharLengthIllegal
+    eCompileTimeReferenceParameter
+    eDeviceMonitorPriorityMustBeInt
+    eDimensionRequestedLargerThanArrayNumberOfIndices
+    eDimensionRequestedLessThanOne
+    eExpressionPassedByReference
+    eExternalAddressWrongType
+    eForkAddressVariableMustBeAddressInt
+    eForkStackSizeExpnMustBeInteger
+    eForkStatusVariableMustBeBoolean
+    eFractionWidthOnlyAppliesToIntegersAndReals
+    eIOFileNumberExpnMustBeInteger
+    eIOStatusVariableMustBeInteger
+    eIllegalAndEqual
+    eIllegalAssignment
+    eIllegalCaseType
+    eIllegalDivEqual
+    eIllegalExponentialEqual
+    eIllegalForIndexType
+    eIllegalIndexType
+    eIllegalInitType
+    eIllegalIntNatSubrange
+    eIllegalMinusEqual
+    eIllegalModEqual
+    eIllegalOrEqual
+    eIllegalPlusEqual
+    eIllegalPutGetOperandType
+    eIllegalRangeUpperBoundLessThanLower
+    eIllegalRealDivEqual
+    eIllegalSetBaseRange
+    eIllegalShiftEqual
+    eIllegalStarEqual
+    eIllegalSubrangeType
+    eIllegalSubscripts
+    eIllegalSubstringIndexType
+    eIllegalSubstringValues
+    eIllegalTypeCheatValue
+    eIllegalUnionInitTagValue
+    eIllegalUseOfAll
+    eIllegalUseOfPredefined
+    eIllegalVariableReference
+    eIllegalXorEqual
+    eIncompatibleAssignmentTypes
+    eIncompatibleCaseLabel
+    eIncompatibleComparisonTypes
+    eIncompatibleConstantValueType
+    eIncompatibleForIndexTypes
+    eIncompatibleInitValue
+    eIncompatibleResultType
+    eIncompatibleSetElementType
+    eIncompatibleSubrangeTypes
+    eIncompatibleSubscriptTypes
+    eIncompatibleTagTypes
+    eIncompatibleValueActualType
+    eInitStringValueTooBigToFit
+    eInitValueNotInRange
+    eIntegerExponentiatePowerNegative
+    eInterruptProcedureNumberMustBeNat
+    eMissingUnionInitTagValue
+    eNonArithmeticType
+    eNonBooleanCondition
+    eNonBooleanType
+    eNonCompileTimeExpression
+    eNonComparisonType
+    eNonLogicalType
+    eNonPointerNewOrFree
+    eNonPriorityOrTimeOutConditionMustNotHaveWaitExpn
+    eNonSetType
+    eNonStringType
+    eNonTagInTagStmt
+    eOpenFileNameMustBeString
+    eOpenFileNameMustBeStringOrInt
+    eOpenFileNumberVarMustBeInteger
+    eOpenModeMustBeString
+    ePackedBind
+    ePackedReferenceActual
+    ePriorityOrTimeOutConditionMustHaveWaitExpn
+    eProcessStackSizeMustBeInt
+    eQuitReasonExpnMustBeInteger
+    eReadOrWriteRegisterVariable
+    eReadWriteItemNotVariable
+    eReadWriteSizeMustBeInteger
+    eReadWriteSizeResultVariableMustBeInteger
+    eRealStorageSizeMustBeInt
+    eRedeclarationOfStubSubprogramHasDifferentFormals
+    eRegisterBind
+    eRegisterReferenceActual
+    eRegisterTypeCheatAssignment
+    eSeekExpnMustBeInteger
+    eSetBaseTypeMismatch
+    eSetElementOutOfRange
+    eSizeOfCompileTimeConstant
+    eSizeOfOpaqueObject
+    eStorageSizeMustBeInt
+    eStorageSizeOnCharSubrange
+    eStreamNumberMustBeInteger
+    eStringBoundMustBeAnIntegerExpn
+    eStringLengthIllegal
+    eStubConstantMustBeCompileTime
+    eSubscriptOutOfRange
+    eTellResultVariableMustBeInteger
+    eTooFewActuals
+    eTooFewInitElements
+    eTooFewSubscripts
+    eTooManyActuals
+    eTooManyInitElements
+    eTooManySubscripts
+    eTypeCheatSizeNotInteger
+    eTypeCheatSizeOnlyAppliesToIntReal
+    eUnionLabelIncompatibleType
+    eUnionLabelMustBeCompileTime
+    eUnresolvedForwardInCollection
+    eUpperOfStringMustNotHaveSecondParm
+    eVariableTypeCheatExpected
+    eWaitExpnMustBeInteger
+    eWidthExprMustBeIntExpr
+    eWidthExpressionMustBeANonNegativeInteger
+    eWidthFieldOnlyAppliesToStringGets
+    eWriteItemCompiletimeConstant
+    eWrongCollectionNewOrFree
+    eWrongCollectionSubscriptType
+    eWrongParametricActualType
+    eWrongReferenceActualType
+    eWrongSetElementType
+
+    % errors generated by the compiler
+    eOrdOnlyAppliesToSingleCharacterStrings
+    eCompileTimeAdditionOverflow
+    eCompileTimeMultiplyOverflow
+    eCompileTimeDivByZero
+    eCompileTimeModByZero
+    eCompileTimeShiftByNegativeValue
+    eStringConcatenateOverflow
+
+
+    firstFatalErrorCode
+    eSymbolStackOverflow		= firstFatalErrorCode
+    eScopeStackOverflow
+    eCountValueOverflow
+    eCountOverflow
+    eUnionBodyCountOverflow
+    eUnionBodyCountValueOverflow
+    eSymbolTableOverflow
+    eNoFreeDummySymbols
+    eNoFreeDummyTypes
+    eTypeStackOverflow
+    eTypeTableOverflow
+    eTypeRangeTableOverflow
+    eTypeArrayIndexOverflow
+    eUnionMapTableOverflow
+    eEmitBufferOverflow
+    eEmitBufferStackOverflow
+    eScopeDisplayOverflow
+    eScopeSymbolOverflow
+    eScopeTableOverflow
+    eSubstringOverflow
+    eValueOverflow
+    eValueTableOverflow
+    eNoMoreStringSpace
+    eSslStackOverflow
+
+    lastErrorCode = eSslStackOverflow;
+
+mechanism FirstSemantic:
+    firstSemanticOperation;
+
+
+type FailureCodes:
+    firstFailureCode
+
+    fSemanticChoiceFailed = firstFailureCode
+
+    fChoiceRuleFailed
+    fInputStreamSyntaxError
+    fUnimplementedOperation
+    lastFailureCode = fUnimplementedOperation;
+
+type Boolean:
+    no = 0
+    yes = 1
+    maybe = 2;
+
+
+
+type Integer:
+    zero = 0;
+
+type PredefinedKinds:
+    firstPredefinedId
+    pAbs	= firstPredefinedId
+    pAddr
+    pArctan
+    pArctand
+    pCeil
+    pChr
+    pCos
+    pCosd
+    pEmpty
+    pEof
+    pErealstr
+    pExp
+    pFloor
+    pFrealstr
+    pGetpriority
+    pIndex
+    pIntreal
+    pIntstr
+    pLength
+    pLn
+    pLower
+    pMax
+    pMin
+    pNatreal
+    pNatstr
+    pNil
+    pOrd
+    pPred
+    pRand
+    pRandInt
+    pRandNext
+    pRandSeed
+    pRandomize
+    pRealstr
+    pRepeat
+    pRound
+    pSetpriority
+    pSign
+    pSin
+    pSind
+    pSize
+    pSqrt
+    pStrint
+    pStrnat
+    pStrdelete
+    pStrmove
+    pStrreal
+    pStrreplace
+    pSucc
+    pUpper
+    lastPredefinedId = pUpper;
+
+
+mechanism Predefined:
+    oPredefinedChoose >> PredefinedKinds;	% Get the predefined index
+						% of the current predefined
+						% token.
+
+type SymbolKinds:
+
+    % Kinds of symbols in the Symbol Table.
+    firstSymbolKind
+
+    sVariable = firstSymbolKind
+    sRuntimeConstant
+    sCompiletimeConstant
+    sType
+    sCollection
+    sProcedure
+    sFunction
+    sModule
+    sMonitor
+    sProcess
+    sEnumeratedElement
+    sCall			% procedure/function/process call
+    sExport
+    sNotFound
+
+    lastSymbolKind = sNotFound;
+
+
+
+type SymbolAttributes:
+
+    % Attributes of symbols
+    firstSymbolAttribute
+
+    saOpaque = firstSymbolAttribute
+    saRegister
+    saForward
+    saTypeCheat
+    saTag
+
+    lastSymbolAttribute = saTag;
+
+mechanism Symbol:
+
+    % The Symbol Mechanism.
+    % This mechanism is used in all handling of declared symbols.
+    % It consists of a permanent Symbol Table and a Symbol Stack
+    % which is used to access currently active entries in the table.
+    % Each entry in the Symbol Stack consists of a symbol kind and
+    % the symbol's Symbol Table index.  The kind is not necessarily
+    % the same as the entry kind in the Symbol Table, but rather
+    % reflects the symbol's status for the current reference.
+
+    oSymbolPush			% push the current identifier onto the
+				% symbol stack
+
+    oSymbolPushDummy		% push a new symbol table entry out of a
+				% number of dummy symbols.
+
+    oSymbolPushDummyCopy	% push a new symbol table entry out of a
+				% number of dummy symbols.  Copy the
+				% top symbol's information to the dummy
+
+    oSymbolPushPredefined	% push the symbol table entry which
+				% corresponds with the current token (a
+				% predefinedId token) onto the top of
+				% the symbol stack
+
+    oSymbolPushCopy		% push a copy of the top symbol
+
+    oSymbolPushCountScope	% push the symbol that is the count'th symbol
+				% in the top scope.  Push sNotFound if there
+				% are not more symbols.
+
+    oSymbolPushTypeSymbol	% push the symbol pointed at by the
+				% top type in the Type Stack
+
+    oSymbolEnterType		% enter the top type in the Type
+				% Stack as the type of the top symbol
+
+    oSymbolEnterValue		% enter the top value in the Value
+				% Stack as the value of the top symbol
+
+    oSymbolEnterAttribute(SymbolAttributes)
+				% add the specified attribute to the
+				% top entry
+
+    oSymbolEnterKind(SymbolKinds)
+				% change the kind of the top entry in the
+				% Symbol Stack to the specified kind and
+				% enter the new kind in the permanent table
+
+    oSymbolEnterUnionBodyCount	% Enter the value of the top of the union
+				% body count stack into the union body field
+
+    oSymbolChangeKind(SymbolKinds)
+				% change the kind of the top entry in the
+				% Symbol Stack to the specified kind
+
+    oSymbolClearAttribute(SymbolAttributes)
+				% remove the specified attribute from the
+				% top entry and its table entry.
+
+    oSymbolPop			% pop the top symbol from the stack
+
+    oSymbolPopAndChooseKind >> SymbolKinds
+				% pop the top entry and choose
+				% on its kind
+
+    oSymbolChooseKind >> SymbolKinds
+				% choose on the kind of the top entry
+
+    oSymbolChooseAttribute(SymbolAttributes) >> Boolean
+				% returns yes if the top entry has
+				% the specified attribute
+
+    oSymbolChooseSameSymbols >> Boolean
+				% returns yes if the top two symbols in the
+				% stack are the identical table entry
+
+    oSymbolSwapSymbols		% swap the top two entries
+
+    oSymbolBodySameAsValue >>Boolean
+				% Return yes if the current symbol's body
+				% number is the same as the top value
+
+    oSymbolSaveHandlerSymbol	% save the top of the symbol stack, which
+				% is a handler symbol
+
+    oSymbolPushHandlerSymbol	% push the saved handler symbol
+
+    ;
+
+type TypeKinds:
+
+    % Kinds of types in the Type Table.
+
+    firstTypeKind
+
+    tProcedure = firstTypeKind
+    tFunction
+    tProcess
+    tModule
+    tMonitor
+    tArray
+    tFlexArray
+    tCollection
+    tRecord
+    tUnion
+    tEnumeratedRange
+    tSet
+    tString
+    tChar
+    tCharString
+    tFlexChar			% char(n)
+    tCondition
+    tEnumeratedElement
+    tPointer
+    tBoolean
+    tInt
+    tNat
+    tReal
+    tSubrange
+    tAddressInt
+    tType
+    tOpaque
+    tInt4
+    tNat4
+    tReal8
+    tIntNat			% for literals, and manifest constants
+    tVaryingParameter
+    tNotFound
+    tError
+
+    lastTypeKind = tError;
+
+
+
+type TypeAttributes:
+
+    % Attributes of types
+
+    firstTypeAttribute
+
+    taForward = firstTypeAttribute
+    taCompile
+    taPacked
+    taTypeCheat
+    taPriorityOrTimeoutCondition
+
+    lastTypeAttribute = taPriorityOrTimeoutCondition;
+
+mechanism Types:
+
+    % The Type Mechanism.
+    % This mechanism is used to handle type definitions.
+    % It consists of a permanent Type Table plus a Type Stack
+    % of currently active entries.
+    % The stack entries consist of pointers to the Type Table
+    % only and hence never differ from the table entry.
+
+    oTypePushBuiltIn(TypeKinds)	% push the built-in type entry specified
+
+    oTypePushNew(TypeKinds)	% push a new type table entry of
+				% the specified kind
+
+    oTypePushBuiltinFromValue	% push the built-in type corresponding to the
+				% top (INTEGER!) value
+
+    oTypePushComponentType	% push the component type of the top type
+
+    oTypePushLeftComponentType	% push the component type of the
+				% second from top type
+
+    oTypePushLeftResultType	% push result type of the second from top type
+
+    oTypePushResultType		% push the result type of the top type
+
+    oTypePushSymbolType		% push the type of the top symbol in
+				% the Symbol Stack
+
+    oTypePushCountIndexType	% push the type of the count'th type int the
+				% array index stack
+
+    oTypePushCharStringDummy	% push a dummy char type with the attributes
+				% of the current
+
+    oTypeReplaceBuiltIn(TypeKinds)
+				% replace the top entry in the stack
+				% with the specified built-in type
+
+    oTypeReplaceComponentType	% replace the top type in the stack
+				% with its component type
+
+    oTypeReplaceFromValue	% replace top type with the appropriate
+				% builtin type, if the top value in manifest;
+				% otherwise;  leave it alone.
+
+    oTypeReplaceResultType	% replace the top type in the stack with
+				% its result type
+
+    oTypeReplaceRootType	% replace the top type with its root type
+
+    oTypeEnterSymbol		% enter the top symbol in the Symbol
+				% Stack as the symbol of the top type
+
+    oTypeEnterFieldsScope	% enter the top scope in the Scope Stack
+				% as the fields list of the top type
+
+    oTypeEnterFormalsScope	% enter the top scope in the Scope Stack
+				% as the formals list of the top type
+
+    oTypeEnterExportsScope	% enter the top scope in the Scope Stack
+				% as the exports list of the top type
+
+    oTypeEnterUnionMap		% enter the top element in the union map
+				% in the current type.
+
+    oTypeReplaceTypeWithSameKindAndStorageSize
+				% replace the top type with one that has the
+				% same type kind and storage size.  Create
+				% a new type if necessary.
+
+    oTypeReplaceTypeWithSameKindAndValue
+				% replace the top type with one that has the
+				% same type kind and value.  Create
+				% a new type if necessary
+
+    oTypeEnterLeftTypeSizeFromRight
+				% enter the size of the second type from the
+				% top type
+
+    oTypeEnterLeftComponentType	% enter the top type in the stack
+				% as the component type of the second
+				% from top type
+
+    oTypeEnterLeftResultType	% enter the top type as the result type of
+				% the second from top type
+
+    oTypeEnterLeftRootType	% enter the top type as the root type of
+				% the second from top type
+
+    oTypeEnterAttribute(TypeAttributes)
+				% add the specified attribute to the
+				% top entry
+
+    oTypeEnterKind(TypeKinds)	% enter the specified kind as the kind
+				% of the top type table entry in the stack
+
+    oTypeEnterFlexRangeValues	% enter the top two values in the
+				% Value Stack as the range values of
+				% the top type in the stack.  The top
+				% value will be run-time and the range
+				% will be part of a flex array declaration.
+
+    oTypeEnterRangeValues	% enter the top two values in the
+				% Value Stack as the range values of
+				% the top type in the stack
+
+    oTypeMakeOpaque		% enter a new unique opaque type number
+				% as the opaque type number of the top
+				% entry in the stack
+
+    oTypeUnMakeOpaque		% Undo the MakeOpaque above
+
+    oTypeReMakeOpaque		% Undo the UnMakeOpaque
+
+    oTypeEnterFirstArrayIndex	% Enter the index of the next unused element
+				% of the type range table into the type
+				% array index table
+
+    oTypeEnterLastArrayIndex	% Enter the index of the last used element
+				% of the type range table into the current
+				% array index table
+
+    oTypeEnterArrayBound	% Add the indices to the type range table
+
+    oTypeEnterStringBound	% enter the value of the string upper bound
+				% from the top of the value stack
+
+    oTypeEnterEnumeratedElementRoot
+				% enter the second element on the stack
+				% (which must be an EnumeratedRange) as
+				% the root of the top type (which must be
+				% an EnumeratedElement).
+
+    oTypeEnterSetBase		% enter the base type and range for a set
+
+    oTypeClearAttribute(TypeAttributes)
+				% remove the specified attribute from the
+				% top entry
+
+    oTypePop			% pop the top entry
+
+    oTypePopAndChooseKind >> TypeKinds
+				% pop the top entry and choose on
+				% its kind
+
+    oTypeChooseKind >> TypeKinds
+				% choose on the kind of the top entry
+
+    oTypeChooseLeftKind >> TypeKinds
+				% choose on the kind of the second from top
+				% entry
+
+    oTypeChooseAttribute(TypeAttributes) >> Boolean
+				% returns yes if the top type has the
+				% specified attribute and no otherwise
+
+    oTypeChooseLeftAttribute(TypeAttributes) >> Boolean
+				% returns yes if the second type has the
+				% specified attribute and no otherwise
+
+    oTypeChooseSameSymbols >> Boolean
+				% returns yes if the top two types in
+				% the stack, which must be pointers,
+				% have the same collection
+
+    oTypeChooseSameRanges >> Boolean
+				% returns yes if the top two types
+				% in the stack have the same range
+				% values
+
+    oTypeChooseSameEnumeratedRanges >> Boolean
+				% returns yes if the top two types
+				% in the stack have the same range
+				% and scope values
+
+    oTypeChooseSameArrayRanges >> Boolean
+				% returns yes if the top two types
+				% in the stack are arrays with
+				% exactly the same range values.  I think
+				% that ANY flex bound should cause this to
+				% return no.
+
+    oTypeChooseSameKinds >> Boolean
+				% returns yes if the top two types
+				% in the stack have the same type kind
+
+    oTypeChooseSameKindsAndSizes >> Boolean
+				% returns yes if the top two types
+				% in the stack have the same type kind and
+				% size
+
+    oTypeChooseSameTypes >> Boolean
+				% returns yes if the top two types
+				% are the identical table entry
+
+    oTypeChooseSameStringBounds >> Boolean
+				% returns yes if the tope two types are
+				% strings with the same value table entry
+				% for the bounds AND if the value table entry
+				% is not run-time
+
+    oTypeChooseSameOpaqueTypeNumbers >> Boolean
+				% returns yes if the top two types
+				% have the same opaque type number
+
+    oTypeCopy			% Replicate the current top of the type
+				% stack as the new top of the type stack
+
+    oTypeCopyLeftType		% copy the top type stack entry to
+				% the second from top
+
+    oTypeCopyLeftRangeValues	% copy the top type stack range values to
+				% the second from top
+
+    oTypeSwapTypes		% swap the top two entries
+
+    oTypeSwapSecondAndThirdTypes% swap the second and third types
+
+    oUnionMapPush		% Create a new Union map & push a pointer
+				% to it
+
+    oUnionMapPop		% pop the top union map pointer
+
+    oUnionMapEnter		% Enter the (value,body#) in the current
+				% union map & increment pointer.
+
+    oTypeCheatSizeValueMatchesType >> Boolean
+				% Return yes if the value of the type cheat
+				% size is valid for the given type.
+				% SLIGHTLY MACHINE DEPENDANT
+
+    oTypeUnionTagValueLegal >> Boolean
+				% Return yes if the value is in the current
+				% union.
+    ;
+
+mechanism Count:
+
+    % The Count Mechanism.
+    % This mechanism is used to count items in actual parameter lists,
+    % etc.  It is a stack since function calls (and other counted things)
+    % may nest.
+
+    oCountPushZero		% push a zero count onto the stack
+
+    oCountPushTypeArrayNumberOfIndices
+				% push the count of the number of indices
+				% of the array which is the top entry in the
+				% type stack.  The top entry MUST be an array
+
+    oCountPushValue		% push value in top of value stack
+
+    oCountPushScopeNumberOfEntries
+				% push the count of the number of entries
+				% in the top scope in the Scope Stack
+
+    oCountDecrement		% decrement the top count in the stack
+
+    oCountIncrement		% increment the top count in the stack
+
+    oCountCopy			% copy the current top of stack to the top
+				% of the count stack.
+
+    oCountPop			% pop the top entry from the stack
+
+    oCountChooseZero >> Boolean	% Return yes is the count is zero
+
+    oUnionBodyCountPushZero	% push a zero count onto the union body stack
+
+    oUnionBodyCountIncrement	% increment the top count in union body stack
+
+    oUnionBodyCountPop;		% pop the top entry from the union body stack
+
+mechanism Scope:
+
+    % The Scope Mechanism.
+    % The Scope Stack is used to keep track of the symbols in
+    % records and formal lists.
+
+    oScopePush			% push a new scope
+
+
+    oScopePushTypeFields	% push the fields list scope of the
+				% top type
+
+    oScopePushTypeFormals	% push the formals list scope of the
+				% top type
+
+    oScopePushTypeExports	% push the exports list scope of the top type.
+
+    oScopeEnterSymbol		% enter the top symbol into the top scope
+
+    oScopePop			% pop top scope from the stack
+    ;
+
+type ContextType:
+    firstContext
+
+    cCompile = firstContext
+    cFunction
+    cRegister
+    cPacked
+    cOpaque
+    cFlex
+    cStringExpn
+    cPervasive
+    cInHandler
+
+    lastContext = cInHandler;
+
+mechanism Context:
+    % this mechanism is used to remember information about certain tokens
+    % that have been seen, etc
+    oContextSet(ContextType)		% mark the given context as set
+
+    oContextClear(ContextType)		% mark the given context as reset
+
+    oContextChoose(ContextType) >> Boolean
+					% return yes if the given context is set
+    ;
+
+
+% When processing variable declarations, arrays may be defined as
+% flex (where the upper bounds of each indice may be a run time expression)
+% or they may be regular array definitions.  A function-rule checks for
+% this condition and returns one of the following types
+% In T+, dynamic char(n) is also possible
+
+type FlexCheck:
+    wasFlex		% was a flex array or char
+    wasntFlex		% obvious
+    wasntArrayNorChar
+    ;
+
+
+mechanism Emit:
+
+    % The Emit Mechanism.
+    % This mechanism is used to output values associated with
+    % tokens to the output stream.
+
+    oEmitInteger		% emit the value of the input integer literal
+
+    oEmitString			% emit the value of the input string literal
+
+    oEmitChar			% emit the value of the input char literal
+
+    oEmitReal			% emit the value of the input real literal
+
+    oEmitSymbol			% emit the Symbol Table index of the top
+				% symbol in the Symbol Stack
+
+    oEmitExtraIdentSymbol	% the top of the symbol stack is a tag.  Emit
+				% the Symbol Table index +1 for the top symbol
+
+    oEmitPredefined		% emit the predefined index of the current
+				% input token
+
+    oEmitManifestValue          % emit the top value in the Value Stack
+				% and its associated infix operator if any
+
+    oEmitManifestSymbolValue    % emit the top value in the Value Stack
+				% and with the attributes of the top symbol.
+				% This is important for const x : nat :=....
+
+    oEmitTypeTop(TypeKinds)     % emit a token representing the top of the
+				% type stack.
+
+    oEmitLine			% emit a new line token (and possible a
+				% new file token as well
+
+    oEmitSubstringKind		% emit the corrent substring kind.
+
+    oEmitSavedIdentText		% emit the saved aIdentText
+
+    % Emit Buffering.
+    % Output is normally emitted directly to the output stream.
+    % However, a stack of buffers is provided to buffer output
+    % to enable folding of expressions.  If a buffer has been pushed,
+    % then all output will be directed into that buffer until it
+    % is popped or until a direct buffer is pushed.  A direct buffer
+    % always emits directly to the output stream.
+    % Buffered output can be emitted to the next lower
+    % level using the oEmitBufferEmit operation.
+
+    oEmitBufferPush		% push a new buffer
+
+    oEmitBufferPushDirect	% push a new buffer which emits directly to
+				% the output stream.
+
+    oEmitBufferPop		% pop an emit buffer which cannot be direct
+
+    oEmitBufferPopDirect	% pop the top buffer which must be direct
+
+    oEmitBufferEmit;		% emit the top buffer to next lower
+				% level (may be another buffer or
+				% direct output)
+
+
+mechanism SaveIdentText:
+    % This mechanism is used to save the ident text of constant ids to allow
+    % manifest constants to be folded, but pass through the identText for
+    % non-manifest ids.
+
+    oSaveIdentText;
+
+mechanism Debug:
+
+    % The Debug Mechanism
+    % This mechanism is used to explicitly request debugging cut in
+    % at certain points during the progress through the S/SL
+
+    oCheckDump
+    ;
+
+type ValueKinds:
+
+    % Kinds of values in the Value Stack.
+    firstValueKind
+
+    vNoValue = firstValueKind
+    vRunTime
+    vReal
+    vTrue
+    vFalse
+    vInteger
+    vString
+    vChar
+    vSet
+    vParameter
+    vNil
+
+    lastValueKind = vNil;
+
+type ValueConstants:
+    % some value constants used by the value mechanism
+    firstConstantValueIndex = 1
+
+    viZero = firstConstantValueIndex
+    viOne
+    viFour
+    viEight
+    viTen
+    viMaxSetElement
+    viMinLongInt
+    viMaxLongInt
+    viMaxNat
+    viDefaultStringSize
+    viMaxStringSize  = viDefaultStringSize
+    viMaxChar = viDefaultStringSize	  % COINCIDENCE !!!
+    viDefaultExponentRange
+    viNonManifest
+    viTrue
+    viFalse
+    viEmptySet
+
+    lastConstantValueIndex = viEmptySet;
+
+mechanism Value:
+
+    % The Value Mechanism.
+    % This mechanism is used to evaluate manifest expressions.
+    % It is a stack of value descriptors.
+    % The value operations (e.g., add, subtract, etc.) act
+    % only on operands which are both within SignedInt
+    % (although the result need not be).
+
+    oValuePushIntegerLit	% push the value of the input integer literal
+
+    oValuePushRealLit		% push the value of the input real literal
+
+    oValuePushStringLit		% push the value of the input string literal
+
+    oValuePushCharLit		% push the value of the input char literal
+
+    oValuePush(ValueConstants)	% push a predefined literal value
+
+    oValuePushStringLiteralLength
+				% push the value of the length of the
+				% top value stack entry, which must
+				% be a string literal
+
+    oValuePushStringLength	% push the length of the string on the
+				% top of the type stack
+
+    oValuePushSymbolValue	% push the value of the top symbol
+				% in the Symbol Stack
+
+    oValuePushSymbolBodyNumber	% push the integer value of the body number of
+				% the top symbol in the Symbol Stack
+
+    oValuePushTypeRangeValues	% push the range values of the top type
+				% in the Type Stack
+
+    oValuePushCount		% push integer value on top of count stack
+
+    oValuePushTypeSize		% push size of the top type
+
+    oValueConvertIntToReal	% Top value is an int. Convert it to a real
+
+    oValueConvertIntToNat	% Top value is a negative int. Convert it to
+				% the corresponding positive nat
+
+    oValueConvertCharToString	% Top value is a char(string). Convert to string
+
+    oValueReplaceNonManifest	% replace the top value with a nonmanifest
+
+    oValueReplaceUnionBodyNumber% replace the top value with the body number
+				% corresponding to the label value
+
+    oValueReplaceNil		% replace top value with nil
+
+    oValueAddValues		% second + top -> second; pop
+
+    oValueSubtractValues	% second - top -> second; pop
+
+    oValueMultiplyValues	% second * top -> second; pop
+
+    oValueDivValues		% second div top -> second; pop
+
+    oValueModValues		% second mod top -> second; pop
+
+    oValueNegate		% -top -> top
+
+    oValueChr			% chr(top) -> top
+
+    oValueOrd			% ord(top) -> top
+
+    oValueGreaterValues		% second > top -> top
+
+    oValueLessValues		% second < top -> top
+
+    oValueEqualValues		% second = top -> top
+
+    oValueNot			% not top -> top
+
+    oValueLogicalAndValues	% second LAND top -> top
+
+    oValueLogicalOrValues	% second LOR top -> top
+
+    oValueLogicalXorValues	% second LXOR top -> top
+
+    oValueLogicalShiftRightValues % second >> top -> top
+
+    oValueLogicalShiftLeftValues % second << top -> top
+
+    oValueSetDifference		% second - top -> top
+
+    oValueSetIntersection	% second * top -> top
+
+    oValueSetUnion		% second + top -> top
+
+    oValueSetXor		% second xor top -> top
+
+    oValueStringConcatenate	% second + top -> second; pop  (both strings)
+
+    oValueTypeSetAll		% using top type, push a set constant covering
+				% the range specified
+
+    oValueTypeSetCount		% using the count in the top of the count stack
+				% and the top type stack entry, build a set
+				% covering the range specified by the type
+				% using the top count values in the value stack
+
+    oValuePop			% pop stack
+
+    oValuePopAndChooseKind >> ValueKinds
+				% pop and choose on the kind
+
+    oValueChooseLegalRangeValues >> Boolean
+				% returns yes if the second from top
+				% value is less than or equal to the top
+				% value
+
+    oValueChooseLegalSubstringValue >> Boolean
+				% returns yes if the top value is legal for
+				% substring(value).  Second value is 1.  Third
+				% value is string length.
+
+    oValueChooseLegalSubstringValues >> Boolean
+				% returns yes if the second from top
+				% value is no more than one greater than the
+				% top value (Trust me, thats what the TURING
+				% REPORT says...)
+
+    oValueChooseLegalSetRangeValues >> Boolean
+				% returns yes if the top two values are legal
+				% set ranges
+
+    oValueChooseIllegalIntNatRange >> Boolean
+				% returns yes if the lower bound is negative
+				% and the upper bound is in nat range
+
+    oValueChooseInTypeRange >> Boolean
+				% returns yes if the top value
+				% is manifest and in the range of the
+				% top type in the Type Stack
+
+    oValueChooseKind >> ValueKinds
+				% choose on the kind of the top value
+
+    oValueChooseLeftKind >> ValueKinds
+				% choose on the kind of the second
+				% from top value
+
+    oValueChooseSameValues >> Boolean
+				% returns yes if the top two values
+				% are the same
+
+    oValueChooseZero >> Boolean
+				% returns yes if the top value is
+				% zero
+
+    oValueChooseNonNegative >> Boolean
+				% returns yes if top value is non-negative
+
+    oValueSwapValues;		% swap the top two values
+
+type SubstringKind:
+    substringStar
+    substringStarMinus
+    substringExpn
+    substringNone;
+
+mechanism SubstringMech:
+    % The Substring Mechanism is used to determine the types of the string
+    % substring operands.
+    % It is a stack structure since substrings may nest.
+
+    oSubstringPushNew		% start a new substring
+
+    oSubstringPop		% pop the stack
+
+    oSubstringSetLeftKind(SubstringKind)
+				% Enter the left operand kind
+
+    oSubstringSetRightKind(SubstringKind)
+				% Enter the right operand kind
+
+    oSubstringChooseLeftKind >> SubstringKind
+				% return the kind of the left operand
+    ;
+
+mechanism LastSemantic:
+    lastSemanticOperation;
+
+
+rules
+
+Program:
+
+    % all stacks empty, tables filled with predefineds
+    %
+    % a program is:
+    %	[PARENT]*
+    %	program
+    %	    [[CHILD [PARENT] ] STUB moduleOrMonitor
+    %		[ BODY moduleOrMonitor] ]*
+    %	  | [[CHILD [PARENT] ] STUB subprogramHeader]*
+    %		[ IS subprogramImplementation]
+
+    oEmitLine
+    aFileName .aFileName	% sync on a new line to start
+    oEmitLine
+    oTypePushNew(tModule)	% typstk: module
+
+    % [PARENT]*
+    {[
+	| aParent:
+	    .aParent
+	| *:
+	    >
+    ]}
+
+    [
+	| aCompile:
+	    .aCompile
+	    oTypeEnterAttribute(taCompile)
+	    oContextSet(cCompile)
+	| *:
+	    oContextClear(cCompile)
+    ]
+    @OptGrant
+    @DclsAndStmts
+    oTypePop
+    .aEndOfFile;
+
+DclsAndStmts:
+    {[ @DclOrStmt
+	| no:	>	% not a true dcl or stmt (probably
+			    % an end delimiter).
+	| *:
+    ]}
+    ;
+
+DclOrStmt >>Boolean:		% return yes iff a true declaration or
+				% statement was parsed.
+    [
+	| aConst:	@ConstDcl
+	| aVar:		@VarDcl
+	| aCondition:
+	    % dummy for allocator
+	    .aCondition
+	    aVar
+	    @VarDcl
+	| aType:	@TypeDcl
+	| aBind:	@BindDcl
+	| aExternal:
+	    [
+		| aProcedure:	@ExternalProcDcl
+		| aFunction:	@ExternalFcnDcl
+		| aVar:
+		    .aExternal
+		    @VarDcl
+		| aExternalAddress:
+		    .aExternal
+		    .aExternalAddress
+		    @CompileTimeExpn
+		    @ResolveType
+		    [ oTypePopAndChooseKind
+			| tString, tInt, tChar, tCharString, tNat,
+			  tNotFound:
+			| *:
+			    #eExternalAddressWrongType
+		    ]
+		    oValuePop
+		    aVar
+		    @VarDcl
+	    ]
+	| aForward:
+	    [
+		| aProcedure:	@ForwardProcDcl
+		| aFunction:	@ForwardFcnDcl
+	    ]
+	| aProcedure:	@ProcDcl
+	| aFunction:	@FcnDcl
+	| aBody:
+	    [
+		| aModule:	@ModuleBody
+		| aMonitor:	@MonitorBody
+		| *:		@BodyDcl
+	    ]
+	| aModule:	@ModuleDcl
+	| aMonitor:	@MonitorDcl
+	| aProcess:	@ProcessDcl
+	| aChild:	@ChildDcl
+	| aStub:	@StubDcl
+	| *:
+	    [ @Stmt
+		| no:	>> no
+		| *:
+	    ]
+    ]
+    oEmitLine
+    >> yes
+    ;
+
+DclsInStub:
+    {
+	[
+	    | aConst:
+		@ConstDclNoSymbolPop
+		[ oSymbolChooseKind
+		    | sCompileTimeConstant:
+		    | *:
+			#eStubConstantMustBeCompileTime
+		]
+		oSymbolPop
+	    | aType:	@TypeDcl
+	    | aExternal:
+		[
+		    | aProcedure:	@ExternalProcDcl
+		    | aFunction:	@ExternalFcnDcl
+		]
+	    | aProcedure:	@ProcedureStub
+	    | aFunction:	@FunctionStub
+	    | aVar:		@VarDcl		% only collection declaration
+	    | aChild:		@ChildDcl
+	    | *:
+		>
+	]
+	oEmitLine
+    }
+    ;
+
+ChildDcl:
+    .aChild
+    [
+	| aParent:
+	    .aParent
+	| *:
+    ]
+    [
+	| aCompile:
+	    .aCompile
+	    oContextSet(cCompile)
+	| *:
+	    oContextClear(cCompile)
+    ]
+    [
+	| aStub:
+	    @StubDcl
+	| aMissingStub:
+	    .aMissingStub
+	    aIdent
+	    oSymbolPush
+	    .aIdent oEmitSymbol
+	    oSymbolPop
+    ]
+    oContextClear(cCompile);
+
+
+%
+% Module stub, or subprogram stub
+%
+StubDcl:
+    .aStub
+    [
+	| aModule:	@ModuleStub
+	| aMonitor:	@MonitorStub
+	| aProcedure:	@ProcedureStub
+	| aFunction:	@FunctionStub
+    ];
+
+ModuleStub:
+    .aModule
+    aIdent
+    oSymbolPush
+    oSymbolEnterKind(sModule)
+    oTypePushNew(tModule)
+    [ oContextChoose(cCompile)
+	| yes:
+	    oTypeEnterAttribute(taCompile)
+	| *:
+    ]
+    oSymbolEnterType
+    .aIdent	oEmitSymbol
+    aIdentText
+    .aIdentText oEmitString
+    oSymbolPop
+
+    oScopePush
+    @OptExport
+    @DclsInStub
+    @ResolveOpaqueExports
+    oTypeEnterExportsScope
+    oScopePop
+
+    oTypePop
+    aEndModule
+    .aEndModule;
+
+
+MonitorStub:
+    .aMonitor
+    aIdent
+    oSymbolPush
+    oSymbolEnterKind(sMonitor)
+    oTypePushNew(tMonitor)
+    [ oContextChoose(cCompile)
+	| yes:
+	    oTypeEnterAttribute(taCompile)
+	| *:
+    ]
+    oSymbolEnterType
+    .aIdent	oEmitSymbol
+    aIdentText
+    .aIdentText oEmitString
+    oSymbolPop
+
+    oScopePush
+    @OptExport
+    @DclsInStub
+    @ResolveOpaqueExports
+    oTypeEnterExportsScope
+    oScopePop
+
+    oTypePop
+    aEndMonitor
+    .aEndMonitor;
+
+ModuleBody:
+    .aBody
+    .aModule
+    aIdent
+    oSymbolPush
+    .aIdent	oEmitSymbol
+    aIdentText
+    .aIdentText oEmitString
+    oTypePushSymbolType
+    oSymbolPop
+
+    % fix up the damn scopes
+    oScopePushTypeExports
+    @MakeOpaquesVisible
+    oScopePop
+
+    @OptGrant
+    @OptPre
+    @DclsAndStmts
+    @OptPost
+    aEndModule
+    oTypePop
+    .aEndModule
+
+    % re-fix up the damn scopes
+    oScopePushTypeExports
+    @MakeOpaquesInvisible
+    oScopePop;
+
+
+
+MonitorBody:
+    .aBody
+    .aMonitor
+    aIdent
+    oSymbolPush
+    .aIdent	oEmitSymbol
+    aIdentText
+    .aIdentText oEmitString
+    oSymbolEnterKind(sMonitor)
+    oTypePushSymbolType
+    oSymbolPop
+    [
+	| aMonitorPriority:
+	    .aMonitorPriority
+	    @Expn
+	    @ResolveType
+	    [ oTypePopAndChooseKind
+		| tInt, tNat:
+		| *:
+		    #eDeviceMonitorPriorityMustBeInt
+	    ]
+	    oValuePop
+	| *:
+    ]
+    % fix up the damn scopes
+    oScopePushTypeExports
+    @MakeOpaquesVisible
+    oScopePop
+
+    @OptGrant
+    @OptPre
+    @DclsAndStmts
+    @OptPost
+    oTypePop
+    aEndMonitor
+    .aEndMonitor
+
+    % re-fix up the damn scopes
+    oScopePushTypeExports
+    @MakeOpaquesInvisible
+    oScopePop;
+
+ProcedureStub:
+    .aProcedure
+    aIdent
+    oSymbolPush
+    [ oSymbolChooseKind
+	| sProcedure:
+	    % this is a re-declaration of a higher level unqualified routine.
+	    % Check that the formal types are the same
+	    oSymbolEnterKind(sProcedure)
+	    .aIdent	oEmitSymbol
+	    aIdentText
+	    .aIdentText oEmitString
+	    oEmitLine
+	    oTypePushSymbolType		% old type
+	    oTypePushNew(tProcedure)
+	    oSymbolEnterType
+	    @SubprogramParameters	% old type, new type
+	    [ @EquivalentSubprograms
+		| no:
+		    #eRedeclarationOfStubSubprogramHasDifferentFormals
+		| *:
+	    ]
+	    oTypeSwapTypes
+	    oTypePop
+	| *:
+	    oSymbolEnterKind(sProcedure)
+	    .aIdent	oEmitSymbol
+	    aIdentText
+	    .aIdentText oEmitString
+	    oEmitLine
+	    oTypePushNew(tProcedure)
+	    oSymbolEnterType
+	    @SubprogramParameters
+    ]
+    oEmitLine
+    [
+	| aIs:
+	    % This is the implementation of a procedure stub
+	    .aIs
+	    @OptPre
+	    @OptInit
+	    @OptPost
+	    @OptHandler
+	    @DclsAndStmts
+	    aEndSubprogramBody
+	    .aEndSubprogramBody
+	| *:
+    ]
+    oSymbolPop
+    oTypePop;
+
+FunctionStub:
+    .aFunction
+    aIdent
+    oSymbolPush
+    [ oSymbolChooseKind
+	| sFunction:
+	    % this is a re-declaration of a higher level unqualified routine.
+	    % Check that the formal types are the same
+	    oSymbolEnterKind(sFunction)
+	    .aIdent	oEmitSymbol
+	    aIdentText
+	    .aIdentText oEmitString
+	    oEmitLine
+	    oTypePushSymbolType		% old type
+	    oTypePushNew(tFunction)
+	    oSymbolEnterType
+	    @SubprogramParameters	% old type, new type
+	    @ResultVariable		% leave result symbol on stack
+	    [ @EquivalentTypes
+		| no:
+		    #eRedeclarationOfStubSubprogramHasDifferentFormals
+		| *:
+	    ]
+	    oTypeSwapTypes		% new, old
+	    oTypePop			% new
+	| *:
+	    oSymbolEnterKind(sFunction)
+	    .aIdent	oEmitSymbol
+	    aIdentText
+	    .aIdentText oEmitString
+	    oEmitLine
+	    oTypePushNew(tFunction)
+	    oSymbolEnterType
+	    @SubprogramParameters
+	    @ResultVariable		% leave result symbol on stack
+    ]
+    oEmitLine
+    oSymbolPop				% return symbol
+    oContextSet(cFunction)
+
+    [
+	| aIs:
+	    % This is the implementation of a function stub
+	    .aIs
+	    @OptPre
+	    @OptInit
+	    @OptPost
+	    @OptHandler
+	    @DclsAndStmts
+	    aEndSubprogramBody
+	    .aEndSubprogramBody
+	| *:
+    ]
+    oContextClear(cFunction)
+    oSymbolPop
+    oTypePop;
+
+ConstDcl:
+    % Enters and leaves with the stacks intact and the new const
+    % in the symbol,type,etc. tables
+    @ConstDclNoSymbolPop
+    oSymbolPop;
+
+
+ConstDclNoSymbolPop:
+    % Enters and leaves with the stacks intact and the new const
+    % in the symbol,type,etc. tables, except that the symbol is still on top
+    [
+	| aPervasive:
+	    oContextSet(cPervasive)
+	| *:
+	    oContextClear(cPervasive)
+    ]
+    [
+	| aRegister:
+	    oContextSet(cRegister)
+	| *:
+	    oContextClear(cRegister)
+    ]
+
+    aIdent
+    oSymbolPush
+    oSymbolEnterKind(sRuntimeConstant)		% assume it is a run time
+						% constant and correct later
+    [ oContextChoose(cRegister)
+	| yes:
+	    oSymbolEnterAttribute(saRegister)
+	| *:
+    ]
+    aIdentText
+    oSaveIdentText
+
+    oEmitBufferPush
+    [
+	| aType:
+	    .aType
+	    @TypeSpec		% typstk: ...,const
+	    oSymbolEnterType	% symstk: ...,const
+	    [
+		| aInit:
+		    oEmitBufferPushDirect       % must emit aConst
+		    .aConst                     % and identifier tokens
+		    [ oContextChoose(cPervasive)
+			| yes:
+			    .aPervasive
+			| *:
+		    ]
+		    [ oContextChoose(cRegister)
+			| yes:
+			    .aRegister
+			| *:
+		    ]
+		    .aIdent		% before rest of stream
+		    oEmitSymbol
+		    .aIdentText
+		    oEmitSavedIdentText
+		    oEmitBufferPopDirect
+		    oEmitBufferEmit
+		    oEmitBufferPop		% cannot buffer init's
+		    @InitializingValueList	% doesn't affect typstk
+		    oEmitBufferPush
+		| *:
+		    @ConstantValue		% typstk: ...,constType
+		    [ oSymbolChooseKind
+			| sCompileTimeConstant:
+			| sRunTimeConstant:
+			    oEmitBufferPushDirect	% must emit aConst
+			    .aConst			% and identifier tokens
+			    [ oContextChoose(cPervasive)
+				| yes:
+				    .aPervasive
+				| *:
+			    ]
+			    [ oContextChoose(cRegister)
+				| yes:
+				    .aRegister
+				| *:
+			    ]
+			    .aIdent		% before rest of stream
+			    oEmitSymbol
+			    .aIdentText
+			    oEmitSavedIdentText
+			    oEmitBufferPopDirect
+			    oEmitBufferEmit
+		    ]
+	    ]
+	| *:
+	    oTypePushBuiltin(tNotFound)	% typstk: ...,notFound
+	    oSymbolEnterType
+	    @ConstantValue		% typstk: ...,expn
+	    oSymbolEnterType			% actual type
+	    [ oSymbolChooseKind
+		| sCompileTimeConstant:
+		| sRunTimeConstant:
+		    oEmitBufferPushDirect	% must emit aConst
+		    .aConst			% and identifier tokens
+		    [ oContextChoose(cPervasive)
+			| yes:
+			    .aPervasive
+			| *:
+		    ]
+		    [ oContextChoose(cRegister)
+			| yes:
+			    .aRegister
+			| *:
+		    ]
+		    .aIdent			% before rest of stream
+		    oEmitSymbol
+		    .aIdentText
+		    oEmitSavedIdentText
+		    .aType			% must also create the type
+		    oTypePushSymbolType
+		    [ oTypeChooseKind
+			| tIntNat:
+			    oTypeReplaceBuiltin(tInt)
+			    oSymbolEnterType
+			| *:
+		    ]
+		    @DetermineTypeAndEmit	% and emit it
+		    oTypePop
+		    oEmitBufferPopDirect
+		    oEmitBufferEmit
+	    ]
+    ]
+    oEmitBufferPop
+    oTypePop;
+
+DetermineTypeAndEmit:
+    % Enters and leaves with the variable or constant type on the top
+    % of the type stack.  Makes a copy of the type before resolving it.
+    oTypeCopy
+    @ResolveType
+    [ oTypePopAndChooseKind
+	| tChar, tCharString:
+	    oEmitTypeTop(tChar)
+	| tInt:
+	    .aInt
+	| tNat:
+	    .aNat
+	| tReal:
+	    .aReal
+	| tBoolean:
+	    .aBoolean
+	| tString:
+	    .aString
+	| tSet:
+	    oEmitTypeTop(tSet)
+	| tEnumeratedRange:
+	    oEmitTypeTop(tEnumeratedRange)
+	| *:
+	    .aNonScalar
+    ];
+
+
+DetermineTypeAndEmitForInitializingValue:
+    % Enters and leaves with the variable or constant type on the top
+    % of the type stack
+    [ oTypeChooseKind
+	| tNat, tSet, tNat4, tEnumeratedRange:
+	    .aNat
+	| tChar:
+	    .aChar
+	| tInt, tInt4, tIntNat, tAddressInt:
+	    .aInt
+	| tSubrange:
+	    % either int or char subrange
+	    oTypeCopy
+	    oTypeReplaceRootType
+	    [ oTypePopAndChooseKind
+		| tChar:
+		    .aChar
+		| *:
+		    .aInt
+	    ]
+	| tEnumeratedElement:
+	    oTypeReplaceRootType
+	    .aNat
+	| tReal, tReal8:
+	    .aReal
+	| tBoolean:
+	    .aBoolean
+	| tString, tCharString:
+	    .aString
+	| *:
+    ];
+
+ConstantValue:
+    % Called with the symbol on top of symstk and the symbol type on typstk
+    % Exits with symbol on symstk and correct type for symbol on top of typstk
+    @DeclarationValue			% typstk: ...,dcl,expn
+    oTypePop
+    [ oValueChooseKind
+	| vRunTime:
+	| *:
+	    [ oTypeChooseKind
+		| tReal:
+		    [ oValueChooseKind
+			| vInteger:
+			    oValueConvertIntToReal
+			| *:
+		    ]
+		| *:
+	    ]
+	    oSymbolEnterKind(sCompileTimeConstant)	% compile time constant
+	    oSymbolEnterValue
+	    [ @ValueInRange
+		| yes, maybe:
+		| *:
+		    #eConstantValueOutOfRange
+	    ]
+    ]
+    oValuePop;
+
+DeclarationValue:
+    % Enters with dcl'n symbol on symstk and type on typstk
+    % Exits with type for dcl'n second on typstk.  This might be
+    % the expn type or the declared type if there was one
+
+    @Expn				% typstk: ...,dcl,expn
+					% valstk: ...,expn
+    [ @CompatibleTypes
+	| yes:
+	    oTypePushSymbolType		% typstk: ...,dcl,expn,dcl
+	    [ oTypeChooseKind
+		| tNotFound:
+		    oTypePop
+		    oTypeCopy		% typstk: ...,true_dcl,expn,dcl
+		| *:
+		    % replace the resolved type with the declared one
+		    oTypePop		% dcl, expn
+		    oTypeSwapTypes	% expn, dcl
+		    oTypePop		% expn
+		    oTypePushSymbolType	% expn, dcl
+		    oTypeSwapTypes	% dcl, expn
+		    oTypePushSymbolType	% dcl, expn, dcl
+	    ]
+	    [ oValueChooseKind
+		| vRunTime, vInteger:	% Compile time expn may be out of range
+		    @RangeCheck		% typstk: ...,true_dcl,expn,dcl
+		| *:
+	    ]
+	    oTypePop			% typstk: ...,true_dcl,expn
+	| *:
+	    [ oTypeChooseLeftKind
+		| tFlexChar:
+		    #eCannotInitializeFlexChars
+		| *:
+		    #eIncompatibleConstantValueType
+	    ]
+    ]
+    [ oTypeChooseLeftKind
+	| tNotFound:			% Type not explicitly defined
+	    oTypeSwapTypes		% typstk: ...,implicit_dcl,notFound
+	| *:
+    ];	% typstk: ...,dcl,expn_or_nil
+
+InitializingValueList:
+    % Enter and exit with type of item to be init'ed on top of typstk
+    .aInit
+    [ oTypeChooseKind
+	| tUnion:
+	    @UnionInit
+	| tArray:
+	    @ArrayInit
+	| tRecord:
+	    @RecordInit
+	| tFlexArray, tFlexChar:
+	    #eCannotInitializeFlexArrayOrChar
+	    @ExtraneousInitializingValues
+	| tNotFound:
+	    @ExtraneousInitializingValues
+	| *:
+	    #eIllegalInitType
+	    @ExtraneousInitializingValues
+    ]
+    .aEndInit;
+
+ExtraneousInitializingValues:	% Consumes tokens without changing stacks
+    {[
+	| aEndInit:
+	    >
+	| aInit:
+	    .aInit
+	    @ExtraneousInitializingValues
+	    .aEndInit
+	| *:
+	    @Expn
+	    oTypePop
+	    oValuePop
+    ]};
+
+ArrayInit:
+    % Entry and exit.  array type on top of stack
+
+    oValuePush(viOne)	% valstk: ...,1
+    oCountPushTypeArrayNumberOfIndices
+    {
+	[ oCountChooseZero
+	    | yes: >
+	    | *:
+	]
+	oTypePushCountIndexType		% typstk: ...,array,index_i
+	[ oTypeChooseKind
+	    | tSubrange, tEnumeratedRange:
+		oValuePushTypeRangeValues	% valstk: prevNum,lwb_i,upb_i
+		oTypePop			% typstk: array
+		[ oValueChooseKind
+		    | vChar:
+			% must convert to integers
+			oValueOrd
+			oValueSwapValues
+			oValueOrd
+			oValueSwapValues
+		    | *:
+		]
+		oValueSwapValues		% valstk: prevNum,upb_i,lwb_i
+		oValueSubtractValues		% valstk: prevNum,diff
+		oValuePush(viOne)		% valstk: prevNum,diff,1
+		oValueAddValues			% valstk: prevNum,numElem
+	    | *:
+		% error case
+		oTypePop
+		oValuePop
+		oValuePush(viZero)
+		>
+	]
+	oValueMultiplyValues		% valstk: ...,numElem*prevElem
+	oCountDecrement
+    }
+    % valstk:	...,totalElemInArray
+    oCountPop
+    [ oValueChooseKind
+	| vInteger:
+	    oCountPushValue
+	    oValuePop
+	| *:	% Can't init a flex array
+	    #eIllegalInitType
+	    oValuePop
+	    @ExtraneousInitializingValues
+	    >>
+    ]
+    % valstk:	...,totalElemInArray
+    {
+	oTypePushComponentType	% typstk: ...,array,elem
+	[ oCountChooseZero
+	    | yes:
+		>		% normal exit or too many values
+	    | *:
+	]
+	[
+	    | aInit:
+		@InitializingValueList
+	    | aEndInit:
+		>		% too few values
+	    | *:
+		@InitializingValue
+		oValuePop
+	]
+	oCountDecrement
+	oTypePop		% typstk: ...,array
+    }
+				% typstk: ...,array,elem_resolved
+    [ oCountChooseZero
+	| yes:		% normal or too many
+	    [
+		| aEndInit:	% normal
+		| *:
+		    #eTooManyInitElements
+		    @ExtraneousInitializingValues
+	    ]
+	| *:			% too few values
+	    #eTooFewInitElements
+    ]
+    oTypePop
+    oCountPop;
+
+RecordInit:
+    % Enter and exit with record type on top of typstk
+    oCountPushZero
+    {					% typstk: ...,record
+	oCountIncrement
+	oScopePushTypeFields		% scostk: ...,record
+	oSymbolPushCountScope		% symstk: ...,record,field
+	oScopePop			% scostk: ...
+	oTypePushSymbolType		% typstk: ...,record,field
+	[ oSymbolChooseKind
+	    | sNotFound:	% last element in scope
+		>
+	    | *:
+	]
+	[
+	    | aInit:
+		@InitializingValueList
+	    | aEndInit:
+		>		% maybe too few init values
+	    | *:
+		@InitializingValue
+		oValuePop
+	]
+	oTypePop
+	oSymbolPop
+    }
+    oTypePop			% typstk: ...,record
+    oCountPop
+    % loop will always exit with the last symbol still on the stack
+    [ oSymbolPopAndChooseKind	% symstk: ...,record
+	| sNotFound:		% normal or too many
+	    [
+		| aEndInit:	% normal
+		| *:
+		    #eTooManyInitElements
+		    @ExtraneousInitializingValues
+	    ]
+	| *:
+	    #eTooFewInitElements
+    ];
+
+UnionInit:
+    % Enter and exit with union type on top of typstk
+    .aIdent
+    oEmitSymbol			% for allocator to handle unions
+    oScopePushTypeFields	% scostk: ...,union
+    oCountPushZero
+    oCountIncrement
+    oSymbolPushCountScope	% symstk: ...,union,tag
+    [
+	| aInit:
+	    #eMissingUnionInitTagValue
+	    @ExtraneousInitializingValues
+	    oSymbolPop
+	    aEndInit
+	| aEndInit:
+	    #eTooFewInitElements
+	    oSymbolPop
+	| *:
+	    oTypePushSymbolType	% typstk: ...,union,tag
+	    @InitializingValue	% valstk: ...,tag
+	    oSymbolPop		% symstk: ...,union
+	    oTypePop		% ...,union
+	    [ oTypeUnionTagValueLegal
+		| no:
+		    #eIllegalUnionInitTagValue
+		    @ExtraneousInitializingValues
+		| *:
+		    oValueReplaceUnionBodyNumber% valstk: ...,body
+		    {
+			oCountIncrement
+			oSymbolPushCountScope	% symstk: ...,union,field
+			[ oSymbolChooseKind
+			    | sNotFound:	% last element in scope
+				>
+			    | *:
+			]
+			[ oSymbolBodySameAsValue
+			    | yes:
+				oTypePushSymbolType % typstk: ...,union,field
+				[
+				    | aInit:
+					@InitializingValueList
+				    | aEndInit:
+					oTypePop
+					>	% maybe too few init values
+				    | *:
+					@InitializingValue
+					oValuePop
+				]
+				oTypePop	% typstk: ...,union
+			    | *:
+				% not in this body, ignore it
+			]
+			oSymbolPop		% symstk: ...,union
+		    }
+
+		    % loop will always exit with the last symbol
+		    %  still on the stack
+		    [ oSymbolPopAndChooseKind	% symstk: ...,union
+			| sNotFound:		% normal or too many
+			    [
+				| aEndInit:	% normal
+				| *:
+				    #eTooManyInitElements
+				    @ExtraneousInitializingValues
+			    ]
+			| *:
+			    #eTooFewInitElements
+		    ]
+	    ]
+	    oValuePop
+    ]
+    oCountPop
+    oScopePop;
+
+InitializingValue:
+    % Enters with typstk: ...,init,elem
+    % Exits with elem resolved
+    oTypeCopy		% typstk: ...,initType,elem,elem
+    oEmitBufferPush
+    @CompileTimeExpn	% typstk: ...,init,elem,elem,expn
+    oEmitBufferPop
+    [ @CompatibleTypes
+	| yes:
+	    oTypePop
+	    oTypePop	% typstk: ...,init,elem
+	    [ @ValueInRange
+		| yes, maybe:
+		| *:
+		    #eInitValueNotInRange
+	    ]
+	| *:
+	    #eIncompatibleInitValue
+	    oTypePop
+	    oTypePop	% typstk: ...,init,elem
+    ]
+    @DetermineTypeAndEmitForInitializingValue
+    oTypeCopy		% typstk: ...,init,elem,elem
+    @ResolveType	% typstk: ...,init,elem,elem*
+    [ oTypeChooseKind
+	| tString, tChar, tCharString:
+	    [ oValueChooseKind
+		| vString, vChar:
+		    [ oTypeChooseKind
+			| tString:
+			    [ oValueChooseKind
+				| vChar:
+				    oValueConvertCharToString
+				| *:
+			    ]
+			| *:
+		    ]
+		    oEmitManifestValue
+		    oValuePushStringLiteralLength
+					% For comparison with type length
+		    oTypeSwapTypes
+		    oValuePushStringLength
+		    oTypeSwapTypes
+		    % Check for string constant too big to fit
+		    [ oValueChooseLegalRangeValues
+			| yes:
+			| *:
+			    #eInitStringValueTooBigToFit
+		    ]
+		    oValuePop
+		    oValuePop
+		| *:
+		    oEmitManifestValue
+	    ]
+	| tReal:
+	    [ oValueChooseKind
+		| vInteger:
+		    oValueConvertIntToReal
+		| *:
+	    ]
+	    oEmitManifestValue
+	| *:
+	    oEmitManifestValue
+    ]
+    oTypeSwapTypes		% typstk: ...,init,elem*,elem
+    oTypePop			% typstk: ...,init,elem*
+    oEmitLine;
+
+VarDcl:
+    .aVar
+    [
+	| aRegister:
+	    .aRegister
+	    oContextSet(cRegister)
+	| *:
+	    oContextClear(cRegister)
+    ]
+    oCountPushZero
+    {
+	[
+	    | aIdent:
+	    | *:
+		>
+	]
+	oSymbolPush
+	oSymbolEnterKind(sVariable)
+	[ oContextChoose(cRegister)
+	    | yes:
+		oSymbolEnterAttribute(saRegister)
+	    | *:
+	]
+	.aIdent	oEmitSymbol
+	aIdentText
+	.aIdentText oEmitString
+	oCountIncrement
+    }
+    [
+	| aType:
+	    .aType
+	    [ @CheckFlexArrayOrChar
+		| wasFlex, wasntFlex:	% processed by check rule
+		| *:
+		    @TypeSpec
+	    ]
+	    oSymbolEnterType		% symstk: ...,var-list
+	    [
+		| aVarInit:
+		    .aVarInit
+		    oTypeCopy
+		    @InitialValue	% typstk: ...,var,expn
+		    oTypePop		% typstk: ...,var
+		| aInit:
+		    @InitializingValueList
+		| *:
+	    ]
+	| aVarInit:
+	    oTypePushBuiltin(tNotFound)
+	    oSymbolEnterType	% give a type to the top entry in the symStk
+	    oEmitBufferPush	% Must determine and emit type info first
+	    .aVarInit
+	    @InitialValue
+	    oSymbolEnterType	% correct the entry of the top symbol stack
+	    oEmitBufferPushDirect	% Must emit type to output stream first
+	    .aType
+	    oTypePushSymbolType
+	    @DetermineTypeAndEmit
+	    oTypePop
+	    oEmitBufferPopDirect
+	    oEmitBufferEmit	% Now emit initializing expression
+	    oEmitBufferPop
+	| aCollection:
+	    @CollectionType		% typstk: ...,collection
+	    oTypePop			% typstk: ...
+	    oCountPop			% symstk: ...  (all popped by
+	    >>
+    ]
+    {[ oCountChooseZero		% Enter Type for all Symbols
+	| yes:	>
+	| *:
+	    oSymbolEnterType		% symstk: ...,var-list
+	    oSymbolPop			% symstk: ...,var-list
+	    oCountDecrement
+    ]}					% symstk: ...
+    oCountPop
+    oTypePop;				% typstk: ...
+
+CollectionType:
+    .aCollection
+    oTypePushNew(tCollection)		% typstk: ...,collection
+    oCountCopy
+    {					% symstk: ...,var-list
+	[ oCountChooseZero
+	    | yes:
+		>
+	    | *:
+		oSymbolEnterKind(sCollection)
+		oSymbolEnterType
+		oSymbolPop
+	]
+	oCountDecrement
+    }					% symstk: ...
+    oCountPop
+    [
+	| aUnchecked:
+	    .aUnchecked
+	| *:
+    ]
+    [
+	| aForward:
+	    .aForward
+	    aIdent
+	    oSymbolPush
+	    .aIdent	oEmitSymbol
+	    oSymbolEnterKind(sType)
+	    oSymbolEnterAttribute(saForward)
+	    oTypePushNew(tType)			% typstk: ...,coll.,fwd_type
+	    oTypeEnterAttribute(taForward)
+	    oSymbolEnterType
+	    oTypePop				% typstk: ...,coll.
+	    oTypePushSymbolType			% typstk: ...,coll.,fwd_type
+	    oSymbolPop				% symstk: ...
+	| *:
+	    @TypeSpec				% typstk: ...,coll.,coll_type
+    ]
+    oTypeEnterLeftComponentType
+    oTypePop;					% typstk: ...,collection
+
+
+InitialValue:
+    @DeclarationValue
+    oTypePop
+    [ oTypeChooseKind
+	| tIntNat:
+	    % coerce values that are integer to int.  This is the expected
+	    % behaviour
+	    oTypeReplaceBuiltin(tInt)
+	| *:
+    ]
+    oValuePop;
+
+CheckFlexArrayOrChar >> FlexCheck:
+    [
+	| aArray:
+	    .aArray
+	    oTypePushNew(tArray)
+	    oContextClear(cFlex)
+	    oTypeEnterFirstArrayIndex
+	    {
+		@PossibleFlexIndex
+		oTypeEnterArrayBound	    % adds indices to range list
+		oTypePop			% get rid of the index type
+		[
+		    | aEndArrayIndexList:
+			.aEndArrayIndexList
+			>
+		    | *:
+		]
+	    }
+	    oTypeEnterLastArrayIndex
+	    @TypeSpec
+	    oTypeEnterLeftComponentType
+	    oTypePop
+	    [ oContextChoose(cFlex)
+		| yes:
+		    oTypeEnterKind(tFlexArray)
+		    [
+			| aVarInit:
+			    #eCannotInitializeFlexArrayOrChar
+			    oEmitBufferPush
+			    @InitialValue
+			    oEmitBufferPop
+			| aInit:
+			    #eCannotInitializeFlexArrayOrChar
+			    @ExtraneousInitializingValues
+			| *:
+		    ]
+		    >> wasFlex
+		| *:
+		    >> wasntFlex
+	    ]
+	| aChar:
+	    .aChar
+	    [
+		| aStringSizeBound:
+		    .aStringSizeBound
+		    oEmitBufferPush
+		    @Expn
+		    @ResolveType
+		    [ oTypePopAndChooseKind
+			| tInt, tNat:
+			    [ oValueChooseKind
+				| vRuntime:
+				    oTypePushNew(tFlexChar)
+				    oTypeEnterStringBound
+				    oValuePop
+				    % must tell the allocator NOW
+				    oEmitBufferPushDirect
+				    .aNonManifest
+				    oEmitBufferPopDirect
+				    oEmitBufferEmit
+				    oEmitBufferPop
+				    >> wasFlex
+				| *:
+				    oTypePushNew(tCharString)
+				    oEmitBufferPop
+				    [ oValueChooseNonNegative
+					| yes:
+					    [ oValueChooseZero
+						| yes:
+						    #eCharLengthIllegal
+						| *:
+					    ]
+					| *:
+					    #eCharLengthIllegal
+				    ]
+			    ]
+			| tNotFound:
+			    oTypePushNew(tCharString)
+			    oEmitBufferPop
+			    oValuePop
+			    oValuePush(viOne)
+			| *:
+			    #eCharBoundMustBeAnIntegerExpn
+			    oTypePushNew(tCharString)
+			    oEmitBufferPop
+			    oValuePop
+			    oValuePush(viOne)
+		    ]
+		    oEmitManifestValue
+		    oTypeEnterStringBound
+		    oValuePop
+		    >> wasntFlex
+		| *:
+		    oTypePushBuiltin(tChar)
+		    >> wasntFlex
+	    ]
+	| *:
+	    >> wasntArrayNorChar
+    ];
+
+PossibleFlexIndex:
+    [
+	| aEnum:
+	    @EnumType
+	    @OptionalStorageSize
+	| aSubrange:
+	    @PossibleFlexSubrange
+	    @OptionalStorageSize
+	| aIdent:
+	    @NamedType
+	    [ oTypeChooseKind
+		| tSubrange, tEnumeratedRange:
+		| tNotFound:
+		    oTypeReplaceBuiltin(tInt)
+		| *:
+		    #eIllegalIndexType
+		    oTypeReplaceBuiltin(tInt)
+	    ]
+    ];
+
+
+PossibleFlexSubrange:
+    .aSubrange
+    oEmitBufferPush
+    @CompileTimeExpn
+    @ResolveType
+    [ oTypeChooseKind
+	| tInt, tNat, tEnumeratedRange, tChar:
+	| tNotFound:
+	    oTypeReplaceBuiltin(tInt)
+	    oValuePop
+	    oValuePush(viOne)
+	| *:
+	    #eIllegalSubrangeType
+	    oTypeReplaceBuiltin(tInt)
+	    oValuePop
+	    oValuePush(viOne)
+    ]
+    oEmitBufferPop		% Through away possibly wrong expn
+    oEmitManifestValue		% Emit manifest lower bound
+    oEmitBufferPush		% Buffer for possible non-manifest upper bound
+    @Expn
+    [ @CompatibleTypes
+	| yes:
+	    oTypePop
+	    [ oTypeChooseKind
+		| tEnumeratedRange, tInt, tNat, tChar:
+		| *:
+		    oTypeReplaceBuiltin(tInt)
+	    ]
+	    oTypePushNew(tSubrange)
+	    oTypeSwapTypes
+	    oTypeEnterLeftRootType
+	    oTypePop
+	    [ oValueChooseKind
+		| vRunTime:
+		    oContextSet(cFlex)
+		    oTypeEnterFlexRangeValues
+		    oEmitBufferPushDirect
+		    .aNonManifest		% must precede non-manifest upb
+		    oEmitBufferPopDirect
+		| *:
+		    oEmitBufferPop		% through away expn
+		    oEmitBufferPush		% and replace with
+		    oEmitManifestValue		% integerLit
+		    [ oValueChooseLegalRangeValues
+			| yes:
+			| *:
+			    #eIllegalRangeUpperBoundLessThanLower
+			    oValueSwapValues
+		    ]
+		    oTypeEnterRangeValues
+	    ]
+	| *:
+	    #eIncompatibleSubrangeTypes
+	    oTypePop
+	    oTypePop
+	    oTypePushBuiltIn(tSubrange)
+	    oValuePop
+	    oValuePush(viOne)
+    ]
+    oEmitBufferEmit
+    oEmitBufferPop
+    oValuePop
+    oValuePop;
+
+TypeDcl:
+    .aType
+    [
+	| aPervasive:
+	| *:
+    ]
+    aIdent
+    oSymbolPush
+    .aIdent	oEmitSymbol
+    oSymbolEnterKind(sType)
+    [
+	| aIdent:
+	    @NamedType			% typstk: ...,namedType
+	    @MakeNewTypeCopy
+	| *:
+	    @TypeSpec			% typstk: ...,Type
+	    [ oTypeChooseKind
+		| tSubrange, tArray, tRecord, tSet,
+		  tPointer, tUnion, tEnumeratedRange:
+		    % virgin type, no need to copy
+		| *:
+		    @MakeNewTypeCopy
+	    ]
+    ]
+    oTypePushSymbolType			% new, old
+    [ oTypeChooseKind
+	| tType:
+	    [ oTypeChooseAttribute(taForward)
+		| yes:
+		    % this was a forward type.  We test for Equivalent types
+		    % by testing for exact type indices.  We will copy the
+		    % information to the old type, and then pop the NEW type,
+		    % leaving the old type as the correct type.
+		    oTypeSwapTypes		% old, new
+		    oTypeCopyLeftType		% new, new
+		| *:
+	    ]
+	| *:
+    ]
+    oTypePop			% new
+    oSymbolEnterType
+    oSymbolPop				% symstk: ...
+    oTypePop;				% typstk: ...
+
+
+MakeNewTypeCopy:
+    % Create a new type table entry for a potentially Opaque
+    % type which is a copy of the top type in the type stack.
+
+    oTypePushNew(tNotFound)
+    oTypeSwapTypes
+    oTypeCopyLeftType
+    oTypePop;
+
+TypeSpec:
+    [
+	| aInt:
+	    .aInt oTypePushBuiltin(tInt)
+	    @OptionalStorageSize
+	| aNat:
+	    .aNat oTypePushBuiltin(tNat)
+	    @OptionalStorageSize
+	| aReal:
+	    .aReal oTypePushBuiltin(tReal)
+	    @OptionalStorageSize
+	| aBoolean:
+	    .aBoolean oTypePushBuiltin(tBoolean)
+	| aString:
+	    @StringType
+	| aChar:
+	    @CharType
+	| aAddressInt:
+	    .aAddressInt oTypePushBuiltin(tAddressInt)
+	| aEnum:
+	    @EnumType
+	    @OptionalStorageSize
+	| aSet:
+	    @SetType
+	| aRecord:
+	    @RecordType
+	| aUnion:
+	    @UnionType
+	| aPointer:
+	    @PointerType
+	| aSubrange:
+	    @SubrangeType
+	    @OptionalStorageSize
+	| aProcedure:
+	    @ProcedureType
+	| aFunction:
+	    @FunctionType
+	| aIdent:
+	    @NamedType
+	| aArray:
+	    @ArrayType
+	| aPacked:
+	    .aPacked
+	    [
+		| aArray:
+		    @ArrayType
+		| aRecord:
+		    @RecordType
+		| aUnion:
+		    @UnionType
+		| aSubrange:
+		    @SubrangeType
+		| aEnum:
+		    @EnumType
+	    ]
+	    oTypeEnterAttribute(taPacked)
+	| aCondition:
+	    @ConditionType
+    ];
+
+OptionalStorageSize:
+    [
+	| aStorageSize:
+	    .aStorageSize
+	    [ oTypeChooseKind
+		| tSubrange:
+		    oTypeCopy
+		    oTypeReplaceRootType
+		    [ oTypePopAndChooseKind
+			| tChar:
+			    #eStorageSizeOnCharSubrange
+			| *:
+		    ]
+		| *:
+	    ]
+	    @CompileTimeExpn
+	    @ResolveType
+	    [ oTypePopAndChooseKind
+		| tInt, tNat:
+		| *:
+		    #eStorageSizeMustBeInt
+		    oValuePop
+		    oValuePush(viZero)
+	    ]
+	    oTypeReplaceTypeWithSameKindAndStorageSize
+	    oValuePop
+	| *:
+    ];
+
+StringType:
+    .aString
+    [
+	| aStringSizeBound:
+	    oTypePushNew(tString)
+	    .aStringSizeBound
+	    [
+		| aStar:
+		    .aStar
+		    oValuePush(viNonManifest)
+		| *:
+		    oEmitBufferPush
+		    @CompileTimeExpn
+		    oEmitBufferPop
+		    @ResolveType
+		    [ oTypePopAndChooseKind
+			| tInt, tNat:
+			    oValuePush(viOne)
+			    oValueSwapValues
+			    [ oValueChooseLegalRangeValues
+				| yes:
+				    oValuePush(viDefaultStringSize)
+				    [ oValueChooseLegalRangeValues
+					 | yes:
+					 | *:
+					    #eStringLengthIllegal
+				    ]
+				    oValuePop
+				| *:
+				    #eStringLengthIllegal
+			    ]
+			    oValueSwapValues
+			    oValuePop
+			| tNotFound:
+			    oValuePop
+			    oValuePush(viOne)
+			| *:
+			    #eStringBoundMustBeAnIntegerExpn
+			    oValuePop
+			    oValuePush(viOne)
+		    ]
+		    oEmitManifestValue
+	    ]
+	    oTypeEnterStringBound
+	    oValuePop
+	| *:
+	    oTypePushBuiltin(tString)
+    ];
+
+CharType:
+    .aChar
+    [
+	| aStringSizeBound:
+	    .aStringSizeBound
+	    [
+		| aStar:
+		    .aStar
+		    oValuePush(viNonManifest)
+		    oTypePushNew(tFlexChar)
+		| *:
+		    oTypePushNew(tCharString)
+		    oEmitBufferPush
+		    @CompileTimeExpn
+		    oEmitBufferPop
+		    @ResolveType
+		    [ oTypePopAndChooseKind
+			| tInt, tNat:
+			    [ oValueChooseNonNegative
+				| yes:
+				    [ oValueChooseZero
+					| yes:
+					    #eCharLengthIllegal
+					| *:
+				    ]
+				| *:
+				    #eCharLengthIllegal
+			    ]
+			| tNotFound:
+			    oValuePop
+			    oValuePush(viOne)
+			| *:
+			    #eCharBoundMustBeAnIntegerExpn
+			    oValuePop
+			    oValuePush(viOne)
+		    ]
+		    oEmitManifestValue
+	    ]
+	    oTypeEnterStringBound
+	    oValuePop
+	| *:
+	    oTypePushBuiltin(tChar)
+    ];
+
+EnumType:
+    oTypePushNew(tEnumeratedRange)
+    .aEnum
+    oScopePush
+    oCountPushZero
+    {[
+	| aEndEnum:
+	    .aEndEnum
+	    >
+	| *:
+	    aIdent
+	    oSymbolPush
+	    oSymbolEnterKind(sEnumeratedElement)
+	    oTypePushNew(tEnumeratedElement)
+	    oTypeEnterEnumeratedElementRoot
+	    oSymbolEnterType
+	    oValuePushCount
+	    oSymbolEnterValue
+	    oValuePop
+	    oScopeEnterSymbol
+	    .aIdent oEmitSymbol
+
+	    oTypePop
+	    oSymbolPop
+	    oCountIncrement
+    ]}
+    oValuePush(viZero)
+    oValuePushCount		% is one too high!
+    oValuePush(viOne)
+    oValueSubtractValues
+    oCountPop
+    oTypeEnterRangeValues
+    oTypeEnterFieldsScope
+    oScopePop
+    oValuePop
+    oValuePop;
+
+
+SetType:
+    .aSet
+    oTypePushNew(tSet)
+    @IndexType
+    oTypeCopyLeftRangeValues
+    oTypeEnterSetBase
+    oTypePop
+    oValuePushTypeRangeValues
+    [ oValueChooseLegalSetRangeValues
+	| yes:
+	| *:
+	    #eIllegalSetBaseRange
+    ]
+    oValuePop
+    oValuePop;
+
+RecordType:
+    .aRecord
+    oTypePushNew(tRecord)
+    oScopePush                          %fields (for init)
+    oUnionBodyCountPushZero
+    {[
+	| aEndRecord:
+	    >
+	| *:
+	    @RecordElement
+    ]}
+    oUnionBodyCountPop
+    oTypeEnterFieldsScope
+    oScopePop
+    .aEndRecord;
+
+
+RecordElement:
+    oCountPushZero
+    {
+	[
+	    | aIdent:
+	    | *:
+		>
+	]
+	oSymbolPush
+	oSymbolEnterKind(sVariable)
+	oSymbolEnterUnionBodyCount
+	oScopeEnterSymbol
+	.aIdent	oEmitSymbol
+	oCountIncrement
+    }
+    aRecordElementType
+    .aRecordElementType
+    @TypeSpec
+    {
+	[ oCountChooseZero
+	    | yes:
+		>
+	    | *:
+		oSymbolEnterType
+		oSymbolPop
+	]
+	oCountDecrement
+    }
+    oCountPop
+    oTypePop
+    oEmitLine;
+
+UnionType:
+    .aUnion
+    oTypePushNew(tUnion)
+    aIdent
+    oSymbolPush
+    .aIdent	oEmitSymbol
+    oSymbolEnterAttribute(saTag)
+    oTypeEnterSymbol
+    aType
+    .aType
+    @IndexType
+    oSymbolEnterType
+    oSymbolEnterKind(sVariable)
+    oTypePop
+    oTypeEnterSymbol
+
+    aIdent			% Symbol for the map identifier
+    oSymbolPush
+    .aIdent	oEmitSymbol	% used by the allocator and coder
+    oSymbolPop
+
+    oUnionBodyCountPushZero
+    oUnionMapPush
+    oTypeEnterUnionMap
+    oScopePush
+    oScopeEnterSymbol		% first symbol is the tag
+    {
+	[
+	    | aEndUnion:
+		>
+	    | aLabel:
+		.aLabel
+		[
+		    | aOtherwise:
+			.aOtherwise
+			oValuePush(viNonManifest)
+			oUnionMapEnter
+			oValuePop
+			@OptUnionLabelBody
+		    | *:
+			{[
+			    | aEndExpressionList:
+				>
+			    | *:
+				oTypePushSymbolType		% Tag Type
+				oEmitBufferPush
+				@Expn
+				oEmitBufferPop
+				[ oValueChooseKind
+				    | vRunTime:
+					#eUnionLabelMustBeCompileTime
+					oValuePop
+					oValuePush(viOne)
+				    | vInteger:
+				    | *:
+					oValuePop
+					oValuePush(viOne)
+				]
+				[ @CompatibleTypes
+				    | yes:
+					oTypePushSymbolType
+					[ @ValueInRange
+					    | no:
+						#eUnionLabelValueNotInRange
+					    | *:
+					]
+					oTypePop
+				    | *:
+					#eUnionLabelIncompatibleType
+				]
+				oTypePop
+				oTypePop
+				oEmitManifestValue
+				oUnionMapEnter
+				oValuePop
+			]}
+			@OptUnionLabelBody
+		]
+	]
+    }
+    oUnionMapPop
+    oUnionBodyCountPop
+    oTypeEnterFieldsScope
+    oScopePop
+    oSymbolPop
+    .aEndUnion;
+
+OptUnionLabelBody:
+    oUnionBodyCountIncrement
+    [
+	| aUnionLabelBody:
+	    .aUnionLabelBody
+	    {[
+		| aEndUnionLabelBody:
+		    >
+		| *:
+		    @RecordElement
+	    ]}
+	    .aEndUnionLabelBody
+	| *:
+    ];
+
+PointerType:
+    .aPointer
+    oTypePushNew(tPointer)
+    aIdent
+    oSymbolPush
+    .aIdent	oEmitSymbol
+    oTypeEnterSymbol
+    oSymbolPop;
+
+
+SubrangeType:
+    .aSubrange
+    oEmitBufferPush
+    @CompileTimeExpn
+    @ResolveType
+    [ oTypeChooseKind
+	| tInt, tNat, tEnumeratedRange, tChar:
+	| tNotFound:
+	    oTypeReplaceBuiltin(tInt)
+	    oValuePop
+	    oValuePush(viOne)
+	| *:
+	    #eIllegalSubrangeType
+	    oTypeReplaceBuiltin(tInt)
+	    oValuePop
+	    oValuePush(viOne)
+    ]
+    @CompileTimeExpn		% low, upper
+    oTypeCopy			% low, upper, upperC
+    oTypeSwapSecondAndThirdTypes% upper, low, upperC
+    [ @CompatibleTypes
+	| yes:
+	    % type of a subrange is the type of its upper bound
+	    oTypePop		% upper, low
+	    oTypePop		% upper
+	    [ oTypeChooseKind
+		| tEnumeratedRange, tChar, tNat, tInt:
+		| tEnumeratedElement:
+		    oTypeReplaceRootType
+		| tIntNat:
+		    oTypeReplaceBuiltin(tInt)
+		| *:
+		    oTypeReplaceBuiltin(tInt)
+		    oValuePop
+		    oValuePush(viOne)
+	    ]
+	    oTypePushNew(tSubrange)	% upper, subr
+	    oTypeSwapTypes		% subr, upper
+	    oTypeEnterLeftRootType
+	    oTypePop			% subr
+	    [ oValueChooseIllegalIntNatRange
+		| no:
+		    [ oValueChooseLegalRangeValues
+			| yes:
+			| *:
+			    #eIllegalRangeUpperBoundLessThanLower
+			    oValueSwapValues
+		    ]
+		| *:
+		    #eIllegalIntNatSubrange
+	    ]
+	    oTypeEnterRangeValues
+	| *:
+	    #eIncompatibleSubrangeTypes
+	    oTypePop		% upper, low
+	    oTypePop		% upper
+	    oTypePop		%
+	    oTypePushBuiltIn(tSubrange)	% subr
+    ]
+    oEmitBufferPop
+    oValueSwapValues
+    oEmitManifestValue
+    oValuePop
+    oEmitManifestValue
+    oValuePop;
+
+ArrayType:
+    .aArray
+    oTypePushNew(tArray)
+    oTypeEnterFirstArrayIndex
+    {[
+	| aEndArrayIndexList:
+	    .aEndArrayIndexList
+	    >
+	| *:
+	    @IndexType
+	    oTypeEnterArrayBound
+	    oTypePop
+    ]}
+    oTypeEnterLastArrayIndex
+    @TypeSpec
+    oTypeEnterLeftComponentType
+    oTypePop;
+
+
+ConditionType:
+    .aCondition
+    [
+	| aPriority:
+	    .aPriority
+	    oTypePushNew(tCondition)
+	    oTypeEnterAttribute(taPriorityOrTimeoutCondition)
+	| aDeferred:
+	    .aDeferred
+	    oTypePushBuiltin(tCondition)
+	| aTimeout:
+	    .aTimeout
+	    oTypePushNew(tCondition)
+	    oTypeEnterAttribute(taPriorityOrTimeoutCondition)
+	| *:
+	    oTypePushBuiltin(tCondition)
+    ];
+
+IndexType:
+    [
+	| aEnum:
+	    @EnumType
+	    @OptionalStorageSize
+	| aSubrange:
+	    @SubrangeType
+	    @OptionalStorageSize
+	| aIdent:
+	    @NamedType
+	    [ oTypeChooseKind
+		| tSubrange, tEnumeratedRange:
+		| tNotFound:
+		    oTypeReplaceBuiltin(tSubrange)
+		| *:
+		    #eIllegalIndexType
+		    oTypeReplaceBuiltin(tSubrange)
+	    ]
+    ];
+
+
+NamedType:
+	% verifies that the current identifier is a type name, and leaves
+	% the associated type on the top of the type stack.  Symbol stack
+	% is left unchanged.
+    oSymbolPush				% symstk: ...,named_type
+    oTypePushSymbolType			% typstk: ...,named_type
+    @SurroundingModule
+    .aIdent	oEmitSymbol
+    oSymbolPop;				% symstk: ...
+
+ProcedureType:
+    .aProcedure
+    aIdent
+    oSymbolPush
+    oSymbolEnterKind(sProcedure)
+    .aIdent	oEmitSymbol
+    aIdentText
+    .aIdentText oEmitString
+    oEmitLine
+    oTypePushNew(tProcedure)
+    oSymbolEnterType
+    @SubprogramParameters
+    oEmitLine
+    oSymbolPop;
+
+
+FunctionType:
+    .aFunction
+    aIdent
+    oSymbolPush
+    oSymbolEnterKind(sFunction)
+    .aIdent	oEmitSymbol
+    aIdentText
+    .aIdentText oEmitString
+    oEmitLine
+    oTypePushNew(tFunction)
+    oSymbolEnterType
+    @SubprogramParameters
+    @ResultVariable			% leave result symbol on stack
+    oSymbolPop
+    oEmitLine
+    oSymbolPop;
+
+BindDcl:
+    .aBind
+    {
+	[
+	    | aEndBind:
+		>
+	    | *:
+	]
+	[
+	    | aVar:
+		.aVar
+		[
+		    | aRegister:
+			.aRegister
+		    | *:
+		]
+		aIdent
+		oSymbolPush				% symstk: ...,binder
+	    | *:
+		[
+		    | aRegister:
+			.aRegister
+		    | *:
+		]
+		aIdent
+		oSymbolPush				% symstk: ...,binder
+	]
+	oSymbolEnterKind(sVariable)
+
+	% register binds don't have saRegister, as they point contain addresses
+	.aIdent	oEmitSymbol
+	@BindReference					% binder, bound
+	oSymbolEnterType
+	oSymbolPop					%
+	oTypePop
+    }
+    .aEndBind;
+
+BindReference:
+    % post:  bound type on stacks
+    oContextClear(cPacked)
+    @VariableReference			% symstk: ...,binder,bound
+					% typstk: ...,bound
+    oValuePop
+    [ oContextChoose(cPacked)
+	| yes:
+	    #ePackedBind
+	| *:
+    ]
+    [ oSymbolChooseAttribute(saRegister)
+	| yes:
+	    #eRegisterBind
+	| *:
+    ]
+    [ oSymbolPopAndChooseKind
+	| sCompileTimeConstant:
+	    #eBindToCompileTimeConstant
+	| *:
+    ]
+    @OptAliasCheck;
+
+
+OptAliasCheck:
+    [
+	| aAliasCheck:
+	    .aAliasCheck
+	    {[
+		| aEndAliasCheck:
+		    .aEndAliasCheck
+		    >
+		| *:
+		    [
+			| aNoAlias:
+			    .aNoAlias
+			| aNoEnclosure:
+			    .aNoEnclosure
+		    ]
+		    aIntegerLit
+		    .aIntegerLit    oEmitInteger
+		    aIntegerLit
+		    .aIntegerLit    oEmitInteger
+	    ]}
+	| *:
+    ];
+
+ProcDcl:
+    .aProcedure
+    aIdent
+    oSymbolPush
+    oSymbolEnterKind(sProcedure)
+    .aIdent	oEmitSymbol
+    aIdentText
+    .aIdentText oEmitString
+    oEmitLine
+    oTypePushNew(tProcedure)
+    oSymbolEnterType
+    @SubprogramParameters
+    oEmitLine
+    @SubprogramBody
+    aEndSubprogramBody
+    .aEndSubprogramBody
+    oTypePop
+    oSymbolPop;
+
+ProcessDcl:
+    .aProcess
+    aIdent
+    oSymbolPush
+    oSymbolEnterKind(sProcess)
+    .aIdent	oEmitSymbol
+    aIdentText
+    .aIdentText oEmitString
+    oEmitLine
+    oTypePushNew(tProcess)
+    oSymbolEnterType
+    @SubprogramParameters
+    oEmitLine
+    [
+	| aProcessStackSize:
+	    .aProcessStackSize
+	    @CompileTimeExpn
+	    @ResolveType
+	    [ oTypePopAndChooseKind
+		| tInt, tNat:
+		| *:
+		    #eProcessStackSizeMustBeInt
+	    ]
+	    oValuePop
+	    oEmitLine
+	| *:
+    ]
+    @SubprogramBody
+    aEndSubprogramBody
+    .aEndSubprogramBody
+    oTypePop
+    oSymbolPop;
+
+ForwardProcDcl:
+    .aForward
+    .aProcedure
+    aIdent
+    oSymbolPush
+    oSymbolEnterKind(sProcedure)
+    oSymbolEnterAttribute(saForward)
+    .aIdent	oEmitSymbol
+    aIdentText
+    .aIdentText oEmitString
+    oEmitLine
+    oTypePushNew(tProcedure)
+    oTypeEnterAttribute(taForward)
+    oSymbolEnterType
+    @SubprogramParameters
+    oEmitLine
+    oTypePop
+    oSymbolPop;
+
+
+ExternalProcDcl:
+    .aExternal
+    .aProcedure
+    aIdent
+    oSymbolPush
+    oSymbolEnterKind(sProcedure)
+    .aIdent	oEmitSymbol
+    aIdentText
+    .aIdentText oEmitString
+    [
+	| aExternalAddress:
+	    .aExternalAddress
+	    aStringLit
+	    .aStringLit oEmitString
+	| *:
+    ]
+    oEmitLine
+    oTypePushNew(tProcedure)
+    oSymbolEnterType
+    @SubprogramParameters
+    oEmitLine
+    oTypePop
+    oSymbolPop;
+
+FcnDcl:
+    .aFunction
+    aIdent
+    oSymbolPush
+    oSymbolEnterKind(sFunction)
+    .aIdent	oEmitSymbol
+    aIdentText
+    .aIdentText oEmitString
+    oEmitLine
+    oTypePushNew(tFunction)
+    oSymbolEnterType
+    @SubprogramParameters
+    @ResultVariable			% leave result symbol on stack
+    oSymbolPop
+    oEmitLine
+    oContextSet(cFunction)
+    @SubprogramBody
+    oContextClear(cFunction)
+    aEndSubprogramBody
+    .aEndSubprogramBody
+    oTypePop
+    oSymbolPop;
+
+
+ForwardFcnDcl:
+    .aForward
+    .aFunction
+    aIdent
+    oSymbolPush
+    oSymbolEnterKind(sFunction)
+    .aIdent	oEmitSymbol
+    aIdentText
+    .aIdentText oEmitString
+    oEmitLine
+    oTypePushNew(tFunction)
+    oSymbolEnterType
+    @SubprogramParameters
+    @ResultVariable
+    oSymbolPop				% return value symbol
+    oEmitLine
+    oTypePop
+    oSymbolPop;
+
+ExternalFcnDcl:
+    .aExternal
+    .aFunction
+    aIdent
+    oSymbolPush
+    oSymbolEnterKind(sFunction)
+    .aIdent	oEmitSymbol
+    aIdentText
+    .aIdentText oEmitString
+    [
+	| aExternalAddress:
+	    .aExternalAddress
+	    aStringLit
+	    .aStringLit oEmitString
+	| *:
+    ]
+    oEmitLine
+    oTypePushNew(tFunction)
+    oSymbolEnterType
+    @SubprogramParameters
+    @ResultVariable
+    oSymbolPop				% return value symbol
+    oEmitLine
+    oTypePop
+    oSymbolPop;
+
+ResultVariable:
+    aIdent
+    oSymbolPush
+    oSymbolEnterKind(sRuntimeConstant)
+    .aIdent	oEmitSymbol
+    aType
+    .aType
+    @TypeSpec
+    oSymbolEnterType
+    oTypeEnterLeftResultType
+    oTypePop;
+
+
+SubprogramParameters:
+    oScopePush
+    [
+	| aSubs:
+	    .aSubs
+	    {[
+		| aEndSubs:
+		    .aEndSubs
+		    >
+		| *:
+		    @ParameterDeclaration
+		    oEmitLine
+	    ]}
+	| aInterruptNumber:
+	    % interrupt procedure
+	    .aInterruptNumber
+	    @Expn
+	    @ResolveType
+	    [ oTypePopAndChooseKind
+		| tInt, tNat:
+		    [ oValueChooseNonNegative
+			| yes:
+			| *:
+			    #eInterruptProcedureNumberMustBeNat
+		    ]
+		| *:
+		    #eInterruptProcedureNumberMustBeNat
+	    ]
+	    oValuePop
+	| *:
+    ]
+    oTypeEnterFormalsScope
+    oScopePop;
+
+ParameterDeclaration:
+    [
+	| aVar:
+	    .aVar
+	     [
+		| aRegister:
+		    .aRegister
+		| *:
+	    ]
+	    oCountPushZero
+	    {
+		[
+		    | aIdent:
+			oSymbolPush
+		    | *:
+			>
+		]
+		.aIdent	oEmitSymbol
+		oSymbolEnterKind(sVariable)
+		% var references aren't registers, as they are addresses!
+
+		oScopeEnterSymbol
+		oCountIncrement
+	    }
+	    aType
+	    .aType
+	    @ParameterType
+	    {
+		[ oCountChooseZero
+		    | yes:	>
+		    | *:
+			oSymbolEnterType
+			[ oTypeChooseAttribute(taTypeCheat)
+			    | yes:
+				oSymbolEnterAttribute(saTypeCheat)
+			    | *:
+			]
+			oSymbolPop
+		]
+		oCountDecrement
+	    }
+	    oTypeClearAttribute(taTypeCheat)
+	    oCountPop
+	    oTypePop
+	| aProcedure:
+	    .aProcedure
+	    aIdent
+	    oSymbolPush
+	    .aIdent	oEmitSymbol
+	    aIdentText
+	    .aIdentText oEmitString
+	    oSymbolEnterKind(sProcedure)
+	    oTypePushNew(tProcedure)
+	    oSymbolEnterType
+	    oEmitLine
+	    @SubprogramParameters
+	    oTypePop
+	    oScopeEnterSymbol
+	    oSymbolPop
+	| aFunction:
+	    .aFunction
+	    aIdent
+	    oSymbolPush
+	    .aIdent	oEmitSymbol
+	    aIdentText
+	    .aIdentText oEmitString
+	    oSymbolEnterKind(sFunction)
+	    oTypePushNew(tFunction)
+	    oSymbolEnterType
+	    oEmitLine
+	    @SubprogramParameters
+	    @ResultVariable
+	    oSymbolPop			% pop result symbol
+	    oTypePop
+	    oScopeEnterSymbol
+	    oSymbolPop
+	| *:
+	     [
+		| aRegister:
+		    .aRegister
+		    oContextSet(cRegister)
+		| *:
+		    oContextClear(cRegister)
+	    ]
+
+	    oCountPushZero
+	    {
+		[
+		    | aIdent:
+			oSymbolPush
+		    | *:
+			>
+		]
+		.aIdent	oEmitSymbol
+		oSymbolEnterKind(sRuntimeConstant)
+		% non-var register parameters may be in registers!
+		[ oContextChoose(cRegister)
+		    | yes:
+			oSymbolEnterAttribute(saRegister)
+		    | *:
+		]
+		oScopeEnterSymbol
+		oCountIncrement
+	    }
+	    aType
+	    .aType
+	    @ParameterType
+	    {
+		[ oCountChooseZero
+		    | yes:
+			>
+		    | *:
+			oSymbolEnterType
+			[ oTypeChooseAttribute(taTypeCheat)
+			    | yes:
+				oSymbolEnterAttribute(saTypeCheat)
+			    | *:
+			]
+			oSymbolPop
+		]
+		oCountDecrement
+	    }
+	    oTypeClearAttribute(taTypeCheat)
+	    oCountPop
+	    oTypePop
+    ];
+
+ParameterType:
+    [
+	| aType:
+	    % this is a type overide spec
+	    .aType
+	    @TypeSpec
+	    oTypeEnterAttribute(taTypeCheat)
+	| aArray:
+	    @ParameterArrayType
+	| aPacked:
+	    .aPacked
+	    @ParameterType
+	    oTypeEnterAttribute(taPacked)
+	| aVaryingParameter:
+	    .aVaryingParameter
+	    oTypePushBuiltin(tVaryingParameter)
+	| *:
+	    @TypeSpec
+    ];
+
+ParameterArrayType:
+    .aArray
+    oTypePushNew(tArray)
+    oContextClear(cFlex)
+    oTypeEnterFirstArrayIndex
+    {
+	[
+	    | aEndArrayIndexList:
+		.aEndArrayIndexList
+		>
+	    | *:
+		[
+		    | aSubrange:
+			.aSubrange
+			oTypePushNew(tSubrange)
+			oEmitBufferPush
+			@CompileTimeExpn
+			oEmitBufferPop
+			oEmitManifestValue
+			@ResolveType
+			[ oTypeChooseKind
+			    | tInt, tNat:
+				oTypePop
+				[
+				    | aStar:
+					.aStar
+					oValuePush(viNonManifest)
+					oContextSet(cFlex)
+					oTypePushBuiltIn(tInt)
+					oTypeEnterLeftRootType
+					oTypePop
+					oTypeEnterFlexRangeValues
+				    | *:
+					oEmitBufferPush
+					@CompileTimeExpn
+					oEmitBufferPop
+					oEmitManifestValue
+					@ResolveType
+					[ oTypePopAndChooseKind
+					    | tInt, tNat:
+						oTypeEnterRangeValues
+					    | tNotFound:
+						oTypeReplaceBuiltIn(tSubrange)
+					    | *:
+						#eIncompatibleSubrangeTypes
+						oTypeReplaceBuiltIn(tSubrange)
+					]
+					oTypePushBuiltIn(tInt)
+					oTypeEnterLeftRootType
+					oTypePop
+				]
+			    | tEnumeratedRange:
+				[
+				    | aStar:
+					.aStar
+					oValuePush(viNonManifest)
+					oContextSet(cFlex)
+					oTypeEnterLeftRootType
+					oTypePop
+					oTypeEnterFlexRangeValues
+				    | *:
+					oEmitBufferPush
+					@CompileTimeExpn
+					oEmitBufferPop
+					oEmitManifestValue
+					@ResolveType
+					[ oTypeChooseKind
+					    | tEnumeratedRange:
+						[ @CompatibleTypes
+						    | yes:
+							oTypePop
+							oTypeEnterLeftRootType
+							oTypePop
+							oTypeEnterRangeValues
+						    | *:
+							#eIncompatibleSubrangeTypes
+							oTypePop
+							oTypePop
+							oTypeReplaceBuiltIn(tSubrange)
+						]
+					    | tNotFound:
+						oTypePop
+						oTypePop
+						oTypeReplaceBuiltIn(tSubrange)
+					    | *:
+						oTypePop
+						oTypePop
+						#eIncompatibleSubrangeTypes
+						oTypeReplaceBuiltIn(tSubrange)
+					]
+				]
+			    | *:
+				#eIllegalSubrangeType
+				[
+				    | aStar:
+					oTypePushBuiltin(tInt)
+					oValuePush(viOne)
+				    | *:
+					oEmitBufferPush
+					@CompileTimeExpn
+					oEmitBufferPop
+				]
+				oEmitManifestValue
+				oTypePop
+				oTypePop
+				oTypeReplaceBuiltIn(tSubrange)
+			]
+			oValuePop
+			oValuePop
+		    | *:	@IndexType
+		]
+	]
+	oTypeEnterArrayBound
+	oTypePop
+    }
+    oTypeEnterLastArrayIndex
+    @TypeSpec
+    oTypeEnterLeftComponentType
+    oTypePop
+    [ oContextChoose(cFlex)
+	| yes:
+	    oTypeEnterKind(tFlexArray)
+	| *:
+    ];
+
+BodyDcl:
+    .aBody
+    [
+	| aProcedure:
+	    .aProcedure
+	| aFunction:
+	    .aFunction
+	    oContextSet(cFunction)
+    ]
+    aIdent
+    oSymbolPush
+    .aIdent	oEmitSymbol
+    oTypePushSymbolType
+    oEmitLine
+    @SubprogramBody
+    oContextClear(cFunction)
+    aEndSubprogramBody
+    .aEndSubprogramBody
+    oTypePop
+    oSymbolPop
+    oEmitLine;
+
+OptExport:
+    [
+	| aExport:
+	    .aExport
+	    {[
+		| aEndExport:
+		    >
+		| *:
+		    [
+			| aOpaque:
+			    .aOpaque
+			    oContextSet(cOpaque)
+			| *:
+			    oContextClear(cOpaque)
+		    ]
+		    [
+			| aUnqualified:
+			| *:
+		    ]
+		    aIdent
+		    oSymbolPush
+		    .aIdent oEmitSymbol
+		    [ oSymbolChooseKind
+			| sNotFound:
+			    oSymbolEnterKind(sExport)
+			| *:
+		    ]
+		    [ oContextChoose(cOpaque)
+			| yes:
+			    oSymbolEnterAttribute(saOpaque)
+			| *:
+		    ]
+		    oScopeEnterSymbol
+		    oSymbolPop
+	    ]}
+	    .aEndExport
+	| *:
+    ];
+
+
+OptGrant:
+    [
+	| aGrant:
+	    .aGrant
+	    {[
+		| aEndGrant:
+		    >
+		| *:
+		    [
+			| aVar:
+			    .aVar
+			| *:
+		    ]
+		    aIdent
+		    oSymbolPush
+		    .aIdent	oEmitSymbol
+		    oSymbolPop
+	    ]}
+	    .aEndGrant
+	| *:
+    ];
+
+SubprogramBody:
+    @OptPre
+    @OptInit
+    @OptPost
+    @OptHandler
+    @DclsAndStmts;
+
+
+OptPre:
+    [
+	| aPre:
+	    .aPre @IfExpn
+	    oEmitLine
+	| *:
+    ];
+
+
+OptPost:
+    [
+	| aPost:
+	    .aPost @IfExpn
+	    oEmitLine
+	| *:
+    ];
+
+
+InvariantStmt:
+    .aInvariant
+    @IfExpn
+    oEmitLine;
+
+
+OptHandler:
+    [
+	| aHandler:
+	    .aHandler
+	    aIdent
+	    oSymbolPush
+	    .aIdent oEmitSymbol
+	    oSymbolEnterKind(sRuntimeConstant)
+	    oTypePushBuiltin(tInt)
+	    oSymbolEnterType
+	    oTypePop
+	    oSymbolSaveHandlerSymbol
+	    oSymbolPop
+
+	    oContextSet(cInHandler)
+	    @DclsAndStmts
+	    oContextClear(cInHandler)
+	    aEndSubprogramBody
+	    .aEndSubprogramBody
+	    oEmitLine
+	| *:
+    ];
+
+
+OptInvariant:
+    [
+	| aInvariant:
+	    .aInvariant @IfExpn
+	    oEmitLine
+	| *:
+    ];
+
+OptInit:
+    [
+	| aInit:
+	    .aInit
+	    {
+		[
+		    | aEndInit:
+			.aEndInit
+			>
+		    | aIdent:
+			oSymbolPush
+		]
+		.aIdent	oEmitSymbol
+		oSymbolEnterKind(sRuntimeConstant)
+		oEmitBufferPush
+		@Expn
+		[ oTypeChooseKind
+		    | tFlexArray, tFlexChar:
+			#eIncompatibleConstantValueType
+		    | *:
+		]
+		oSymbolEnterType
+		oEmitBufferPushDirect
+		.aType
+		@DetermineTypeAndEmit
+		oEmitBufferPopDirect
+		oEmitBufferEmit
+		oEmitBufferPop
+		oValuePop
+		oTypePop
+		oSymbolPop
+	    }
+	    oEmitLine
+	| *:
+    ];
+
+ModuleDcl:
+    .aModule
+    aIdent
+    oSymbolPush
+    oSymbolEnterKind(sModule)
+    oTypePushNew(tModule)
+    oSymbolEnterType
+    .aIdent	oEmitSymbol
+    aIdentText
+    .aIdentText oEmitString
+    oScopePush
+    @OptExport
+    @OptGrant
+    @OptPre
+    @DclsAndStmts
+    @OptPost
+    @ResolveOpaqueExports
+    oScopePop
+    aEndModule
+    .aEndModule
+    oTypePop
+    oSymbolPop;
+
+
+MonitorDcl:
+    .aMonitor
+    aIdent
+    oSymbolPush
+    oSymbolEnterKind(sMonitor)
+    oTypePushNew(tMonitor)
+    oSymbolEnterType
+    .aIdent	oEmitSymbol
+    aIdentText
+    .aIdentText oEmitString
+    [
+	| aMonitorPriority:
+	    .aMonitorPriority
+	    @Expn
+	    @ResolveType
+	    [ oTypePopAndChooseKind
+		| tInt, tNat, tNotFound:
+		| *:
+		    #eDeviceMonitorPriorityMustBeInt
+	    ]
+	    oValuePop
+	| *:
+    ]
+    oScopePush
+    @OptExport
+    @OptGrant
+    @OptPre
+    @DclsAndStmts
+    @OptPost
+    @ResolveOpaqueExports
+    oScopePop
+    aEndMonitor
+    .aEndMonitor
+    oSymbolPop
+    oTypePop;
+
+ResolveOpaqueExports:
+    % Assumes that the top scope is the exports list
+    oCountPushScopeNumberOfEntries
+    {[ oCountChooseZero
+	| yes:
+	    >
+	| *:
+	    oSymbolPushCountScope
+	    [ oTypeChooseAttribute(taCompile)
+		| no:
+		    [ oSymbolChooseAttribute(saOpaque)
+			| yes:
+			    [ oSymbolChooseKind
+				| sType:
+				    oTypePushSymbolType
+				    oTypeMakeOpaque
+				    oTypePop
+				| *:
+				    #eOpaqueOnlyAppliesToTypes
+			    ]
+			| *:
+		    ]
+		| *:
+		    % don't make it opaque since we're compiling a stub
+	    ]
+	    oSymbolPop
+	    oCountDecrement
+    ]}
+    oCountPop;
+
+MakeOpaquesVisible:
+    % Assumes that the top scope is the exports list
+    oCountPushScopeNumberOfEntries
+    {[ oCountChooseZero
+	| yes:
+	    >
+	| *:
+	    oSymbolPushCountScope
+	    [ oTypeChooseAttribute(taCompile)
+		| no:
+		    [ oSymbolChooseAttribute(saOpaque)
+			| yes:
+			    [ oSymbolChooseKind
+				| sType:
+				    oTypePushSymbolType
+				    oTypeUnMakeOpaque
+				    oTypePop
+				| *:
+			    ]
+			| *:
+		    ]
+		| *:
+	    ]
+	    oSymbolPop
+	    oCountDecrement
+    ]}
+    oCountPop;
+
+MakeOpaquesInvisible:
+    % Assumes that the top scope is the exports list
+    oCountPushScopeNumberOfEntries
+    {[ oCountChooseZero
+	| yes:
+	    >
+	| *:
+	    oSymbolPushCountScope
+	    [ oTypeChooseAttribute(taCompile)
+		| no:
+		    [ oSymbolChooseAttribute(saOpaque)
+			| yes:
+			    [ oSymbolChooseKind
+				| sType:
+				    oTypePushSymbolType
+				    oTypeReMakeOpaque
+				    oTypePop
+				| *:
+			    ]
+			| *:
+		    ]
+		| *:
+	    ]
+	    oSymbolPop
+	    oCountDecrement
+    ]}
+    oCountPop;
+
+Stmt >> Boolean:
+    [
+	| aIdent:
+	    @Variable
+	    oValuePop
+	    @AssignOrCallStmt
+	| aPredefinedId:
+	    @PredefinedVariable
+	    oValuePop
+	    oTypePop
+	    [ oSymbolChooseKind
+		| sCall:
+		    % was a call to a predefined procedure
+		| *:
+		    % No parameters to a predefined procedure
+		    #eTooFewActuals
+	    ]
+	    oSymbolPop
+	| aIf:		@IfStmt
+	| aLoop:	@LoopStmt
+	| aExit:
+	    .aExit
+	| aExitWhen:
+	    .aExitWhen
+	    @IfExpn
+	| aCase:	@CaseStmt
+	| aFor:	@ForStmt
+	| aBegin:
+	    .aBegin
+	    oEmitLine
+	    @DclsAndStmts
+	    aEndBegin
+	    .aEndBegin
+	| aAssert:	@AssertStmt
+	| aInvariant:	@InvariantStmt
+	| aReturn:
+	    .aReturn
+	| aResult:	@ResultStmt
+	| aPut:	@PutStmt
+	| aGet:	@GetStmt
+	| aNew:
+	    .aNew
+	    @NewOrFreeStmt
+	| aFree:
+	    .aFree
+	    @NewOrFreeStmt
+	| aTag:
+	    @TagStmt
+	| aRead:
+	    @ReadStmt
+	| aWrite:
+	    @WriteStmt
+	| aSeek:
+	    @SeekStmt
+	| aTell:
+	    @TellStmt
+	| aOpen:
+	    @OpenStmt
+	| aClose:
+	    @CloseStmt
+	| aQuit:
+	    @QuitStmt
+	| aFork:
+	    @ForkStmt
+	| aAsm:
+	    @AssembleStmt
+	| aUnchecked:
+	    .aUnchecked
+	| aChecked:
+	    .aChecked
+	| aBits:
+	    @BitsStmt
+	| aTypeCheat:
+	    @TypeCheatStmt
+	| aSignal:
+	    @SignalStmt
+	| aWait:
+	    @WaitStmt
+	| aPause:
+	    @PauseStmt
+	| *:
+	    >> no	% this was not a true stmt
+    ]
+    >> yes;
+
+AssertStmt:
+    .aAssert
+    @IfExpn;
+
+
+ResultStmt:
+    .aResult
+    oTypePushSymbolType		% function
+    oTypePushResultType		% function, functionResult
+    oTypeCopy			% f, res, resC
+    @Expn			% f, res, resC, expn
+    [ @CompatibleTypes
+	| yes:
+	| *:
+	    #eIncompatibleResultType
+    ]
+    oTypePop			% f, res, resC
+    oTypePop			% f, res
+    @RangeCheck
+    oValuePop
+    oTypePop			% f
+    oTypePop;
+
+CollectionReference:
+    @VariableReference
+    oTypePushSymbolType
+    oTypePushComponentType
+    [ oTypeChooseKind
+	| tType:
+	    [ oTypeChooseAttribute(taForward)
+		| yes:
+		    #eUnresolvedForwardInCollection
+		| *:
+	    ]
+	| *:
+    ]
+    oTypePop
+    oTypePop
+    oTypePop;
+
+
+NewOrFreeStmt:
+    @CollectionReference
+    oValuePop
+    @VariableReference
+    oValuePop
+    oSymbolPop
+    [ oTypeChooseKind
+	| tPointer:
+	    oSymbolPushTypeSymbol
+	    [ oSymbolChooseSameSymbols
+		| yes:
+		| *:
+		    #eWrongCollectionNewOrFree
+	    ]
+	    oSymbolPop
+	| tNotFound:
+	| *:
+	    #eNonPointerNewOrFree
+    ]
+    oTypePop
+    oSymbolPop;
+
+TagStmt:
+    .aTag
+    @VariableReference
+    oValuePop
+    @Expn
+    [ oTypeChooseLeftKind
+	| tUnion:
+	    [ oSymbolChooseKind
+		| sType:
+		    % the union type also has tUnion
+		    #eNonTagInTagStmt
+		    oTypePop
+		    oTypePop
+		| *:
+		    oTypeSwapTypes			% union to top
+		    oSymbolPushTypeSymbol		% tag symbol
+		    oTypeSwapTypes			% expn back to top
+		    oTypePushSymbolType			% tag type
+		    oSymbolPop				% don't need tag symbol
+							% any more
+		    [ @CompatibleTypes
+			| yes:
+			    oTypePop
+			    oTypePop
+			    oSymbolPushTypeSymbol
+			    oTypePushSymbolType
+			    oSymbolPop
+			    @RangeCheck
+			    oTypePop
+			| *:
+			    #eIncompatibleTagTypes
+			    oTypePop
+			    oTypePop
+		    ]
+		    oTypePop
+	    ]
+	| tNotFound:
+	    oTypePop
+	    oTypePop
+	| *:
+	    #eNonTagInTagStmt
+	    oTypePop
+	    oTypePop
+    ]
+    oSymbolPop
+    oValuePop;
+
+TypePopAndIsInt >> Boolean:
+    [ oTypeChooseKind
+	| tInt, tInt4:
+	    oTypePushBuiltin(tInt)		% t, i
+	    [ oTypeChooseSameKinds
+		| yes:
+		    oTypePop
+		    oTypePop
+		    >> yes
+		| *:
+		    oTypePop
+		    oTypePushBuiltin(tInt4)	% t, i4
+		    [ oTypeChooseSameKinds
+			| yes:
+			    #eIntInt4Equivalence
+			    oTypePop
+			    oTypePop
+			    >> yes
+			| *:
+			    oTypePop
+			    oTypePop
+			    >> no
+		    ]
+	    ]
+	| *:
+	    oTypePop
+	    >> no
+    ];
+
+
+TypePopAndIsIntNat >> Boolean:
+    [ oTypeChooseKind
+	| tInt, tInt4:
+	    [ @TypePopAndIsInt
+		| yes:
+		    >> yes
+		| *:
+		    >> no
+	    ]
+	| tNat, tNat4:
+	    oTypePushBuiltin(tNat)		% t, n
+	    [ oTypeChooseSameKinds
+		| yes:
+		    oTypePop
+		    oTypePop
+		    >> yes
+		| *:
+		    oTypePop
+		    oTypePushBuiltin(tNat4)	% t, n4
+		    [ oTypeChooseSameKinds
+			| yes:
+			    #eNatNat4Equivalence
+			    oTypePop
+			    oTypePop
+			    >> yes
+			| *:
+			    oTypePop
+			    oTypePop
+			    >> no
+		    ]
+	    ]
+	| *:
+	    oTypePop
+	    >> no
+    ];
+
+OpenStmt:
+    .aOpen
+    @VariableReference
+    [ @TypePopAndIsIntNat
+	| yes :
+	| *:
+	    #eOpenFileNumberVarMustBeInteger
+    ]
+    oValuePop
+    oSymbolPop
+    oEmitBufferPush
+    @Expn
+    @ResolveType
+    oValuePop
+    oEmitBufferPushDirect
+    [ *
+	| aGet, aPut, aRead, aWrite, aSeek, aMod:
+	    % this is the new open statement
+	    [ oTypePopAndChooseKind
+		| tString, tChar, tFlexChar, tCharString:
+		    .aString
+		| tInt, tNat:
+		    .aInt
+		| *:
+		    #eOpenFileNameMustBeStringOrInt
+	    ]
+	    oEmitBufferPopDirect
+	    oEmitBufferEmit
+	    oEmitBufferPop
+	    {[
+		| aGet:		.aGet
+		| aPut:		.aPut
+		| aRead:	.aRead
+		| aWrite:	.aWrite
+		| aSeek:	.aSeek
+		| aMod:		.aMod
+		| *:
+		    >
+	    ]}
+	| *:
+	    % this is the old form open predefined proc
+	    [ oTypePopAndChooseKind
+		| tString, tChar, tFlexChar, tCharString:
+		    .aString
+		| *:
+		    #eOpenFileNameMustBeString
+	    ]
+	    oEmitBufferPopDirect
+	    oEmitBufferEmit
+	    oEmitBufferPop
+	    @Expn
+	    @ResolveType
+	    [ oTypePopAndChooseKind
+		| tString, tChar, tFlexChar, tCharString:
+		| *:
+		    #eOpenModeMustBeString
+	    ]
+	    oValuePop
+    ]
+    aEndOpen
+    .aEndOpen;
+
+
+CloseStmt:
+    .aClose
+    @Expn
+    @ResolveType
+    [ oTypePopAndChooseKind
+	| tInt, tNat, tNotFound:
+	| *:
+	    #eIOFileNumberExpnMustBeInteger
+    ]
+    oValuePop;
+
+ReadStmt:
+    .aRead
+    @Expn
+    @ResolveType
+    [ oTypePopAndChooseKind
+	| tInt, tNat, tNotFound:
+	| *:
+	    #eIOFileNumberExpnMustBeInteger
+    ]
+    oValuePop
+    [
+	| aReadWriteStatus:
+	    .aReadWriteStatus
+	    @VariableReference
+	    [ @TypePopAndIsInt
+		| yes:
+		| *:
+		    #eIOStatusVariableMustBeInteger
+	    ]
+	    oValuePop
+	    oSymbolPop
+	| *:
+    ]
+    {[
+	| aEndRead:
+	    .aEndRead
+	    >
+	| *:
+	    @ReadItem
+    ]};
+
+
+WriteStmt:
+    .aWrite
+    @Expn
+    @ResolveType
+    [ oTypePopAndChooseKind
+	| tInt, tNat, tNotFound:
+	| *:
+	    #eIOFileNumberExpnMustBeInteger
+    ]
+    oValuePop
+    [
+	| aReadWriteStatus:
+	    .aReadWriteStatus
+	    @VariableReference
+	    [ @TypePopAndIsInt
+		| yes:
+		| *:
+		    #eIOStatusVariableMustBeInteger
+	    ]
+	    oValuePop
+	    oSymbolPop
+	| *:
+    ]
+    {[
+	| aEndWrite:
+	    .aEndWrite
+	    >
+	| *:
+	    @WriteItem
+    ]};
+
+
+ReadItem:
+    @VariableReference
+    oTypePop
+    oValuePop
+    [ oSymbolChooseAttribute(saRegister)
+	| yes:
+	    #eReadOrWriteRegisterVariable
+	| *:
+    ]
+    [ oSymbolChooseKind
+	| sCompiletimeConstant:
+	    #eWriteItemCompiletimeConstant
+	| *:
+    ]
+    oSymbolPop
+    [
+	| aReadWriteSize:
+	    .aReadWriteSize
+	    @Expn
+	    @ResolveType
+	    [ oTypePopAndChooseKind
+		| tInt, tNat, tNotFound:
+		| *:
+		    #eReadWriteSizeMustBeInteger
+	    ]
+	    oValuePop
+	    [
+		| aReadWriteSizeResult:
+		    .aReadWriteSizeResult
+		    @VariableReference
+		    [ @TypePopAndIsIntNat
+			| yes:
+			| *:
+			    #eReadWriteSizeResultVariableMustBeInteger
+		    ]
+		    oValuePop
+		    oSymbolPop
+		| *:
+	    ]
+	| *:
+    ];
+
+
+WriteItem:
+    @VariableReference
+    oValuePop
+    [ oSymbolChooseAttribute(saRegister)
+	| yes:
+	    #eReadOrWriteRegisterVariable
+	| *:
+    ]
+    [ oSymbolPopAndChooseKind
+	| sCompiletimeConstant:
+	    #eReadWriteItemNotVariable
+	| *:
+    ]
+    oTypePop
+    [
+	| aReadWriteSize:
+	    .aReadWriteSize
+	    @Expn
+	    @ResolveType
+	    [ oTypePopAndChooseKind
+		| tInt, tNat, tNotFound:
+		| *:
+		    #eReadWriteSizeMustBeInteger
+	    ]
+	    oValuePop
+	    [
+		| aReadWriteSizeResult:
+		    .aReadWriteSizeResult
+		    @VariableReference
+		    [ @TypePopAndIsIntNat
+			| yes:
+			| *:
+			    #eReadWriteSizeResultVariableMustBeInteger
+		    ]
+		    oValuePop
+		    oSymbolPop
+		| *:
+	    ]
+	| *:
+    ];
+
+SeekStmt:
+    .aSeek
+    @Expn
+    @ResolveType
+    [ oTypePopAndChooseKind
+	| tInt, tNat, tNotFound:
+	| *:
+	    #eIOFileNumberExpnMustBeInteger
+    ]
+    oValuePop
+    [
+	| aStar:
+	    .aStar
+	| *:
+	    @Expn
+	    @ResolveType
+	    [ oTypePopAndChooseKind
+		| tInt, tNat, tNotFound:
+		| *:
+		    #eSeekExpnMustBeInteger
+	    ]
+	    oValuePop
+    ];
+
+
+TellStmt:
+    .aTell
+    @Expn
+    @ResolveType
+    [ oTypePopAndChooseKind
+	| tInt, tNat, tNotFound:
+	| *:
+	    #eIOFileNumberExpnMustBeInteger
+    ]
+    oValuePop
+
+    @VariableReference
+    [ @TypePopAndIsInt
+	| yes:
+	| *:
+	    #eTellResultVariableMustBeInteger
+    ]
+    oValuePop
+    oSymbolPop;
+
+QuitStmt:
+    .aQuit
+    [
+	| aGreater:
+	    .aGreater
+	    [ oContextChoose(cInHandler)
+		| yes:
+		    [ *
+			| aQuitReason:
+			    % okay
+			| *:
+			    % the default exception for a quit > in a handler
+			    % is the saved exception
+			    oSymbolPushHandlerSymbol
+			    .aQuitReason
+			    .aIdent oEmitSymbol
+			    .aEndExpression
+			    oSymbolPop
+		    ]
+		| *:
+	    ]
+	| aLess:
+	    .aLess
+	| *:
+    ]
+    [
+	| aQuitReason:
+	    .aQuitReason
+	    @Expn
+	    @ResolveType
+	    [ oTypePopAndChooseKind
+		| tInt, tNat, tNotFound:
+		| *:
+		    #eQuitReasonExpnMustBeInteger
+	    ]
+	    oValuePop
+	| *:
+    ];
+
+ForkStmt:
+    .aFork
+    aIdent
+    @Variable
+    [ oSymbolPopAndChooseKind
+	| sCall:
+	| sProcess:
+	    % there were no arguments.  Output an aCall to be consistent
+	    .aCall
+    ]
+    oTypePop
+    oValuePop
+    [
+	| aForkStatus:
+	    .aForkStatus
+	    @VariableReference
+	    [ oTypePopAndChooseKind
+		| tBoolean, tNotFound, tError:
+		| *:
+		    #eForkStatusVariableMustBeBoolean
+	    ]
+	    oValuePop
+	    oSymbolPop
+	    [
+		| aForkStackSize:
+		    .aForkStackSize
+		    @Expn
+		    @ResolveType
+		    [ oTypePopAndChooseKind
+			| tInt, tNat, tNotFound:
+			| *:
+			    #eForkStackSizeExpnMustBeInteger
+		    ]
+		    oValuePop
+		    [
+			| aForkAddress:
+			    .aForkAddress
+			    @VariableReference
+			    [ oTypePopAndChooseKind
+				| tAddressInt, tNotFound, tError:
+				| *:
+				    #eForkAddressVariableMustBeAddressInt
+			    ]
+			    oValuePop
+			    oSymbolPop
+			| *:
+		    ]
+		| *:
+	    ]
+	| *:
+    ];
+
+AssembleStmt:
+    .aAsm
+    @CompileTimeExpn					% type, value
+    [
+	| aLabel:
+	    % The first expn was a label
+	    @ResolveType
+	    [ oTypePopAndChooseKind			% value
+		| tString, tChar, tCharString:
+		| *:
+		    #eAsmLabelMustBeString
+	    ]
+	    oValuePop					%
+	    .aLabel
+	    @CompileTimeExpn				% type, value
+	| *:
+	    % the first expn wasn't a label
+    ]
+
+    % handle the opcode
+    @ResolveType
+    [ oTypePopAndChooseKind				% value
+	| tString, tChar, tCharString:
+	| *:
+	    #eAsmOpcodeMustBeString
+    ]
+    oValuePop						%
+    aBeginAsm
+    .aBeginAsm
+    {[
+	| aEndAsm:
+	    .aEndAsm
+	    >
+	| *:
+	    @Expn
+	    oTypePop
+	    oValuePop
+    ]};
+
+SignalStmt:
+    .aSignal
+    @ConditionReference
+    oTypePop;
+
+
+WaitStmt:
+    .aWait
+    @ConditionReference
+    [ oTypeChooseAttribute(taPriorityOrTimeoutCondition)
+	| yes:
+	    [
+		| aWaitPriorityOrTimeout:
+		    .aWaitPriorityOrTimeout
+		    @Expn
+		    @ResolveType
+		    [ oTypePopAndChooseKind
+			| tInt, tNat, tNotFound:
+			| *:
+			    #eWaitExpnMustBeInteger
+		    ]
+		    oValuePop
+		| *:
+		    #ePriorityOrTimeOutConditionMustHaveWaitExpn
+	    ]
+	| *:
+	    [
+		| aWaitPriorityOrTimeout:
+		    #eNonPriorityOrTimeOutConditionMustNotHaveWaitExpn
+		    .aWaitPriorityOrTimeout
+		    @Expn
+		    oTypePop
+		    oValuePop
+		| *:
+	    ]
+    ]
+    oTypePop;
+
+
+ConditionReference:
+    @VariableReference
+    oValuePop
+    oSymbolPop;
+
+
+PauseStmt:
+    .aPause
+    @Expn
+    @ResolveType
+    [ oTypePopAndChooseKind
+	| tInt, tNat, tNotFound:
+	| *:
+	    #eWaitExpnMustBeInteger
+    ]
+    oValuePop;
+
+EnterAtType:
+    oTypePushBuiltin(tNat)
+    oValuePush(viOne)
+    oTypeReplaceTypeWithSameKindAndStorageSize
+    oValuePop
+    oSymbolEnterType;
+
+BitsStmt:
+    % We have just seen a 'bits'.  This must be an assignment statement
+    .aBits
+    @VariableReference
+    [ oTypePopAndChooseKind
+	| tNat, tNat4, tNotFound, tError:
+	| *:
+	    #eBitsAssignmentTargetMustBeNat
+    ]
+    oValuePop
+    @BitsType
+    oTypeReplaceBuiltin(tNat)
+    @AssignOrCallStmt;
+
+BitsType:
+    % this is either type, or compiletimeexpn..compiletimeexpn or
+    %	compiletimeexpn
+    oEmitBufferPush
+    @CompileTimeExpnOrBitsSubrangeType
+    oEmitBufferPop
+    [
+	| aSubrange:
+	    % expn..expn
+	    @ResolveType
+	    [ oTypeChooseKind
+		| tInt, tNat, tEnumeratedRange:
+		| tNotFound:
+		    oTypeReplaceBuiltin(tInt)
+		    oValuePop
+		    oValuePush(viOne)
+		| *:
+		    #eIllegalSubrangeType
+		    oTypeReplaceBuiltin(tInt)
+		    oValuePop
+		    oValuePush(viOne)
+	    ]
+	    oEmitBufferPush
+	    @CompileTimeExpn
+	    oEmitBufferPop
+	    [ @CompatibleTypes
+		| yes:
+		    oTypePop
+		    [ oTypeChooseKind
+			| tEnumeratedRange, tInt, tNat:
+			| *:
+			    oTypeReplaceBuiltin(tInt)
+			    oValuePop
+			    oValuePush(viOne)
+		    ]
+		    oTypePushNew(tSubrange)
+		    oTypeSwapTypes
+		    oTypeEnterLeftRootType
+		    oTypePop
+		    [ oValueChooseLegalRangeValues
+			| yes:
+			| *:
+			    #eIllegalRangeUpperBoundLessThanLower
+			    oValueSwapValues
+		    ]
+		    oTypeEnterRangeValues
+		| *:
+		    #eIncompatibleSubrangeTypes
+		    oTypePop
+		    oTypePop
+		    oTypePushBuiltIn(tSubrange)
+	    ]
+	    oValueSwapValues
+	| *:
+	    [ oTypeChooseKind
+		| tSubrange, tEnumeratedRange:
+		    oValuePop
+		    oValuePushTypeRangeValues
+		    oValueSwapValues
+		| *:
+		    @ResolveType
+		    [ oTypeChooseKind
+			| tInt, tNat, tEnumeratedElement:
+			    % copy the value
+			    oCountPushValue
+			    oValuePushCount
+			    oCountPop
+			| *:
+			    #eBitsTypeMustBeSubrange
+			    oValuePop
+			    oValuePush(viOne)
+			    oValuePush(viOne)
+		    ]
+	    ]
+    ]
+    .aSubrange
+    oEmitManifestValue
+    oValuePop
+    oEmitManifestValue
+    oValuePop;
+
+TypeCheatVariable:
+    % We have just seen a 'typecheat'.  This must be a reference to a variable
+    % pre:
+    % post: symbol on symbolStack, cheat type on TypeStack
+    .aTypeCheat
+    @TypeSpec
+    [
+	| aIdent:
+	    @Variable
+	    aEndExpression
+	    .aEndExpression
+	| aTypeCheat:
+	    @TypeCheatVariable
+	    @Reference
+	    aEndExpression
+	    .aEndExpression
+	| aAt:
+	    .aAt
+	    @Expn
+	    @ResolveType
+	    [ oTypePopAndChooseKind
+		| tInt, tNat, tNotFound:
+		| *:
+		    #eAtExpnMustBeInteger
+	    ]
+	    oSymbolPushDummy
+	    oSymbolEnterKind(sVariable)
+	    @EnterAtType
+	    oValueReplaceNonManifest
+    ]
+    oTypePop;	% discard the symbol type
+
+
+TypeCheatStmt:
+    % We have just seen a 'type'.  This must be an assignment statement or
+    % a procedure call
+    @TypeCheatVariable
+    [ oSymbolChooseAttribute(saRegister)
+	| yes:
+	    #eRegisterTypeCheatAssignment
+	| *:
+    ]
+    @ReplaceSymbolWithAppropriateDummySymbol
+    @Reference
+    oValuePop
+    @AssignOrCallStmt;
+
+
+ReplaceSymbolWithAppropriateDummySymbol:
+    % we have just type converted a variable.  Change it to the appropriate
+    % type, so that it may be assigned, called, etc.
+    oSymbolPushDummyCopy
+    oSymbolSwapSymbols
+    oSymbolPop
+    oSymbolEnterType;
+
+AssignOrCallStmt:
+    [
+	| aAssign:
+	    .aAssign
+	    @AssignmentStmt
+	    @RangeCheck
+	    oValuePop
+	| aPlusEqual:
+	    [ oTypeChooseKind
+		| tInt, tNat, tReal, tSubrange, tAddressInt, tVaryingParameter,
+		  tInt4, tNat4, tReal8, tNotFound:
+		    .aPlusEqual
+		| tSet:
+		    .aSetUnionAssign
+		| tString:
+		    .aConcatenateAssign
+		| *:
+		    % can't apply += to tChar, tCharString
+		    #eIllegalPlusEqual
+	    ]
+	    @AssignmentStmt
+	    @RangeCheck2
+	    oValuePop
+	| aMinusEqual:
+	    [ oTypeChooseKind
+		| tInt, tNat, tReal, tSubrange, tAddressInt, tVaryingParameter,
+		  tInt4, tNat4, tReal8, tNotFound:
+		    .aMinusEqual
+		| tSet:
+		    .aSetDifferenceAssign
+		| *:
+		    #eIllegalMinusEqual
+	    ]
+	    @AssignmentStmt
+	    @RangeCheck2
+	    oValuePop
+	| aStarEqual:
+	    [ oTypeChooseKind
+		| tInt, tNat, tReal, tSubrange, tAddressInt, tVaryingParameter,
+		  tInt4, tNat4, tReal8, tNotFound:
+		    .aStarEqual
+		| tSet:
+		    .aSetIntersectionAssign
+		| *:
+		    #eIllegalStarEqual
+	    ]
+	    @AssignmentStmt
+	    @RangeCheck2
+	    oValuePop
+	| aXorEqual:
+	    [ oTypeChooseKind
+		| tInt, tNat, tInt4, tNat4, tAddressInt, tVaryingParameter,
+			tNotFound:
+		    .aXorEqual
+		| tSet:
+		    .aSetXorAssign
+		| *:
+		    #eIllegalXorEqual
+	    ]
+	    @AssignmentStmt
+	    @RangeCheck2
+	    oValuePop
+	| aRealDivEqual:
+	    [ oTypeChooseKind
+		| tReal, tReal8, tNotFound:
+		    .aRealDivEqual
+		| *:
+		    #eIllegalRealDivEqual
+	    ]
+	    @AssignmentStmt
+	    oValuePop
+	| aDivEqual:
+	    [ oTypeChooseKind
+		| tInt, tNat, tReal, tSubrange, tAddressInt, tVaryingParameter,
+		  tInt4, tNat4, tReal8, tNotFound:
+		    .aDivEqual
+		| *:
+		    #eIllegalDivEqual
+	    ]
+	    @AssignmentStmt
+	    @RangeCheck2
+	    oValuePop
+	| aModEqual:
+	    [ oTypeChooseKind
+		| tInt, tNat, tReal, tSubrange, tAddressInt, tVaryingParameter,
+		  tInt4, tNat4, tReal8, tNotFound:
+		    .aModEqual
+		| *:
+		    #eIllegalModEqual
+	    ]
+	    @AssignmentStmt
+	    @RangeCheck2
+	    oValuePop
+	| aShiftLeftEqual:
+	    [ oTypeChooseKind
+		| tInt, tNat, tAddressInt, tInt4, tNat4, tVaryingParameter,
+			tNotFound:
+		    .aShiftLeftEqual
+		| *:
+		    #eIllegalShiftEqual
+	    ]
+	    @AssignmentStmt
+	    @RangeCheck2
+	    oValuePop
+	| aShiftRightEqual:
+	    [ oTypeChooseKind
+		| tInt, tNat, tAddressInt, tInt4, tNat4, tVaryingParameter,
+			tNotFound:
+		    .aShiftRightEqual
+		| *:
+		    #eIllegalShiftEqual
+	    ]
+	    @AssignmentStmt
+	    @RangeCheck2
+	    oValuePop
+	| aExponentiateEqual:
+	    [ oTypeChooseKind
+		| tInt, tNat, tReal, tSubrange, tAddressInt, tVaryingParameter,
+		  tInt4, tNat4, tReal8, tNotFound:
+		    .aExponentiateEqual
+		| *:
+		    #eIllegalExponentialEqual
+	    ]
+	    @AssignmentStmt
+	    @RangeCheck2
+	    oValuePop
+	| aAndEqual:
+	    [ oTypeChooseKind
+		| tInt, tNat, tAddressInt, tInt4, tNat4, tVaryingParameter,
+			tNotFound:
+		    .aAndEqual
+		| tBoolean:
+		    .aBooleanAndEqual
+		| *:
+		    #eIllegalAndEqual
+	    ]
+	    @AssignmentStmt
+	    @RangeCheck2
+	    oValuePop
+	| aOrEqual:
+	    [ oTypeChooseKind
+		| tInt, tNat, tAddressInt, tInt4, tNat4, tVaryingParameter,
+			tNotFound:
+		    .aOrEqual
+		| tBoolean:
+		    .aBooleanOrEqual
+		| *:
+		    #eIllegalOrEqual
+	    ]
+	    @AssignmentStmt
+	    @RangeCheck2
+	    oValuePop
+	| aCall:
+	    .aCall
+	| *:
+	    [ oSymbolChooseKind
+		| sProcedure:
+		    % call to parameterless procedure
+		    .aCall
+		| sCall:
+		    % was a call to a procedure variable
+		| sVariable, sRuntimeConstant, sCollection:
+		    [ oTypeChooseKind
+			| tProcedure:
+			    % call to parameterless procedure
+			    .aCall
+		    ]
+		| sNotFound:
+	    ]
+    ]
+    oTypePop
+    oSymbolPop;
+
+AssignmentStmt:
+    oTypeCopy		% second copy of target type
+    @Expn
+    [ @CompatibleTypes
+	| yes:
+	    oTypePop
+	    oTypePop
+	| *:
+	    oTypePop
+	    [ oTypePopAndChooseKind
+		| tFlexChar:
+		    #eCannotAssignToFlexChar
+		| tFlexArray:
+		    #eCannotAssignToFlexArray
+		| *:
+		    #eIncompatibleAssignmentTypes
+	    ]
+    ];
+
+
+RangeCheck:
+    % Called with the target type on top of the stack
+    [ oTypeChooseKind
+	| tSubrange:				% target type
+	    [ @ValueInRange
+		| yes:
+		    >>
+		| maybe:
+		| *:
+		    #eAssignmentValueOutOfRange
+	    ]
+	    .aRangeCheck
+	    oValuePushTypeRangeValues
+	    oValueSwapValues
+	    oEmitManifestValue
+	    oValuePop
+	    oEmitManifestValue
+	    oValuePop
+	| *:
+	    % no range check
+    ];
+
+
+RangeCheck2:
+    [ oTypeChooseKind
+	| tSubrange:		% target type
+	    .aRangeCheck2
+	    oValuePushTypeRangeValues
+	    oValueSwapValues
+	    oEmitManifestValue
+	    oValuePop
+	    oEmitManifestValue
+	    oValuePop
+	| *:
+	    % no range check
+    ];
+
+IfStmt:
+    .aIf
+    @IfExpn
+    oEmitLine
+    @DclsAndStmts
+    {[
+	| aElsif:
+	    .aElsif
+	    @IfExpn
+	    oEmitLine
+	    @DclsAndStmts
+	| aElse:
+	    .aElse
+	    oEmitLine
+	    @DclsAndStmts
+	    oEmitLine
+	    >
+	| *:
+	    >
+    ]}
+    aEndIf
+    .aEndIf;
+
+
+IfExpn:
+    @Expn
+    [ oTypePopAndChooseKind
+	| tBoolean, tNotFound:
+	| *:
+	    #eNonBooleanCondition
+    ]
+    oValuePop;
+
+
+LoopStmt:
+    .aLoop
+    oEmitLine
+    @OptInvariant
+    @DclsAndStmts
+    oEmitLine
+    aEndLoop
+    .aEndLoop;
+
+CaseStmt:
+    .aCase
+    @Expn
+    @ResolveType
+    [ oTypeChooseKind
+	| tInt, tNat, tEnumeratedRange, tChar:
+	| tNotFound:
+	    oTypeReplaceBuiltin(tInt)
+	| *:
+	    #eIllegalCaseType
+	    oTypeReplaceBuiltIn(tInt)
+    ]
+    oValuePop
+    oEmitLine
+    @CaseBody
+    {[
+	| aEndCase:
+	    >
+	| *:
+	    [
+		| aOtherwise:
+		    .aOtherwise
+		    oEmitLine
+		    @DclsAndStmts
+		    oEmitLine
+		| *:
+		    @CaseBody
+	    ]
+    ]}
+    oTypePop
+    .aEndCase;
+
+
+CaseBody:
+    {
+	@LabelExpression
+	oValuePop
+	[
+	    | aCaseBody:
+		>
+	    | *:
+	]
+    }
+    oEmitLine
+    .aCaseBody
+    @DclsAndStmts
+    aEndCaseBody
+    .aEndCaseBody;
+
+
+LabelExpression:
+    oEmitBufferPush
+    @CompileTimeExpn
+    oEmitBufferPop
+    [ @CompatibleTypes
+	| yes:
+	    [ oValueChooseKind
+		| vInteger, vChar:
+		| *:
+		    #eCaseLabelBadValue
+		    oValuePop
+		    oValuePush(viOne)
+	    ]
+	| *:
+	    #eIncompatibleCaseLabel
+	    oValuePop
+	    oValuePush(viOne)
+    ]
+    oEmitManifestValue
+    oTypePop;
+
+ForStmt:
+    .aFor
+    oEmitBufferPush
+    [
+	| aDecreasing:
+	    .aDecreasing
+	| *:
+    ]
+    aIdent
+    oSymbolPush
+    oSymbolEnterKind(sRuntimeConstant)
+    oSymbolEnterAttribute(saRegister)
+    .aIdent	oEmitSymbol
+    aForRange
+    .aForRange
+    [
+	| aSubrange:
+	    @Expn
+	    oValuePop
+	    @ResolveType
+	    [ oTypeChooseKind
+		| tInt, tNat, tEnumeratedRange:
+		| tChar:
+		    oEmitBufferPushDirect
+		    .aChar
+		    oEmitBufferPopDirect
+		| tNotFound:
+		    oTypeReplaceBuiltIn(tInt)
+		| *:
+		    #eIllegalForIndexType
+		    oTypeReplaceBuiltIn(tInt)
+	    ]
+	    @Expn
+	    oValuePop
+	    @ResolveType
+	    [ oTypeChooseKind
+		| tInt, tNat, tEnumeratedRange, tChar:
+		| tNotFound:
+		    oTypeReplaceBuiltIn(tInt)
+		| *:
+		    #eIllegalForIndexType
+		    oTypeReplaceBuiltIn(tInt)
+	    ]
+	    [ @CompatibleTypes
+		| yes:
+		    oTypePop
+		| *:
+		    #eIncompatibleForIndexTypes
+		    oTypePop
+		    oTypeReplaceBuiltIn(tSubrange)
+	    ]
+	| aIdent:
+	    % This is a named type.
+	    oEmitBufferPush
+	    @NamedType
+	    oEmitBufferPop
+	    [ oTypeChooseKind
+		| tSubrange, tEnumeratedRange, tChar:
+		    [ oTypeChooseKind
+			| tChar:
+			    oEmitBufferPushDirect
+			    .aChar
+			    oEmitBufferPopDirect
+			| tSubrange:
+			    oTypeCopy
+			    oTypeReplaceRootType
+			    [ oTypePopAndChooseKind
+				| tChar:
+				    oEmitBufferPushDirect
+				    .aChar
+				    oEmitBufferPopDirect
+				| *:
+			    ]
+			| *:
+		    ]
+		    oValuePushTypeRangeValues
+		    oValueSwapValues
+		    oEmitManifestValue
+		    .aEndExpression
+		    oValuePop
+		    oEmitManifestValue
+		    .aEndExpression
+		    oValuePop
+		| *:
+		    #eIllegalForIndexType
+	    ]
+    ]
+    oEmitBufferEmit
+    oEmitBufferPop
+    oSymbolEnterType
+    oSymbolPop
+    oTypePop
+    oEmitLine
+    @DclsAndStmts
+    aEndFor
+    .aEndFor;
+
+StreamNumber:
+    .aStreamNumber
+    @Expn
+    @ResolveType
+    [ oTypePopAndChooseKind
+	| tInt, tNat, tNotFound:
+	| *:
+	    #eStreamNumberMustBeInteger
+    ]
+    oValuePop;
+
+PutItem:
+    oEmitBufferPush
+    @Expn
+    oTypeCopy
+    @ResolveType
+    [ oTypeChooseKind
+	| tInt, tNat, tReal, tString, tChar, tFlexChar, tCharString:
+	| tNotFound:
+	    oTypeReplaceBuiltIn(tInt)
+	| *:
+	    #eIllegalPutGetOperandType
+	    oTypeReplaceBuiltIn(tInt)
+    ]
+    [
+	| aColon:
+	    .aColon
+	    @Expn
+	    @ResolveType
+	    [ oTypePopAndChooseKind
+		| tInt, tNat:
+		    [ oValueChooseKind
+			| vRunTime:
+			| vInteger:
+			    [ oValueChooseNonNegative
+				| yes:
+				| *:
+				    #eWidthExpressionMustBeANonNegativeInteger
+			    ]
+			| *:
+			    #eWidthExprMustBeIntExpr
+		    ]
+		| tNotFound:
+		| *:
+		    #eWidthExprMustBeIntExpr
+	    ]
+	    oValuePop
+	    [
+		| aColon:	.aColon
+		    [ oTypeChooseKind
+			| tInt, tNat, tReal:
+			| tNotFound:
+			| *:
+			    #eFractionWidthOnlyAppliesToIntegersAndReals
+		    ]
+		    oTypeReplaceBuiltIn(tReal)
+		    @Expn
+		    @ResolveType
+		    [ oTypePopAndChooseKind
+			| tInt, tNat:
+			    [ oValueChooseKind
+				| vRunTime:
+				| vInteger:
+				    [ oValueChooseNonNegative
+					| yes:
+					| *:
+					    #eWidthExpressionMustBeANonNegativeInteger
+				    ]
+				| *:
+				    #eWidthExprMustBeIntExpr
+			    ]
+			| tNotFound:
+			| *:
+			    #eWidthExprMustBeIntExpr
+		    ]
+		    oValuePop
+		    [
+			| aColon:	.aColon
+			    @Expn
+			    @ResolveType
+			    [ oTypePopAndChooseKind
+				| tInt, tNat:
+				    [ oValueChooseKind
+					| vRunTime:
+					| vInteger:
+					    [ oValueChooseNonNegative
+						| yes:
+						| *:
+						    #eWidthExpressionMustBeANonNegativeInteger
+					    ]
+					| *:
+					    #eWidthExprMustBeIntExpr
+				    ]
+				| tNotFound:
+				| *:
+				    #eWidthExprMustBeIntExpr
+			    ]
+			    oValuePop
+			| *:
+		    ]
+		| *:
+	    ]
+	| *:
+	    .aColon
+	    oValuePush(viZero)
+	    oEmitManifestValue
+	    .aEndExpression
+	    oValuePop
+    ]
+    oTypePop		% the resolved type
+    oEmitBufferPushDirect
+    @ResolveType
+    [ oTypePopAndChooseKind
+	| tInt:
+	    .aInt
+	| tNat:
+	    .aNat
+	| tReal:
+	    .aReal
+	| tString:
+	    .aString
+	| tChar, tFlexChar, tCharString:
+	    .aChar
+	| *:
+	    .aInt
+    ]
+    oEmitBufferPopDirect
+    oEmitBufferEmit
+    oEmitBufferPop
+    oValuePop;
+
+PutStmt:
+    .aPut
+    [
+	| aStreamNumber:
+	    @StreamNumber
+	| *:
+    ]
+    {[
+	| aEndPut:
+	    .aEndPut
+	    >
+	| aPutContinue:
+	    .aPutContinue
+	    aEndPut
+	    .aEndPut
+	    >
+	| aSkip:
+	    .aSkip
+	| *:
+	    @PutItem
+    ]}
+    ;
+
+GetItem:
+    oEmitBufferPush
+    @VariableReference
+    oEmitBufferPushDirect
+    [ oTypeChooseKind
+	| tSubrange:
+	    .aSubrange
+	    oTypeCopy
+	    oTypeReplaceRootType
+	    [ oTypePopAndChooseKind
+		| tChar:
+		    .aChar
+		| *:
+	    ]
+	| tInt, tInt4:
+	    .aInt
+	| tNat, tNat4, tAddressInt:
+	    .aNat
+	| tChar, tCharString:
+	    .aChar
+	| tReal, tReal8:
+	    .aReal
+	| tString, tFlexChar:
+	    .aString
+	| tError, tNotFound:
+	    .aInt
+	| * :
+	    #eIllegalPutGetOperandType
+	    .aInt
+    ]
+    oEmitBufferPopDirect
+    oEmitBufferEmit
+    oEmitBufferPop
+    [
+	| aColon:
+	    [ oTypeChooseKind
+		| tString, tFlexChar, tCharString, tNotFound:
+		| *:
+		    #eWidthFieldOnlyAppliesToStringGets
+	    ]
+	    .aColon
+	    [
+		| aStar:	.aStar
+		| *:
+		    @Expn
+		    @ResolveType
+		    [ oTypePopAndChooseKind
+			| tInt, tNat:
+			    [ oValueChooseKind
+				| vRunTime:
+				| vInteger:
+				    [ oValueChooseNonNegative
+					| yes:
+					| *:
+					    #eWidthExpressionMustBeANonNegativeInteger
+				    ]
+				| *:
+				    #eWidthExprMustBeIntExpr
+			    ]
+			| tNotFound:
+			| *:
+			    #eWidthExprMustBeIntExpr
+		    ]
+		    oValuePop
+	    ]
+	| *:
+    ]
+    oSymbolPop
+    [ oTypeChooseKind
+	| tSubrange:
+	    oValuePushTypeRangeValues
+	    oValueSwapValues
+	    oEmitManifestValue
+	    oValuePop
+	    oEmitManifestValue
+	    oValuePop
+	| *:
+    ]
+
+    oTypePop
+    oValuePop;
+
+GetStmt:
+    .aGet
+    [
+	| aStreamNumber:
+	    @StreamNumber
+	| *:
+    ]
+    {[
+	| aEndGet:
+	    .aEndGet
+	    >
+	| aSkip:
+	    .aSkip
+	| *:
+	    @GetItem
+    ]};
+
+VariableReference:
+    [
+	| aIdent:
+	    @Variable
+	| aPredefinedId:
+	    @PredefinedVariable
+	| aTypeCheat:
+	    @TypeCheatVariable
+	    @Reference
+	| *:
+	    #eIllegalVariableReference
+	    oEmitBufferPush
+	    @Expn
+	    oEmitBufferPop
+	    oTypeReplaceBuiltin(tNotFound)
+    ];
+
+PredefinedVariable:
+    oSymbolPushPredefined
+    [
+	| aCall:
+	    [ oPredefinedChoose
+		% handle the predefined routine with no parameters
+		| pRandomize:
+		    oTypePushSymbolType
+		    .aPredefinedId	oEmitSymbol	oEmitPredefined
+		    .aCall
+		    [
+			| aSubs:
+			    #eIllegalSubscripts
+			    @FlushSubscripts
+			| *:
+		    ]
+		    oValuePush(viNonManifest)
+		    oSymbolChangeKind(sCall)
+		    >>
+		| pGetpriority:
+		    oTypePushSymbolType
+		    .aPredefinedId	oEmitSymbol	oEmitPredefined
+		    .aCall
+		    [
+			| aSubs:
+			    #eIllegalSubscripts
+			    @FlushSubscripts
+			| *:
+		    ]
+		    oValuePush(viNonManifest)
+		    oTypeReplaceBuiltin(tInt)
+		    oSymbolChangeKind(sCall)
+		    >>
+		| pEof:
+		    @EofArgument
+		    >>
+		| pAbs:
+		    .aAbs
+		    @AbsArgument
+		    >>
+		| pMin:
+		    .aMin
+		    @MinMaxArguments
+		    >>
+		| pMax:
+		    .aMax
+		    @MinMaxArguments
+		    >>
+		% factor out common code for predefined routines that must be
+		% handled specially.
+		| pOrd, pChr, pPred, pSucc, pIntstr, pNatstr, pLower, pUpper,
+		  pNil, pAddr, pSize, pStrdelete, pStrmove, pStrreplace, pEmpty,
+		  pStrint, pStrnat:
+		    oTypePushSymbolType
+		    .aPredefinedId	oEmitSymbol	oEmitPredefined
+		    .aCall
+		    [
+			| aSubs:
+			    .aSubs
+			    [
+				| aEndSubs:
+				    oTypePop		% predefined type
+				    @PrematureEndPredefined
+				    oTypeReplaceBuiltIn(tInt)
+				    oSymbolChangeKind(sCall)
+				    @Reference
+				    >>
+				| *:
+			    ]
+			| *:
+			    @ErroneousPredefined
+			    oTypePop
+			    oTypeReplaceBuiltIn(tInt)
+			    oValuePush(viNonManifest)
+			    oSymbolChangeKind(sCall)
+			    @Reference
+			    >>
+		    ]
+		| *:
+		    oTypePushSymbolType
+		    .aPredefinedId	oEmitSymbol	oEmitPredefined
+	    ]
+	    [ oPredefinedChoose
+		| pOrd:
+		    @Expn
+		    @ResolveType
+		    [ oTypePopAndChooseKind
+			| tEnumeratedRange, tString, tChar, tFlexChar,
+			  tCharString:
+			    oValueOrd
+			| tNotFound:
+			    oValueReplaceNonManifest
+			| *:
+			    #eIncompatibleValueActualType
+			    oValueReplaceNonManifest
+		    ]
+		    oTypeReplaceBuiltIn(tInt)
+		    @EndPredefined
+		| pChr:
+		    @Expn
+		    @ResolveType
+		    [ oTypePopAndChooseKind
+			| tInt, tNat:
+			    oValueChr
+			| tNotFound:
+			    oValueReplaceNonManifest
+			| *:
+			    #eIncompatibleValueActualType
+			    oValueReplaceNonManifest
+		    ]
+		    oTypeReplaceResultType
+		    @EndPredefined
+		| pPred:
+		    @Expn
+		    [ oTypeChooseKind
+			| tInt, tNat, tChar:
+			| *:
+			    @ResolveType
+			    [ oTypeChooseKind
+				| tEnumeratedRange, tChar:
+				| tInt, tNat, tNotFound:
+				    oTypeReplaceBuiltIn(tInt)
+				| *:
+				    #eIncompatibleValueActualType
+				    oTypeReplaceBuiltIn(tInt)
+			    ]
+		    ]
+		    oValuePushTypeRangeValues
+		    oValuePop
+		    oEmitManifestValue
+		    .aEndExpression
+		    oValuePop
+		    oValueReplaceNonManifest
+		    oTypeSwapTypes		% result to second
+		    oTypePop
+		    @EndPredefined
+		| pSucc:
+		    @Expn
+		    [ oTypeChooseKind
+			| tInt, tNat, tChar:
+			| *:
+			    @ResolveType
+			    [ oTypeChooseKind
+				| tEnumeratedRange, tChar:
+				| tInt, tNat, tNotFound:
+				    oTypeReplaceBuiltIn(tInt)
+				| *:
+				    #eIncompatibleValueActualType
+				    oTypeReplaceBuiltIn(tInt)
+			    ]
+		    ]
+		    oValuePushTypeRangeValues
+		    oValueSwapValues
+		    oValuePop
+		    oEmitManifestValue
+		    .aEndExpression
+		    oValuePop
+		    oValueReplaceNonManifest
+		    oTypeSwapTypes		% result to second
+		    oTypePop
+		    @EndPredefined
+		| pIntstr, pNatstr:
+		    @Expn
+		    @ResolveType
+		    [ oTypePopAndChooseKind
+			| tInt, tNat, tNotFound:
+			| *:
+			    #eIncompatibleValueActualType
+		    ]
+		    [ *
+			| aEndSubs:
+			    % no width expn, put a 1 in
+			    oValuePush(viOne)
+			    oEmitManifestValue
+			    .aEndExpression
+			    % no base expn, put a 10 in
+			    oValuePush(viTen)
+			    oEmitManifestValue
+			    .aEndExpression
+			| *:
+			    @Expn
+			    @ResolveType
+			    [ oTypePopAndChooseKind
+				| tInt, tNat, tNotFound:
+				| *:
+				    #eIncompatibleValueActualType
+			    ]
+			    [ *
+				| aEndSubs:
+				    % no base expn, put a 10 in
+				    oValuePush(viTen)
+				    oEmitManifestValue
+				    .aEndExpression
+				| *:
+				    @Expn
+				    @ResolveType
+				    [ oTypePopAndChooseKind
+					| tInt, tNat, tNotFound:
+					| *:
+					    #eIncompatibleValueActualType
+				    ]
+			    ]
+		    ]
+		    oTypeReplaceResultType
+		    oValuePop
+		    oValuePop
+		    oValueReplaceNonManifest
+		    @EndPredefined
+		| pStrint, pStrnat:
+		    @Expn
+		    @ResolveType
+		    [ oTypePopAndChooseKind
+			| tString, tChar, tCharString, tFlexChar, tNotFound:
+			| *:
+			    #eIncompatibleValueActualType
+		    ]
+		    [ *
+			| aEndSubs:
+			    % no base expn, put a 10 in
+			    oValuePush(viTen)
+			    oEmitManifestValue
+			    .aEndExpression
+			| *:
+			    @Expn
+			    @ResolveType
+			    [ oTypePopAndChooseKind
+				| tInt, tNat, tNotFound:
+				| *:
+				    #eIncompatibleValueActualType
+			    ]
+		    ]
+		    oTypeReplaceResultType
+		    oValuePop
+		    oValueReplaceNonManifest
+		    @EndPredefined
+		| pLower:
+		    @LowerArgument
+		| pUpper:
+		    @UpperArguments
+		| pNil:
+		    @NilArgument
+		| pAddr:
+		    @AddrArgument
+		| pSize:
+		    @SizeArgument
+		| pStrdelete:
+		    @StrdeleteArguments
+		| pStrmove:
+		    @StrmoveArguments
+		| pStrreplace:
+		    @StrreplaceArguments
+		| pEmpty:
+		    @EmptyArgument
+		| *:
+		    oValuePush(viNonManifest)
+		    @Reference
+	    ]
+	| *:
+	    % there was no aCall.  This must be a reference to the routine
+	    % itself.  A special case is the eof predefined, as it may
+	    % be used without any parameters
+	    .aPredefinedId	oEmitSymbol	oEmitPredefined
+	    [ oPredefinedChoose
+		| pEof:
+		    .aCall
+		    .aSubs
+		    oValuePush(viOne)
+		    oValuePush(viOne)
+		    oValueAddValues
+		    oValueNegate		% default eof stream = -2
+		    oEmitManifestValue
+		    .aEndExpression
+		    oValueReplaceNonManifest
+		    oTypePushBuiltIn(tBoolean)
+		    oSymbolChangeKind(sCall)
+		    .aEndSubs
+		    @Reference
+		| pRandomize:
+		    .aCall
+		    [
+			| aSubs:
+			    #eIllegalSubscripts
+			    @FlushSubscripts
+			| *:
+		    ]
+		    oValuePush(viNonManifest)
+		    oTypePushBuiltin(tInt)
+		    oSymbolChangeKind(sCall)
+		    >>
+		| pGetpriority:
+		    .aCall
+		    [
+			| aSubs:
+			    #eIllegalSubscripts
+			    @FlushSubscripts
+			| *:
+		    ]
+		    oValuePush(viNonManifest)
+		    oTypePushBuiltin(tInt)
+		    oSymbolChangeKind(sCall)
+		    @Reference
+		| *:
+		    oTypePushSymbolType
+		    oValuePush(viNonManifest)
+	    ]
+    ];
+
+
+ErroneousPredefined:
+    #eIllegalUseOfPredefined
+    oTypePushBuiltIn(tInt)
+    oValuePush(viOne)
+    oEmitManifestValue
+    .aEndExpression;
+
+
+PrematureEndPredefined:
+    #eTooFewActuals
+    oTypePushBuiltIn(tInt)
+    oValuePush(viOne)
+    oEmitManifestValue
+    .aEndExpression;
+
+
+EndPredefined:
+    @ExtraneousSubscripts
+    oSymbolChangeKind(sCall)
+    .aEndSubs
+    @Reference;
+
+EofArgument:
+    % subscript is here in this case
+    oTypePushSymbolType
+    .aPredefinedId	oEmitSymbol	oEmitPredefined
+    .aCall
+    aSubs
+    .aSubs
+    [
+	| aEndSubs:
+	    oTypePop			% predefined type
+	    @PrematureEndPredefined
+	    oValueReplaceNonManifest
+	    oTypeReplaceBuiltIn(tNotFound)
+	    oSymbolChangeKind(sCall)
+	    @Reference
+	    >>
+	| *:
+	    @Expn
+	    @ExtraneousSubscripts
+    ]
+    @ResolveType
+    [ oTypePopAndChooseKind
+	| tInt, tNat:
+	| tNotFound:
+	| *:
+	    #eIncompatibleValueActualType
+    ]
+    oValueReplaceNonManifest
+    oTypeReplaceBuiltIn(tBoolean)
+    oSymbolChangeKind(sCall)
+    .aEndSubs
+    @Reference;
+
+MinMaxArguments:
+    [
+	| aSubs:
+	    [
+		| aEndSubs:
+		    @PrematureEndPredefined
+		| *:
+		    @Expn
+		    [
+			| aEndSubs:
+			    @PrematureEndPredefined
+			| *:
+			    @Expn
+			    @ExtraneousSubscripts
+		    ]
+		    oValuePop
+		    @ArithmeticTypes
+	    ]
+	| *:
+	    @ErroneousPredefined
+    ]
+    oValueReplaceNonManifest
+    oSymbolChangeKind(sCall)
+    @Reference;
+
+
+AbsArgument:
+    [
+	| aSubs:
+	    [
+		| aEndSubs:
+		    @PrematureEndPredefined
+		| *:
+		    @Expn
+		    @ResolveType
+		    [ oTypeChooseKind
+			| tReal, tInt, tNat, tNotFound:
+			| *:
+			    #eIncompatibleValueActualType
+		    ]
+		    @ExtraneousSubscripts
+	    ]
+	| *:
+	    @ErroneousPredefined
+    ]
+    oValueReplaceNonManifest
+    oSymbolChangeKind(sCall)
+    @Reference;
+
+LowerArgument:
+    % handle subrange types, arrays.
+    [
+	| aIdent:
+	    [ @VariableNotFnValue
+		| no:
+		    #eBadArgToLower
+		| *:
+		    [ oTypeChooseKind
+			| tSubrange, tEnumeratedRange, tArray, tFlexArray:
+			    [ oSymbolChooseKind
+				| sType:
+				    % make up for MainVariable not emitting
+				    % type name
+				    .aIdent	oEmitSymbol
+				| sVariable, sRuntimeConstant,
+				  sCompiletimeConstant:
+				| *:
+				    #eBadArgToLower
+			    ]
+			| *:
+		    ]
+	    ]
+	    [
+		| aEndExpression:
+		    .aEndExpression
+		| *:
+		    #eBadArgToLower
+		    @Expn
+		    oTypeReplaceBuiltin(tNotFound)
+	    ]
+	    oSymbolPop
+	| *:
+	    #eBadArgToLower
+	    @Expn
+	    oTypeReplaceBuiltin(tNotFound)
+    ]
+    oValuePop
+    [ oTypeChooseKind
+	| tSubrange, tEnumeratedRange:
+	    oValuePush(viNonManifest)
+	    oTypeSwapTypes
+	    oTypePop
+	    @EndPredefined
+	    >>
+	| tArray, tFlexArray:
+	| tNotFound:
+	    oTypeSwapTypes
+	    oTypePop
+	    oValuePush(viNonManifest)
+	    @EndPredefined
+	    >>
+	| *:
+	    #eBadArgToLower
+    ]
+    [ *
+	| aEndSubs:
+	    oValuePush(viOne)
+	| *:
+	    [ oTypeChooseKind
+		| tArray, tFlexArray:
+		    oCountPushTypeArrayNumberOfIndices
+		    oValuePushCount		% count
+		    oCountPop
+		| *:
+		    oValuePush(viOne)
+	    ]
+	    oEmitBufferPush
+	    @CompileTimeExpn		% count, value
+	    oEmitBufferPop
+	    @ResolveType
+	    [ oTypePopAndChooseKind
+		| tInt, tNat:
+		| tNotFound:
+		    oValuePop
+		    oValuePush(viOne)
+		| *:
+		    #eIncompatibleValueActualType
+		    oValuePop
+		    oValuePush(viOne)
+	    ]
+	    oValueSwapValues		% value, count
+	    [ oValueChooseLegalRangeValues
+		| yes:
+		| *:
+		    #eDimensionRequestedLargerThanArrayNumberOfIndices
+		    % replace with 1
+		    oValueSwapValues	% count, value
+		    oValuePop
+		    oValuePush(viOne)
+		    oValueSwapValues	% value, count
+	    ]
+	    oValuePop		% value
+	    oValuePush(viOne)
+	    oValueSwapValues	% 1, value
+	    [ oValueChooseLegalRangeValues
+		| yes:
+		| *:
+		    #eDimensionRequestedLessThanOne
+		    oValuePop
+		    oValuePush(viOne)
+	    ]
+	    oValueSwapValues
+	    oValuePop
+    ]
+    oEmitManifestValue
+    .aEndExpression
+    [ oTypeChooseKind
+	| tArray, tFlexArray:
+	    oCountPushValue
+	    oTypePushCountIndexType		% base, array, index
+	    oCountPop
+	    oTypeSwapTypes			% base, index, array
+	    oTypePop				% base, index
+	    @ResolveType
+	    oTypeSwapTypes			% index, base
+	    oTypePop				% index
+	| *:
+	    oTypePop
+	    oTypeReplaceBuiltIn(tInt)
+    ]
+    oValueReplaceNonManifest
+    @EndPredefined;
+
+UpperArguments:
+    [
+	| aIdent:
+	    [ @VariableNotFnValue
+		| no:
+		    #eBadArgToUpper
+		| *:
+		    [ oTypeChooseKind
+			| tSubrange, tEnumeratedRange:
+			    [ oSymbolChooseKind
+				| sType:
+				    % make up for MainVariable not emitting
+				    % type name
+				    .aIdent	oEmitSymbol
+				| sVariable, sRuntimeConstant,
+				  sCompiletimeConstant:
+				    #eBadArgToUpper
+				| *:
+			    ]
+			| tString, tCharString, tFlexChar, tArray, tFlexArray:
+			    [ oSymbolChooseKind
+				| sType:
+				    % make up for MainVariable not emitting
+				    % type name
+				    .aIdent	oEmitSymbol
+				| *:
+			    ]
+			| *:
+		    ]
+	    ]
+	    [
+		| aEndExpression:
+		    .aEndExpression
+		| *:
+		    #eBadArgToUpper
+		    @Expn
+		    oTypeReplaceBuiltin(tNotFound)
+	    ]
+	    oSymbolPop
+	| *:
+	    #eBadArgToUpper
+	    @Expn
+	    oTypeReplaceBuiltin(tNotFound)
+    ]
+    oValuePop
+    [ oTypeChooseKind
+	| tSubrange, tEnumeratedRange:
+	    oValuePush(viNonManifest)
+	    oTypeSwapTypes
+	    oTypePop
+	    @EndPredefined
+	    >>
+	| tArray, tFlexArray, tString, tFlexChar, tCharString:
+	| tNotFound:
+	| *:
+	    #eBadArgToUpper
+	    oTypeReplaceBuiltin(tNotFound)
+    ]
+    [ oTypeChooseKind
+	| tNotFound:
+	    oTypeSwapTypes
+	    oTypePop
+	    oValuePush(viNonManifest)
+	    @EndPredefined
+	    >>
+	| *:
+    ]
+    [ *
+	| aEndSubs:
+	    oValuePush(viOne)
+	| *:
+	    oValuePush(viOne)
+	    [ oTypeChooseKind
+		| tArray, tFlexArray:
+		    oValuePop
+		    oCountPushTypeArrayNumberOfIndices
+		    oValuePushCount
+		    oCountPop
+		| tNotFound:
+		| *:
+		    #eUpperOfStringMustNotHaveSecondParm
+	    ]
+	    % count
+	    oEmitBufferPush
+	    @CompileTimeExpn	% count, value
+	    oEmitBufferPop
+	    @ResolveType
+	    [ oTypePopAndChooseKind
+		| tInt, tNat:
+		| tNotFound:
+		    oValuePop
+		    oValuePush(viOne)
+		| *:
+		    #eIncompatibleValueActualType
+		    oValuePop
+		    oValuePush(viOne)
+	    ]
+	    oValueSwapValues	% value, count
+	    [ oValueChooseLegalRangeValues
+		| yes:
+		| *:
+		    #eDimensionRequestedLargerThanArrayNumberOfIndices
+		    % replace with 1
+		    oValueSwapValues	% count, value
+		    oValuePop
+		    oValuePush(viOne)
+		    oValueSwapValues	% value, count
+	    ]
+	    oValuePop
+	    oValuePush(viOne)
+	    oValueSwapValues
+	    [ oValueChooseLegalRangeValues
+		| yes:
+		| *:
+		    #eDimensionRequestedLessThanOne
+		    oValuePop
+		    oValuePush(viOne)
+	    ]
+	    oValueSwapValues
+	    oValuePop
+    ]
+    [ oTypeChooseKind
+	| tArray, tFlexArray:
+	    oEmitManifestValue
+	    .aEndExpression
+	    oCountPushValue
+	    oTypePushCountIndexType		% base, array, index
+	    oCountPop
+	    oTypeSwapTypes			% base, index, array
+	    oTypePop				% base, index
+	    @ResolveType
+	    oTypeSwapTypes			% index, base
+	    oTypePop				% index
+	| *:
+	    oTypePop
+	    oTypeReplaceBuiltIn(tInt)
+    ]
+    oValueReplaceNonManifest
+    @EndPredefined;
+
+NilArgument:
+    oTypePop		% nil return type
+    [
+	| aIdent:
+	    @Variable
+	    [
+		| aEndExpression:
+		    .aEndExpression
+		| *:
+		    #eBadArgToNil
+		    oEmitBufferPush
+		    @Expn
+		    oEmitBufferPop
+		    oTypeReplaceBuiltin(tNotFound)
+	    ]
+	| *:
+	    #eBadArgToNil
+	    [ *
+		| aEndSubs:
+		    oTypePushBuiltIn(tNotFound)
+		    oValuePush(viNonManifest)
+		| *:
+		    @Expn
+	    ]
+	    oSymbolPushDummy
+	    oTypeReplaceBuiltin(tNotFound)
+    ]
+    [ oTypeChooseKind
+	| tCollection:
+	    oTypePushComponentType
+	    [ oTypePopAndChooseKind
+		| tType:
+		    [ oTypeChooseAttribute(taForward)
+			| yes:
+			    #eUnresolvedForwardInCollection
+			| *:
+		    ]
+		| *:
+	    ]
+	    oValueReplaceNil
+	| tNotFound:
+	    oValueReplaceNonManifest
+	| *:
+	    #eBadArgToNil
+	    oTypeReplaceBuiltin(tNotFound)
+	    oValueReplaceNonManifest
+    ]
+    oTypePop
+    oTypePushNew(tPointer)
+    oTypeEnterSymbol
+    oSymbolPop
+    @EndPredefined;
+
+AddrArgument:
+    oTypePop		% addr type
+    [ *
+	| aIdent, aTypeCheat:
+	    @VariableReference
+	    [
+		| aEndExpression:
+		    .aEndExpression
+		| *:
+		    #eBadArgToAddr
+		    oEmitBufferPush
+		    @Expn
+		    oEmitBufferPop
+		    oTypeReplaceBuiltin(tNotFound)
+		    oSymbolChangeKind(sNotFound)
+	    ]
+	| *:
+	    #eBadArgToAddr
+	    [ *
+		| aEndSubs:
+		    oTypePop			% predefined type
+		    oTypePushBuiltIn(tInt)
+		    oValuePush(viOne)
+		    oEmitManifestValue
+		    .aEndExpression
+		| *:
+		    @Expn
+	    ]
+	    oSymbolPushDummy
+	    oSymbolEnterKind(sNotFound)
+	    oTypeReplaceBuiltin(tNotFound)
+    ]
+    oValueReplaceNonManifest
+    [ oSymbolChooseKind
+	| sProcedure, sFunction, sVariable, sRuntimeConstant, sNotFound,
+	  sProcess, sCollection:
+	    [ oSymbolChooseAttribute(saRegister)
+		| yes:
+		    #eAddrOfRegisterVariable
+		| *:
+	    ]
+	| sCompiletimeConstant:
+	    #eAddrOfCompileTimeConstant
+	| *:
+	    #eBadArgToAddr
+    ]
+    oTypeReplaceBuiltin(tAddressInt)
+    oSymbolPop
+    @EndPredefined;
+
+SizeArgument:
+    oTypePop		% size type
+    [ *
+	| aIdent, aTypeCheat:
+	    @VariableReference
+	    % Allow size(namedType)
+	    [ oSymbolChooseKind
+		| sType:
+		    % this wasn't done in VariableReference
+		    .aIdent oEmitSymbol
+		| *:
+	    ]
+	    [ oTypeChooseKind
+		| tOpaque:
+		    #eSizeOfOpaqueObject
+		| *:
+	    ]
+	    [
+		| aEndExpression:
+		    .aEndExpression
+		| *:
+		    #eBadArgToSize
+		    oEmitBufferPush
+		    @Expn
+		    oEmitBufferPop
+		    oTypeReplaceBuiltin(tNotFound)
+		    oSymbolChangeKind(sNotFound)
+	    ]
+	| *:
+	    #eBadArgToSize
+	    [ *
+		| aEndSubs:
+		    oTypePop			% predefined type
+		    oTypePushBuiltIn(tInt)
+		    oValuePush(viOne)
+		    oEmitManifestValue
+		    .aEndExpression
+		| *:
+		    @Expn
+	    ]
+	    oSymbolPushDummy
+	    oSymbolEnterKind(sNotFound)
+	    oTypeReplaceBuiltin(tNotFound)
+    ]
+    oValueReplaceNonManifest
+    [ oSymbolChooseKind
+	| sVariable, sRuntimeConstant, sType, sNotFound:
+	| sCompiletimeConstant:
+	    #eSizeOfCompileTimeConstant
+	| *:
+	    #eBadArgToSize
+    ]
+    oTypeReplaceBuiltin(tInt)
+    oSymbolPop
+    @EndPredefined;
+
+% strdelete(var target : string(*), len, loc : int)
+StrdeleteArguments:
+    @StringOpStringStar
+    @StringOpIntExpnIntExpn
+    oValuePush(viNonManifest)
+    @EndPredefined;
+
+
+StringOpStringStar:
+    @VariableReference
+    [
+	| aEndExpression:
+	    .aEndExpression
+	    [ oTypePopAndChooseKind
+		| tString, tNotFound:
+		    [ oSymbolChooseKind
+			| sVariable, sNotFound:
+			| *:
+			    #eIllegalVariableReference
+		    ]
+		| *:
+		    #eBadArgToStringop
+	    ]
+	| *:
+	    #eBadArgToStringop
+	    @Expn
+	    oTypePop
+    ]
+    oValuePop
+    oSymbolPop;
+
+
+StringOpIntExpnIntExpn:
+    [ *
+	| aEndSubs:
+	    @PrematureEndPredefined
+	| *:
+	    @Expn
+	    @ResolveType
+	    [ oTypePopAndChooseKind
+		| tInt, tNat, tNotFound, tError:
+		| *:
+		    #eBadArgToStringop
+	    ]
+	    oValuePop
+	    @StringOpIntExpn
+    ];
+
+
+StringOpIntExpn:
+    [ *
+	| aEndSubs:
+	    @PrematureEndPredefined
+	| *:
+	    @Expn
+	    @ResolveType
+	    [ oTypePopAndChooseKind
+		| tInt, tNat, tNotFound, tError:
+		| *:
+		    #eBadArgToStringop
+	    ]
+	    oValuePop
+    ];
+
+
+EmitDirectStringKind:
+    oEmitBufferPushDirect
+    [ oTypeChooseKind
+	| tString:
+	    .aString
+	| tChar, tFlexChar, tCharString:
+	    .aChar
+	| *:
+    ]
+    oEmitBufferPopDirect;
+
+% strmove(var target : strChar, source : strChar, loc : int)
+StrmoveArguments:
+    oEmitBufferPush
+    @VariableReference
+    [
+	| aEndExpression:
+	    .aEndExpression
+	    @EmitDirectStringKind
+	    [ oTypePopAndChooseKind
+		| tString, tChar, tFlexChar, tCharString, tNotFound:
+		    [ oSymbolChooseKind
+			| sVariable, sNotFound:
+			| *:
+			    #eIllegalVariableReference
+		    ]
+		| *:
+		    #eBadArgToStringop
+	    ]
+	| *:
+	    #eBadArgToStringop
+	    @Expn
+	    oTypePop
+    ]
+    oEmitBufferEmit
+    oEmitBufferPop
+    oSymbolPop
+    oValuePop
+    [ *
+	| aEndSubs:
+	    @PrematureEndPredefined
+	| *:
+	    oEmitBufferPush
+	    @Expn
+	    @ResolveType
+	    @EmitDirectStringKind
+	    [ oTypePopAndChooseKind
+		| tString, tChar, tFlexChar, tCharString, tNotFound:
+		| *:
+		    #eBadArgToStringop
+	    ]
+	    oValuePop
+	    oEmitBufferEmit
+	    oEmitBufferPop
+	    @StringOpIntExpn
+    ]
+    oValuePush(viNonManifest)
+    @EndPredefined;
+
+
+% strreplace(var target : string(*), source : strChar, loc, len : int)
+StrreplaceArguments:
+    @StringOpStringStar
+    [ *
+	| aEndSubs:
+	    @PrematureEndPredefined
+	| *:
+	    oEmitBufferPush
+	    @Expn
+	    @ResolveType
+	    @EmitDirectStringKind
+	    [ oTypePopAndChooseKind
+		| tString, tChar, tCharString, tFlexChar, tNotFound:
+		| *:
+		    #eBadArgToStringop
+	    ]
+	    oValuePop
+	    oEmitBufferEmit
+	    oEmitBufferPop
+	    @StringOpIntExpnIntExpn
+    ]
+    oValuePush(viNonManifest)
+    @EndPredefined;
+
+EmptyArgument:
+    oTypePop		% empty return type
+    [
+	| aIdent:
+	    @Variable
+	    [
+		| aEndExpression:
+		    .aEndExpression
+		| *:
+		    #eBadArgToNil
+		    oEmitBufferPush
+		    @Expn
+		    oEmitBufferPop
+		    oTypeReplaceBuiltin(tNotFound)
+	    ]
+	| *:
+	    #eBadArgToEmpty
+	    [ *
+		| aEndSubs:
+		    oTypePushBuiltIn(tNotFound)
+		    oValuePush(viNonManifest)
+		| *:
+		    @Expn
+	    ]
+	    oSymbolPushDummy
+	    oTypeReplaceBuiltin(tNotFound)
+    ]
+    oValueReplaceNonManifest
+    [ oTypeChooseKind
+	| tCondition, tNotFound:
+	| *:
+	    #eBadArgToEmpty
+	    oTypeReplaceBuiltin(tNotFound)
+    ]
+    oTypeReplaceBuiltin(tBoolean)
+    oSymbolPop
+    @EndPredefined;
+
+VariableNotFnValue >> Boolean:
+    oSymbolPush
+    oTypePushSymbolType
+    @SurroundingModule
+    [ oSymbolChooseKind
+	| sFunction:
+	    @MainVariable
+	    @Reference
+	    >> no
+	| *:
+	    @MainVariable
+	    @Reference
+	    >> yes
+    ];
+
+
+Variable:
+    oSymbolPush
+    oTypePushSymbolType
+    @SurroundingModule
+    @MainVariable
+    @Reference;
+
+MainVariable:
+    [ oSymbolChooseKind
+	| sVariable, sRunTimeConstant:
+	    oValuePush(viNonManifest)
+	    .aIdent	oEmitSymbol
+	    >>				% for efficiency only
+	| sCompileTimeConstant, sEnumeratedElement:
+	    oValuePushSymbolValue
+	    oEmitManifestSymbolValue
+	    >>
+	| sType:
+	    oValuePush(viOne)
+	    >>
+	| sFunction:
+	    oValuePush(viNonManifest)
+	    .aIdent	oEmitSymbol
+	    oScopePushTypeFormals
+	    oCountPushScopeNumberOfEntries
+	    [ oCountChooseZero
+		| yes:		% parameter-less function
+		    oSymbolChangeKind(sCall)
+		    oTypeReplaceResultType
+		    aCall
+		    .aCall
+		| *:
+	    ]
+	    oCountPop
+	    oScopePop
+	    >>
+	| *:
+	    oValuePush(viNonManifest)
+	    .aIdent	oEmitSymbol
+	    >>
+    ];
+
+Reference:
+	% doesn't change stacks
+    {[
+	| aSubs:
+	    @SubscriptOrActuals
+	| aCall:
+	    aSubs
+	    @SubscriptOrActuals
+	| aField:
+	    @Field
+	| aHash:
+	    .aHash
+	    oTypePushNew(tNat)			% old, nat
+	    oTypeSwapTypes			% nat, old
+	    oTypeEnterLeftTypeSizeFromRight
+	    oTypePop				% nat
+	    oValueReplaceNonManifest
+	| aSubstring:
+	    @SubString
+	| aSet:
+	    @SetElementList
+	| aCollection:
+	    @CollectionSubscript
+	| *:
+	    >>
+    ]};
+
+Field:
+    .aField
+    oSymbolPop
+    [ oTypeChooseAttribute(taPacked)
+	| yes:
+	    oContextSet(cPacked)
+	| *:
+    ]
+    [ oTypeChooseKind
+	| tUnion:
+	    aIdent
+	    oSymbolPush
+
+	    [ oSymbolChooseAttribute(saTag)
+		| yes:
+		    % no need to check the tag!!
+		| *:
+		    % type stack:  unionType
+		    % symbolStack: field symbol
+		    .aTagCheck
+		    oSymbolPushTypeSymbol		% field, tag
+		    .aIdent oEmitSymbol
+		    .aIdent oEmitExtraIdentSymbol
+		    oSymbolPop				% field
+		    oValuePushSymbolBodyNumber
+		    oEmitManifestValue
+		    oValuePop
+	    ]
+	| *:
+	    aIdent
+	    oSymbolPush
+    ]
+    oTypePop
+    .aIdent	oEmitSymbol
+    oTypePushSymbolType;
+
+SubscriptOrActuals:
+    [ oSymbolChooseKind
+	| sVariable, sRuntimeConstant, sCompileTimeConstant,
+	  sCollection, sCall:
+	    [ oTypeChooseKind
+		| tArray, tFlexArray:
+		    @Subscript
+		    [ oTypeChooseAttribute(taPacked)
+			| yes:
+			    oContextSet(cPacked)
+			| *:
+		    ]
+		    oTypeReplaceComponentType
+		| tProcedure:
+		    @ActualParameters
+		    oSymbolChangeKind(sCall)
+		| tFunction:
+		    @ActualParameters
+		    oTypeReplaceResultType
+		    oSymbolChangeKind(sCall)
+	    ]
+	    >>
+	| sProcedure:
+	    @ActualParameters
+	    oSymbolChangeKind(sCall)
+	    >>
+	| sProcess:
+	    @ActualParameters
+	    oSymbolChangeKind(sCall)
+	    >>
+	| sFunction:
+	    @ActualParameters
+	    oTypeReplaceResultType
+	    oSymbolChangeKind(sCall)
+	    >>
+    ];
+
+Subscript:
+    .aSubs
+    oCountPushTypeArrayNumberOfIndices
+    {
+	[ oCountChooseZero
+	    | yes:
+		>
+	    | *:
+		[ *
+		    | aEndSubs:
+			#eTooFewSubscripts
+			>
+		    | aAll:
+			aAll
+			#eIllegalUseOfAll
+		    | *:
+		]
+		oTypePushCountIndexType
+		@Expn
+		[ @CompatibleTypes
+		    | yes:
+			oTypePop
+			oTypePop
+			oTypePushCountIndexType
+			[ @ValueInRange
+			    | yes, maybe:
+			    | *:
+				#eSubscriptOutOfRange
+			]
+			oTypePop
+		    | *:
+			#eIncompatibleSubscriptTypes
+			oTypePop
+			oTypePop
+		]
+		oValuePop
+	]
+	oCountDecrement
+    }
+    [ oCountChooseZero
+	| yes:
+	    @ExtraneousSubscripts
+	| *:
+	    aEndSubs
+    ]
+    oCountPop
+    .aEndSubs;
+
+SubString:
+    % emit:  aSubstring expn [expn] aEndSubstring(kind)
+    .aSubstring
+    oSubstringPushNew
+    oValuePushStringLength
+    [
+	| aStar:
+	    [
+		| aMinus:
+		    oSubstringSetLeftKind(substringStarMinus)
+		    @Expn
+		    @CheckSubstringExpnTypePop
+		| *:
+		    oSubstringSetLeftKind(substringStar)
+		    oValuePush(viZero)
+		    oEmitManifestValue
+		    .aEndExpression
+
+	    ]
+	| *:
+	    oSubstringSetLeftKind(substringExpn)
+	    @Expn
+	    @CheckSubstringExpnTypePop
+    ]
+    [
+	| aSubstring:
+	    aEndExpressionList
+	    oSubstringSetRightKind(substringNone)
+	    oValuePush(viOne)		% stringLen, right, 1
+	    aEndSubs
+	    [ oTypeChooseKind
+		| tCharString, tFlexChar:
+		    % char(x) == char
+		    oTypePop
+		    oTypePushBuiltin(tChar)
+		| *:
+	    ]
+	    [ oSubstringChooseLeftKind
+		| substringExpn:
+		    oValueSwapValues	% stringLen, 1, right
+		    [ oValueChooseLegalSubstringValue
+			| yes:
+			| *:
+			    #eIllegalSubstringValue
+		    ]
+		    oValueSwapValues	% stringLen, right, 1
+		| *:
+	    ]
+	| aEndExpressionList:
+	    oSubstringSetRightKind(substringNone)
+	    oValuePush(viOne)		% stringLen, right, 1
+	    aEndSubs
+	    [ oTypeChooseKind
+		| tCharString, tFlexChar:
+		    % char(x) == char
+		    oTypePop
+		    oTypePushBuiltin(tChar)
+		| *:
+	    ]
+	    [ oSubstringChooseLeftKind
+		| substringExpn:
+		    oValueSwapValues	% stringLen, 1, right
+		    [ oValueChooseLegalSubstringValue
+			| yes:
+			| *:
+			    #eIllegalSubstringValue
+		    ]
+		    oValueSwapValues	% stringLen, right, 1
+		| *:
+	    ]
+	| *:
+	    [
+		| aStar:
+		    [
+			| aMinus:
+			    oSubstringSetRightKind(substringStarMinus)
+			    @Expn
+			    @CheckSubstringExpnTypePop
+			| *:
+			    oSubstringSetRightKind(substringStar)
+			    oValuePush(viZero)
+			    oEmitManifestValue
+			    .aEndExpression
+		    ]
+		| *:
+		    oSubstringSetRightKind(substringExpn)
+		    @Expn
+		    @CheckSubstringExpnTypePop
+		    [ oSubstringChooseLeftKind
+			| substringExpn:
+			    [ oValueChooseKind
+				| vInteger:
+				    oValueSwapValues
+				    [ oValueChooseKind
+					| vInteger:
+					    % both bounds are compile time
+					    oValueSwapValues
+					    [ oValueChooseLegalSubstringValues
+						| yes:
+						| *:
+						    #eIllegalSubstringValues
+					    ]
+					| *:
+					    oValueSwapValues
+				    ]
+				| *:
+			    ]
+			| *:
+		    ]
+	    ]
+	    [
+		| aSubString:
+		    aEndExpressionList
+		    aEndSubs
+		    [ oTypeChooseKind
+			| tCharString, tFlexChar:
+			    % char(a..b) == string
+			    oTypePop
+			    oTypePushBuiltin(tString)
+			| *:
+		    ]
+		    oContextSet(cStringExpn)
+		| *:
+		    @FlushSubscripts
+	    ]
+    ]
+    oValuePop
+    oValuePop
+    oValuePop
+    oValueReplaceNonManifest
+    .aEndSubstring
+    oEmitSubstringKind
+    oSubstringPop;
+
+
+CheckSubstringExpnTypePop:
+    @ResolveType
+    [ oTypePopAndChooseKind
+	| tInt, tNat:
+	| tNotFound:
+	    oValuePop
+	    oValuePush(viOne)
+	| *:
+	    #eIllegalSubstringIndexType
+	    oValuePop
+	    oValuePush(viOne)
+    ];
+
+CollectionSubscript:
+    % Handle a collection pointer subscript.
+    % Assumes that the top entry in the Symbol Stack is
+    % the collection.
+
+    .aCollection
+    aSubs
+    .aSubs
+    @Expn
+    [ oTypeChooseKind
+	| tPointer:
+	    oSymbolPushTypeSymbol
+	    [ oSymbolChooseSameSymbols
+		| yes:
+		| *:
+		    #eWrongCollectionSubscriptType
+	    ]
+	    oSymbolPop
+	| tNotFound:
+	| *:
+	    #eWrongCollectionSubscriptType
+    ]
+    oTypePop
+    oValuePop
+    @ExtraneousSubscripts
+    oTypeReplaceComponentType
+    .aEndSubs;
+
+SetElementList:
+    .aIdent	oEmitSymbol		%Subscripted types emit ID
+    .aSet
+    aSubs
+    .aSubs
+    oValuePop		% dummy value
+    oTypePushComponentType
+    [
+	| aAll:
+	    .aAll
+	    oValueTypeSetAll
+	    aEndSubs
+	| *:
+	    @SetElements
+    ]
+    oTypePop
+    oSymbolChangeKind(sRuntimeConstant)
+    .aEndSubs;
+
+
+
+SetElements:
+    oCountPushZero
+    {
+	[
+	    | aEndSubs:
+		>
+	    | *:
+		oCountIncrement
+		oTypeCopy		% extra copy of baseIndex to "play with"
+		@Expn
+		[ @CompatibleTypes
+		    | yes:
+			oTypePop
+			oTypePop
+			[ @ValueInRange
+			    | yes, maybe:
+			    | *:
+				#eSetElementOutOfRange
+			]
+		    | *:
+			#eIncompatibleSetElementType
+			oTypePop
+			oTypePop
+		]
+	]
+    }
+    oValueTypeSetCount
+    oCountPop;
+
+ActualParameters:
+    % symstk: ...,subprogram	- no change on exit
+    % typstk: ...,subprogram	- no change on exit
+    .aCall .aSubs
+    oCountPushZero
+    {[
+	| aEndSubs:
+	    >
+	| *:
+	    oCountIncrement
+	    oScopePushTypeFormals
+	    oSymbolPushCountScope		% symstk: ...,proc,formal
+	    oScopePop
+		% typstk: ...,proc
+	    [ oSymbolChooseKind
+		| sVariable:
+		    @ReferenceActual
+		| sRuntimeConstant:
+		    [ oSymbolChooseAttribute(saTypeCheat)
+			| yes:
+			    % parameter type cheats must be by reference
+			    % These may be strings, char strings, sets
+			    @ValueActual
+			| *:
+			    oTypePushSymbolType
+			    [ oTypePopAndChooseKind
+				| tArray, tFlexArray, tRecord, tUnion:
+				    @ReferenceActual
+				| tString, tChar, tFlexChar, tCharString, tSet:
+				    @ValueActual
+				| tProcedure, tFunction:
+				    @ValueActual
+				| tVaryingParameter:
+				    % counteract the upcoming count increment
+				    oCountDecrement
+				    @Expn
+				    oTypePop
+				    oValuePop
+				| *:
+				    @ValueActual
+			    ]
+		    ]
+		| sProcedure, sFunction:
+		    @ParametricActual
+		| sNotFound:
+		    % this may be a call to a predefined routine with too
+		    % many parameters
+		    oSymbolPop
+		    #eTooManyActuals
+		    @FlushSubscripts
+		    >
+	    ]
+	    oSymbolPop			% symstk: ...,proc
+    ]}
+    .aEndSubs
+    oCountIncrement
+    oScopePushTypeFormals
+    oSymbolPushCountScope
+    oScopePop
+    [ oSymbolChooseKind
+	| sNotFound:
+	    % no more actuals
+	| *:
+	    oTypePushSymbolType
+	    [ oTypePopAndChooseKind
+		| tVaryingParameter:
+		| *:
+		    #eTooFewActuals
+	    ]
+    ]
+    oSymbolPop
+    oCountPop
+    @OptAliasCheck;
+
+ReferenceActual:
+	% symstk: ...,proc,formal	- no change
+	% typstk: ...,proc		- no change
+    oContextClear(cPacked)
+    oContextClear(cStringExpn)
+    @VariableReference
+    oValuePop
+    [ oSymbolChooseAttribute(saRegister)
+	| yes:
+	    % this is okay if it is a reference (i.e. nonscalar) parameter
+	    oSymbolPop				% symstk: ...,proc,formal
+	    oTypePushSymbolType	% formal
+	    [ oTypePopAndChooseKind
+		| tArray, tFlexArray, tRecord, tUnion, tString, tCharString,
+			tFlexChar:
+		| *:
+		    #eRegisterReferenceActual
+	    ]
+	| *:
+	    [ oSymbolChooseKind
+		| sCompiletimeConstant:
+		    #eCompileTimeReferenceParameter
+		| *:
+	    ]
+	    oSymbolPop				% symstk: ...,proc,formal
+    ]
+
+    % validate actual type
+    oTypePushSymbolType	% formal
+    oTypeSwapTypes	% on top
+
+    [ oSymbolChooseAttribute(saTypeCheat)
+	| yes:
+	| *:
+	    @CheckReferenceActualType
+    ]
+    oTypePop
+    oTypePop
+    aEndExpression
+    .aEndExpression
+    [ oContextChoose(cPacked)
+	| yes:
+	    #ePackedReferenceActual
+	| *:
+    ]
+    [ oContextChoose(cStringExpn)
+	| yes:
+	    #eExpressionPassedByReference
+	| *:
+    ];
+
+
+CheckReferenceActualType:
+    [ @EquivalentParameterTypes
+	| yes:
+	| *:
+	    #eWrongReferenceActualType
+    ];
+
+ValueActual:
+    oTypePushSymbolType	% formal
+    @Expn
+    [ oSymbolChooseAttribute(saTypeCheat)
+	| no:
+	    [ @CompatibleTypes
+		| yes:
+		    oTypePushSymbolType	% new unresolved copy of formal type
+		    [ @ValueInRange
+			| yes, maybe:
+			| *:
+			    #eValueActualOutOfRange
+		    ]
+		    oTypePop
+		| *:
+		    % flex chars can't be assigned to, but can be passed to
+		    [ oTypeChooseLeftKind
+			| tFlexChar:
+			    [ oTypeChooseKind
+				| tChar, tCharString, tString, tFlexChar:
+				| *:
+				    #eIncompatibleValueActualType
+			    ]
+			| *:
+			    #eIncompatibleValueActualType
+		    ]
+	    ]
+	| *:
+    ]
+    oTypePop
+    oValuePop
+    oTypePop
+    oTypePushSymbolType			% unresolved formal type
+    [ oTypeChooseKind
+	| tSubrange:
+	    .aRangeCheck
+	    oValuePushTypeRangeValues
+	    oValueSwapValues
+	    oEmitManifestValue
+	    oValuePop
+	    oEmitManifestValue
+	    oValuePop
+	| tString:
+	    oValuePushStringLength
+	    [ oValueChooseKind
+		| vInteger:
+		    oValuePush(viDefaultStringSize)
+		    [ oValueChooseSameValues
+			| yes:
+			    oValuePop
+			| *:
+			    oValuePop
+			    .aRangeCheck
+			    .aString
+			    oEmitManifestValue
+		    ]
+		| *:
+	    ]
+	    oValuePop
+	| *:
+    ]
+    oTypePop;
+
+ParametricActual:
+    % Entered with called procedure on top of type stack and formal
+    % parametric subprogram parameter on top of symbol stack.
+    % Checks actual matches formal and then checks for aliasing
+    % between the actual and the called procedure.
+    oTypePushSymbolType		% typstk: ...,called,formal
+    @VariableReference
+    [
+	| aEndExpression:
+	    .aEndExpression
+	    oSymbolSwapSymbols		% actual, formal
+	    [ oSymbolChooseAttribute(saTypeCheat)
+		| yes:
+		    oSymbolSwapSymbols	% formal, actual
+		    oTypeSwapTypes	% typstk: ...,called,actual,formal
+		    oTypePop		% typstk: ...,called,actual
+		| *:
+		    oSymbolSwapSymbols	% formal, actual
+		    [ @EquivalentParameterTypes
+			| yes:
+			    oTypeSwapTypes % typstk: ...,called,actual,formal
+			    oTypePop	   % typstk: ...,called,actual
+			| *:
+			    #eWrongParametricActualType
+			    oTypePop	   % typstk: ...,called,formal
+		    ]
+	    ]
+	| *:
+	    % symstk: ...,actual
+	    % typstk: ...,called,formal,actual
+	    oTypePushBuiltin(tNotFound)	% will be popped below
+	    @IllegalReferenceActual	% typstk: ...,called,formal
+    ]
+    oSymbolPop				% remove actual
+    oValuePop
+    oTypePop;				% typstk: ...,called
+
+
+IllegalReferenceActual:
+    #eExpressionPassedByReference
+    @Expn
+    oTypePop
+    oValuePop;
+
+CompileTimeExpn:
+    @Expn
+    [ oValueChooseKind
+	| vRunTime:
+	    #eNonCompileTimeExpression
+	    oTypeReplaceBuiltIn(tInt)
+	    oValuePop
+	    oValuePush(viOne)
+	| *:
+    ];
+
+
+CompileTimeExpnOrBitsSubrangeType:
+    % Accept a subrange/enum type or a compile-time expression
+    [
+	| aIdent:
+	    @Variable
+	    [ *
+		| aEndExpression:
+		    [ oSymbolChooseKind
+			| sType:
+			    aEndExpression
+			    [ oTypeChooseKind
+				| tSubrange, tEnumeratedRange:
+				| *:
+				    #eBitsTypeMustBeSubrange
+			    ]
+			| *:
+			    @CompileTimeExpn
+		    ]
+		| *:
+		    @CompileTimeExpn
+	    ]
+	    oSymbolPop
+	| *:
+	    @CompileTimeExpn
+    ];
+
+Expn:
+    oEmitBufferPush
+    {[
+	| aEndExpression:
+	    >
+	| aIdent:
+	    @Variable
+	    oSymbolPop
+	| aIntegerLit:
+	    .aIntegerLit    oEmitInteger
+	    oValuePushIntegerLit
+	    oTypePushBuiltInFromValue
+	| aRealLit:
+	    .aRealLit	oEmitReal
+	    oTypePushBuiltIn(tReal)
+	    oValuePushRealLit
+	| aCharLit:
+	    .aCharLit	oEmitChar
+	    oValuePushCharLit
+	    oValuePushStringLiteralLength
+	    oValuePush(viOne)
+	    oValueEqualValues
+	    [ oValuePopAndChooseKind
+		| vTrue:
+		    oTypePushBuiltIn(tChar)
+		| *:
+		    oTypePushCharStringDummy
+	    ]
+	| aStringLit:
+	    .aStringLit	oEmitString
+	    oTypePushBuiltIn(tString)
+	    oValuePushStringLit
+	| aPredefinedId:
+	    oEmitBufferPush
+	    @PredefinedVariable
+	    oSymbolPop
+	    [ oValueChooseKind
+		| vRuntime:
+		    oEmitBufferEmit
+		    oEmitBufferPop
+		| *:
+		    oEmitBufferPop
+		    oEmitManifestValue
+	    ]
+	| aTrue:
+	    .aTrue
+	    oTypePushBuiltIn(tBoolean)
+	    oValuePush(viTrue)
+	| aFalse:
+	    .aFalse
+	    oTypePushBuiltIn(tBoolean)
+	    oValuePush(viFalse)
+	| *:
+	    @Operator
+    ]}
+    [ oValueChooseKind
+	| vRunTime :
+	    oEmitBufferEmit
+	    oEmitBufferPop
+	| * :
+	    oEmitBufferPop
+	    oEmitManifestValue
+    ]
+    .aEndExpression;
+
+Operator:
+    [
+	| aPlus:
+	    @Plus
+	| aMinus:
+	    @Minus
+	| aAdd:
+	    @AddOrSetUnionOrStringConcatenate
+	| aSubtract:
+	    @SubtractOrSetDifference
+	| aMultiply:
+	    @MultiplyOrSetIntersection
+	| aExponentiate:
+	    @Exponentiate
+	| aDivideReal:
+	    @DivideReal
+	| aDiv:
+	    @Div
+	| aMod:
+	    @Mod
+	| aXor:
+	    @Xor
+	| aShiftLeft:
+	    @ShiftLeft
+	| aShiftRight:
+	    @ShiftRight
+
+	| aHash:
+	    .aHash
+	    oTypePushNew(tNat)			% old, nat
+	    oTypeSwapTypes			% nat, old
+	    oTypeEnterLeftTypeSizeFromRight
+	    oTypePop				% nat
+	    oValueReplaceNonManifest
+
+	% type cheap operator
+	| aTypeCheat:
+	    @TypeCheat
+
+	% bits operator
+	| aBits:
+	    @Bits
+
+	% Relational operators; all are postfix.
+	% aInfixCompare marks the original location of the infix operator
+
+	| aInfixCompare:
+	    [ oTypeChooseKind
+		| tBoolean:
+		    .aInfixBooleanCompare
+		| *:
+		    .aInfixCompare
+	    ]
+	| aEqual:
+	    @Equal
+	| aNotEqual:
+	    @NotEqual
+	| aLess:
+	    @Less
+	| aLessEqual:
+	    @LessEqualOrSetLessEqual
+	| aGreater:
+	    @Greater
+	| aGreaterEqual:
+	    @GreaterEqualOrSetGreaterEqual
+	| aNotIn:
+	    @NotIn
+	| aIn:
+	    @In
+
+	% Boolean operators; both infix and postix are provided
+
+	| aNot:
+	    @Not
+	| aInfixAnd:
+	    [ oTypeChooseKind
+		| tBoolean:
+		    .aInfixAnd
+		| *:
+		    % bitwise and
+	    ]
+	| aAnd:
+	    @AndOrLogicalAnd
+	| aInfixOr:
+	    [ oTypeChooseKind
+		| tBoolean:
+		    .aInfixOr
+		| *:
+		    % bitwise or
+	    ]
+	| aOr:
+	    @OrOrLogicalOr
+	| aInfixImply:
+	    .aInfixImply
+	| aImply:
+	    @Imply
+    ];
+
+Plus:
+    .aPlus
+    @ResolveSubrangeType
+    [ oTypeChooseKind
+	| tReal, tReal8, tInt, tInt4, tNat, tNat4, tIntNat, tAddressInt,
+		tVaryingParameter:
+	| tNotFound:
+	    oTypeReplaceBuiltIn(tInt)
+	| *:
+	    #eNonArithmeticType
+	    oTypeReplaceBuiltIn(tInt)
+    ];
+
+
+Minus:
+    .aMinus
+    @ResolveSubrangeType
+    [ oTypeChooseKind
+	| tReal, tReal8, tInt, tInt4:
+	| tNat, tNat4, tIntNat, tAddressInt, tVaryingParameter:
+	    % - nat ==> int
+	    oTypeReplaceBuiltIn(tInt)
+	| tNotFound:
+	    oTypeReplaceBuiltIn(tInt)
+	| *:
+	    #eNonArithmeticType
+	    oTypeReplaceBuiltIn(tInt)
+    ]
+    oValueNegate
+    oTypeReplaceFromValue;
+
+ArithmeticTypes:
+    % Check that the top two types are arithmetic types.
+    % Replaces them with the type of the result operation
+    % nat op nat ==> nat;  nat op int ==> int; X op real ==> real
+    @ResolveSubrangeType
+    [ oTypePopAndChooseKind
+	| tInt, tInt4:
+	    @ResolveSubrangeType
+	    [ oTypeChooseKind
+		| tInt, tIntNat, tInt4:
+		    oTypeReplaceBuiltIn(tInt)
+		| tReal, tReal8:
+		    oTypeReplaceBuiltIn(tReal)
+		| tNat, tNat4, tAddressInt, tVaryingParameter, tNotFound:
+		    oTypeReplaceBuiltIn(tInt)
+		| *:
+		    #eNonArithmeticType
+		    oTypeReplaceBuiltIn(tInt)
+	    ]
+	| tNat, tNat4, tAddressInt, tVaryingParameter:
+	    @ResolveSubrangeType
+	    [ oTypeChooseKind
+		| tInt, tInt4:
+		    oTypeReplaceBuiltIn(tInt)
+		| tReal, tReal8:
+		    oTypeReplaceBuiltIn(tReal)
+		| tNat, tNat4, tIntNat, tAddressInt, tVaryingParameter,
+			tNotFound:
+		    oTypeReplaceBuiltin(tNat)
+		| *:
+		    #eNonArithmeticType
+		    oTypeReplaceBuiltIn(tInt)
+	    ]
+	| tIntNat:
+	    % depends on the other type
+	    @ResolveSubrangeType
+	    [ oTypeChooseKind
+		| tInt, tInt4, tIntNat, tNotFound:
+		    oTypeReplaceBuiltIn(tInt)
+		| tReal, tReal8:
+		    oTypeReplaceBuiltIn(tReal)
+		| tNat, tNat4, tAddressInt, tVaryingParameter:
+		    oTypeReplaceBuiltin(tNat)
+		| *:
+		    #eNonArithmeticType
+		    oTypeReplaceBuiltIn(tInt)
+	    ]
+	| tReal, tReal8:
+	    @ResolveSubrangeType
+	    [ oTypeChooseKind
+		| tReal, tReal8, tInt, tInt4, tNat, tNat4, tIntNat,
+		  tAddressInt, tVaryingParameter:
+		| tNotFound:
+		| *:
+		    #eNonArithmeticType
+	    ]
+	    oTypeReplaceBuiltIn(tReal)
+	| tNotFound:
+	| *:
+	    #eNonArithmeticType
+	    [ oTypeChooseKind
+		| tReal, tReal8:
+		    % leave type stack as is
+		| *:
+		    % choose integer as best
+		    oTypeReplaceBuiltIn(tInt)
+	    ]
+    ];
+
+LogicalTypes:
+    % Check that the top two types are int/nat types.
+    % Replaces them with the result type nat.
+    % Check that constant values are not negative ints.
+    @ResolveType
+    [ oTypePopAndChooseKind
+	| tInt, tNat:
+	    @ResolveType
+	    [ oTypeChooseKind
+		| tInt, tNat:
+		| tNotFound:
+		| *:
+		    #eNonLogicalType
+	    ]
+	| tNotFound:
+	| *:
+	    #eNonLogicalType
+    ]
+    oTypeReplaceBuiltIn(tNat)
+    [ oValueChooseKind
+	| vInteger:
+	    [ oValueChooseNonNegative
+		| yes:
+		| *:
+		    #eNegativeConstantUsedInLogicalOperation
+		    oValueConvertIntToNat
+	    ]
+	| *:
+    ]
+    oValueSwapValues
+    [ oValueChooseKind
+	| vInteger:
+	    [ oValueChooseNonNegative
+		| yes:
+		| *:
+		    #eNegativeConstantUsedInLogicalOperation
+		    oValueConvertIntToNat
+	    ]
+	| *:
+    ]
+    oValueSwapValues;
+
+SetTypes:
+    % Check that the top two types are compatible sets and pop the
+    % top (right operand) type.  Assumes that the left operand type
+    % is known to be a set.
+    [ oTypeChooseKind
+	| tSet:
+	    [ oTypeChooseLeftKind
+		| tSet:
+		    [ oTypeChooseSameRanges
+			| yes:
+			| *:
+			    #eSetBaseTypeMismatch
+		    ]
+		| *:
+		    #eNonSetType
+	    ]
+	| tNotFound:
+	| *:
+	    #eNonSetType
+    ]
+    oTypePop;
+
+
+EqualTypes:
+    % Booleans and pointers can only be compared for equality (=, ~=)
+    % Sets are restricted to (=, ~=, <=, and >=) instead of the full
+    % comparison range.
+    % procedures/functions can only be compare for equality
+    [ oTypeChooseKind
+	| tBoolean:
+	    @BooleanTypes
+	| tSet:
+	    @SetTypes
+	| tPointer, tProcedure, tFunction:
+	    [ @EquivalentTypes
+		| yes:
+		| *:
+		    #eIncompatibleComparisonTypes
+	    ]
+	    oTypePop
+	| tNotFound:
+	    oTypePop
+	| *:
+	    @ComparisonTypes
+    ]
+    oTypeReplaceBuiltIn(tBoolean);
+
+
+BooleanTypes:
+    @ResolveType
+    [ oTypePopAndChooseKind
+	| tBoolean:
+	    @ResolveType
+	    [ oTypeChooseKind
+		| tBoolean:
+		| tNotFound:
+		| *:
+		    #eNonBooleanType
+	    ]
+	| tNotFound:
+	| *:
+	    #eNonBooleanType
+    ]
+    oTypeReplaceBuiltIn(tBoolean);
+
+ComparisonTypes:
+    % Checks that the operand types of a comparison match and
+    % replaces the operand types with the result type Boolean.
+    % Some types are handled in EqualType, etc.
+    oTypeSwapTypes	% left operand type on top
+    @ResolveType
+    [ oTypeChooseKind
+	| tString, tChar, tCharString, tFlexChar:
+	    oTypePop
+	    @ResolveType
+	    [ oTypeChooseKind
+		| tString, tChar, tCharString, tFlexChar:
+		| tNotFound:
+		| *:
+		    #eIncompatibleComparisonTypes
+	    ]
+	| tInt, tNat, tReal:
+	    oTypePop
+	    @ResolveType
+	    [ oTypeChooseKind
+		| tInt, tNat, tReal:
+		| tNotFound:
+		| *:
+		    #eIncompatibleComparisonTypes
+	    ]
+	| tEnumeratedRange:
+	    oTypeSwapTypes
+	    @ResolveType
+	    [ oTypeChooseKind
+		| tEnumeratedRange:
+		    [ oTypeChooseSameEnumeratedRanges
+			| yes:
+			| *:
+			    #eIncompatibleComparisonTypes
+		    ]
+		| tNotFound:
+		| *:
+		    #eIncompatibleComparisonTypes
+	    ]
+	    oTypePop
+	| tNotFound:
+	    oTypePop
+	| *:
+	    #eNonComparisonType
+	    oTypePop
+    ]
+    oTypeReplaceBuiltIn(tBoolean);
+
+InTypes:
+    % Checks that the left operand of "in" or "not in" is an integer
+    % and the right operand is a set.  Leaves the set component type on
+    % the type stack so that "in" and "not in" can  emit the set lower
+    % bound for the allocator pass
+    % typstk: element, set
+    @ResolveType
+    [ oTypeChooseKind
+	| tSet:
+	    oTypeSwapTypes		% typstk: set, element
+	    oTypePushLeftComponentType	% typstk: set, element, base
+	    oTypeSwapTypes		% typstk: set, base, element
+	    [ @CompatibleTypes
+		| yes:
+		    oTypePop
+		    oTypePop			% typstk: set
+		    oValueSwapValues		% move inclusion value to top
+		    oTypeReplaceComponentType	% typstk: base
+		    [ @ValueInRange
+			| yes, maybe:
+			| *:
+			    #eBadSetElement
+		    ]
+		    oValueSwapValues		% restore value stack
+		| *:
+		    #eWrongSetElementType
+		    oTypePop
+		    oTypePop
+		    oTypeReplaceComponentType
+	    ]
+	| tNotFound:
+	    oTypePop
+	    oTypeReplaceBuiltIn(tSubrange)
+	| *:
+	    #eNonSetType
+	    oTypePop
+	    oTypeReplaceBuiltIn(tSubrange)
+    ];
+
+AddOrSetUnionOrStringConcatenate:
+    % Decide if the + operator is an add or a set union or a string
+    % concatenation.  Decisions between set, string, and arithmetic operators
+    % are made based on the left operand type.
+
+    [ oTypeChooseLeftKind
+	| tSet:
+	    @SetUnion
+	| tString, tChar, tCharString, tFlexChar:
+	    @StringConcatenate
+	| *:
+	    @Add
+    ];
+
+
+Add:
+    .aAdd
+    @ArithmeticTypes
+    oValueAddValues
+    oTypeReplaceFromValue;
+
+
+SetUnion:
+    .aSetUnion
+    @SetTypes
+    oValueSetUnion;
+
+
+StringConcatenate:
+    % result is char(c) when operands are char or char(a)
+    %	     is string when either operand is string of char(*)
+    .aConcatenate
+    [ oTypeChooseKind
+	| tFlexChar, tString:
+	    % result is tString
+	    oTypePop
+	    oTypeReplaceBuiltin(tString)
+	| tChar, tCharString:
+	    [ oTypeChooseLeftKind
+		| tFlexChar, tString:
+		    % result is tString
+		    oTypePop
+		    oTypeReplaceBuiltin(tString)
+		| tChar, tCharString:
+		    oValuePushStringLength
+		    oTypePop
+		    oValuePushStringLength
+		    oTypePop
+		    oValueAddValues
+		    oTypePushBuiltin(tCharString)
+		    oTypeReplaceTypeWithSameKindAndValue
+		    oValuePop
+	    ]
+	| *:
+	    #eNonStringType
+	    oTypePop
+	    oTypeReplaceBuiltin(tString)
+    ]
+    oValueStringConcatenate;
+
+SubtractOrSetDifference:
+    [ oTypeChooseLeftKind
+	| tSet:
+	    @SetDifference
+	| *:
+	    @Subtract
+    ];
+
+
+Subtract:
+    .aSubtract
+    @ArithmeticTypes
+    oValueSubtractValues
+    oTypeReplaceFromValue;
+
+
+SetDifference:
+    .aSetDifference
+    @SetTypes
+    oValueSetDifference;
+
+MultiplyOrSetIntersection:
+    [ oTypeChooseLeftKind
+	| tSet:
+	    @SetIntersection
+	| *:
+	    @Multiply
+    ];
+
+
+Multiply:
+    .aMultiply
+    @ArithmeticTypes
+    oValueMultiplyValues
+    oTypeReplaceFromValue;
+
+
+SetIntersection:
+    .aSetIntersection
+    @SetTypes
+    oValueSetIntersection;
+
+
+Exponentiate:
+    .aExponentiate
+    @ArithmeticTypes
+    [ oTypeChooseKind
+	| tReal:
+	    % one of the operands was real
+	| *:
+	    % neither of the operands were real
+	    [ oValueChooseKind
+		| vInteger:			% The exponent of an integer
+		    [ oValueChooseNonNegative	% exponentiate was a constant
+			| yes:
+			| *:
+			    #eIntegerExponentiatePowerNegative
+		    ]
+		| *:
+	    ]
+	    % For now, nat ** nat == int
+	    oTypeReplaceBuiltin(tInt)
+    ]
+    oValuePop
+    oValueReplaceNonManifest;
+
+
+DivideReal:
+    .aDivideReal
+    @ArithmeticTypes
+    oTypeReplaceBuiltIn(tReal)
+    [ oValueChooseZero
+	| yes:
+	    #eDivByZero
+	| *:
+    ]
+    oValuePop
+    oValueReplaceNonManifest;
+
+Div:
+    .aDiv
+    @ArithmeticTypes
+    [ oTypeChooseKind
+	| tReal:
+	    % real div real == int
+	    oTypeReplaceBuiltin(tInt)
+	| *:
+    ]
+    [ oValueChooseZero
+	| yes:
+	    #eDivByZero
+	    oValuePop
+	    oValueReplaceNonManifest
+	| *:
+	    oValueDivValues
+	    oTypeReplaceFromValue
+    ];
+
+
+Mod:
+    .aMod
+    @ArithmeticTypes
+    [ oValueChooseZero
+	| yes:
+	    #eDivByZero
+	    oValuePop
+	    oValueReplaceNonManifest
+	| *:
+	    oValueModValues
+	    oTypeReplaceFromValue
+    ];
+
+
+Equal:
+    .aEqual
+    @EqualTypes
+    oValueEqualValues;
+
+
+NotEqual:
+    .aNotEqual
+    @EqualTypes
+    oValueEqualValues
+    oValueNot;
+
+
+Less:
+    .aLess
+    @ComparisonTypes
+    oValueLessValues;
+
+
+Greater:
+    .aGreater
+    @ComparisonTypes
+    oValueGreaterValues;
+
+LessEqualOrSetLessEqual:
+    [ oTypeChooseLeftKind
+	| tSet:
+	    @SetLessEqual
+	| *:
+	    @LessEqual
+    ];
+
+
+SetLessEqual:
+    .aSetLessEqual
+    @SetTypes
+    oTypeReplaceBuiltIn(tBoolean)
+    oValuePop
+    oValueReplaceNonManifest;
+
+
+LessEqual:
+    .aLessEqual
+    @ComparisonTypes
+    oValueGreaterValues
+    oValueNot;
+
+
+GreaterEqualOrSetGreaterEqual:
+    [ oTypeChooseLeftKind
+	| tSet:
+	    @SetGreaterEqual
+	| *:
+	    @GreaterEqual
+    ];
+
+
+SetGreaterEqual:
+    .aSetGreaterEqual
+    @SetTypes
+    oTypeReplaceBuiltIn(tBoolean)
+    oValuePop
+    oValueReplaceNonManifest;
+
+
+GreaterEqual:
+    .aGreaterEqual
+    @ComparisonTypes
+    oValueLessValues
+    oValueNot;
+
+Not:
+    .aNot
+    @ResolveType
+    [ oTypeChooseKind
+	| tBoolean:
+	| tNotFound:
+	    oTypeReplaceBuiltIn(tBoolean)
+	| *:
+	    #eNonBooleanType
+	    oTypeReplaceBuiltIn(tBoolean)
+    ]
+    oValueNot;
+
+AndOrLogicalAnd:
+    [ oTypeChooseLeftKind
+	| tBoolean:
+	    @And
+	| *:
+	    @LogicalAnd
+    ];
+
+
+And:
+    .aAnd
+    @BooleanTypes
+    [ oValueChooseLeftKind
+	| vTrue:
+	    [ oValueChooseKind
+		| vTrue:
+		    oValuePop		% Leaves true on stack
+		| vFalse:
+		    oValueSwapValues
+		    oValuePop		% Leaves false on stack
+		| *:
+		    oValuePop
+		    oValueReplaceNonManifest
+	    ]
+	| vFalse:
+	    oValuePop			% Leaves false on stack
+	| *:
+	    oValuePop
+	    oValueReplaceNonManifest
+    ];
+
+
+LogicalAnd:
+    .aLogicalAnd
+    @LogicalTypes
+    oValueLogicalAndValues
+    oTypeReplaceFromValue;
+
+OrOrLogicalOr:
+    [ oTypeChooseLeftKind
+	| tBoolean:
+	    @Or
+	| *:
+	    @LogicalOr
+    ];
+
+
+Or:
+    .aOr
+    @BooleanTypes
+    [ oValueChooseLeftKind
+	| vTrue:
+	    oValuePop			% Leaves true on value stack
+	| vFalse:
+	    [ oValueChooseKind
+		| vTrue:
+		    oValueSwapValues
+		    oValuePop		% Leaves true on value stack
+		| vFalse:
+		    oValuePop		% Leaves false on value stack
+		| *:
+		    oValuePop
+		    oValueReplaceNonManifest
+	    ]
+	| *:
+	    oValuePop
+	    oValueReplaceNonManifest
+    ];
+
+
+LogicalOr:
+    .aLogicalOr
+    @LogicalTypes
+    oValueLogicalOrValues
+    oTypeReplaceFromValue;
+
+Xor:
+    [ oTypeChooseLeftKind
+	| tSet:
+	    @SetXor
+	| *:
+	    @LogicalXor
+    ];
+
+
+LogicalXor:
+    .aLogicalXor
+    @LogicalTypes
+    oValueLogicalXorValues
+    oTypeReplaceFromValue;
+
+
+SetXor:
+    .aSetXor
+    @SetTypes
+    oValueSetXor;
+
+
+ShiftRight:
+    .aShiftRight
+    @LogicalTypes
+    oValueLogicalShiftRightValues
+    oTypeReplaceFromValue;
+
+
+ShiftLeft:
+    .aShiftLeft
+    @LogicalTypes
+    oValueLogicalShiftLeftValues
+    oTypeReplaceFromValue;
+
+Imply:
+    .aImply
+    @BooleanTypes
+    [ oValueChooseLeftKind
+	| vFalse:
+	    oValuePop
+	    oValueNot			% Leaves true on value stack
+	| vTrue:
+	    [ oValuePopAndChooseKind
+		| vTrue:		% Leaves true on value stack
+		| vFalse:
+		    oValueNot		% Leaves false on value stack
+		| *:
+		    oValueReplaceNonManifest
+	    ]
+	| *:
+	    oValuePop
+	    oValueReplaceNonManifest
+    ];
+
+NotIn:
+    .aNotIn
+    @InTypes
+    oValuePushTypeRangeValues
+    oValueSwapValues
+    oEmitManifestValue			% set base lower bound
+    oValuePop
+    oEmitManifestValue			% set base upper bound
+    oValuePop
+    oTypeReplaceBuiltIn(tBoolean)	% result type of sub-expression
+    oValuePop
+    oValueReplaceNonManifest;
+
+
+In:
+    .aIn
+    @InTypes
+    oValuePushTypeRangeValues
+    oValueSwapValues
+    oEmitManifestValue			% set base lower bound
+    oValuePop
+    oEmitManifestValue			% set base upper bound
+    oValuePop
+    oTypeReplaceBuiltIn(tBoolean)	% result type of sub-expression
+    oValuePop
+    oValueReplaceNonManifest;
+
+Bits:
+    % We have just seen a 'bits'
+    .aBits
+    @Expn
+    @ResolveType
+    [ oTypePopAndChooseKind
+	| tInt, tNat, tNotFound, tError:
+	| *:
+	    #eBitsExpnMustBeInteger
+    ]
+    @BitsType
+    oValueReplaceNonManifest
+    oTypeReplaceBuiltin(tNat);
+
+
+TypeCheat:
+    % We have just seen a 'typecheat'.
+    .aTypeCheat
+    @TypeSpec
+    [
+	| aAt:
+	    .aAt
+	    @Expn
+	    @ResolveType
+	    [ oTypePopAndChooseKind
+		| tInt, tNat, tNotFound:
+		| *:
+		    #eAtExpnMustBeInteger
+	    ]
+	| *:
+	    @Expn
+	    [
+		| aTypeCheatSize:
+		    .aTypeCheatSize
+		    @CompileTimeExpn
+		    @ResolveType
+		    [ oTypePopAndChooseKind
+			| tInt, tNat, tNotFound, tError:
+			    @ResolveType
+			    [ oTypeChooseKind
+				| tInt, tNat:
+				    [ oTypeCheatSizeValueMatchesType
+					| no:
+					    #eIllegalTypeCheatValue
+					| *:
+				    ]
+				| tReal:
+				    [ oTypeCheatSizeValueMatchesType
+					| no:
+					    #eIllegalTypeCheatValue
+					| *:
+				    ]
+				| tNotFound, tError:
+				| *:
+				    #eTypeCheatSizeOnlyAppliesToIntReal
+			    ]
+			| *:
+			    #eTypeCheatSizeNotInteger
+		    ]
+		    oValuePop
+		| *:
+	    ]
+	    oTypePop
+    ]
+    oValueReplaceNonManifest
+    oSymbolPushDummy
+    oSymbolEnterType
+    oSymbolEnterKind(sRuntimeConstant)
+    @Reference
+    oSymbolPop;
+
+ResolveType:
+    % Resolve the top type on the Type Stack to its root type.
+    [ oTypeChooseKind
+	| tInt, tInt4, tIntNat:
+	    oTypeReplaceBuiltIn(tInt)
+	| tNat, tNat4, tAddressInt, tVaryingParameter:
+	    oTypeReplaceBuiltIn(tNat)
+	| tReal, tReal8:
+	    oTypeReplaceBuiltIn(tReal)
+	| tString:
+	    % must be here!
+	    oTypeReplaceBuiltIn(tString)
+	| tEnumeratedElement, tSubrange:
+	    oTypeReplaceRootType
+	| *:
+    ];
+
+
+ResolveSubrangeType:
+    % Resolve a subrange or enum type to its root type.
+    [ oTypeChooseKind
+	| tSubrange, tEnumeratedElement:
+	    oTypeReplaceRootType
+	| *:
+    ];
+
+
+SurroundingModule:
+    [ oSymbolChooseKind
+	| sModule, sMonitor:
+	    [
+		| aField:
+		    oSymbolPop
+		    oTypePop
+
+		    aIdent
+		    oSymbolPush
+		    oTypePushSymbolType
+		| *:
+	    ]
+	| *:
+    ];
+
+ExtraneousSubscripts:
+    % Check for extraneous subscripts and flag and flush them if present.
+
+    [
+	| aEndSubs:
+	| *:
+	    #eTooManySubscripts
+	    @FlushSubscripts
+    ];
+
+
+
+FlushSubscripts:
+
+    % Flush extraneous or illegal subscripts.
+
+    {[
+	| aEndSubs:
+	    >
+	| aAll:
+	| aSubString:
+	| aStar:
+	| *:
+	    @Expn
+	    oTypePop
+	    oValuePop
+    ]};
+
+EquivalentTypes >> Boolean:
+    % are the types identical?
+    [ oTypeChooseSameTypes
+	| yes:
+	    >> yes
+	| *:
+    ]
+    % not identical, are they equivalent?
+    [ oTypeChooseLeftKind
+	% catch int == int4
+	| tInt, tInt4:
+	    [ oTypeChooseSameKindsAndSizes
+		| yes:
+		    >> yes
+		| *:
+		    [ @EquivalentInts
+			| yes:
+			    >> yes
+			| *:
+		    ]
+	    ]
+	% catch nat == nat4
+	| tNat, tNat4:
+	    [ oTypeChooseSameKindsAndSizes
+		| yes:
+		    >> yes
+		| *:
+		    [ @EquivalentNats
+			| yes:
+			    >> yes
+			| *:
+		    ]
+	    ]
+	% catch real == real8
+	| tReal, tReal8:
+	    [ oTypeChooseSameKindsAndSizes
+		| yes:
+		    >> yes
+		| *:
+		    [ @EquivalentReals
+			| yes:
+			    >> yes
+			| *:
+		    ]
+	    ]
+	| tBoolean:
+	    [ oTypeChooseSameKinds
+		| yes:
+		    >> yes
+		| *:
+	    ]
+	| tSubrange:
+	    [ oTypeChooseKind
+		| tSubrange:
+		    [ oTypeChooseSameRanges
+			| yes:
+			    [ oTypeChooseAttribute(taPacked)
+				| yes:
+				    [ oTypeChooseLeftAttribute(taPacked)
+					| yes:
+					    >> yes
+					| *:
+				    ]
+				| *:
+				    [ oTypeChooseLeftAttribute(taPacked)
+					| yes:
+					| *:
+					    >> yes
+				    ]
+			    ]
+			| *:
+		    ]
+		| *:
+	    ]
+	| tEnumeratedRange:
+	    [ oTypeChooseKind
+		| tEnumeratedRange:
+		    [ oTypeChooseSameEnumeratedRanges
+			| yes:
+			    >> yes
+			| *:
+		    ]
+		| *:
+	    ]
+	| tArray:
+	    [ oTypeChooseKind
+		| tArray:
+		     [ oTypeChooseAttribute(taPacked)
+			| yes:
+			    [ oTypeChooseLeftAttribute(taPacked)
+				| yes:
+				| *:
+				    >> no
+			    ]
+			| *:
+			    [ oTypeChooseLeftAttribute(taPacked)
+				| yes:
+				    >> no
+				| *:
+			    ]
+		    ]
+		    oTypePushLeftComponentType
+		    oTypePushLeftComponentType
+		    [ @EquivalentTypes
+			| yes:
+			| *:
+			    oTypePop
+			    oTypePop
+			    >> no
+		    ]
+		    oTypePop
+		    oTypePop
+		    [ oTypeChooseSameArrayRanges
+			| yes:
+			    >> yes
+			| *:
+		    ]
+		| *:
+	    ]
+	| tSet:
+	    [ oTypeChooseKind
+		| tSet:
+		    [ oTypeChooseSameRanges
+			| yes:
+			    >> yes
+			| *:
+		    ]
+		| *:
+	    ]
+	| tPointer:
+	    [ oTypeChooseKind
+		| tPointer:
+		    [ oTypeChooseSameSymbols
+			| yes:
+			    >> yes
+			| *:
+		    ]
+		| *:
+	    ]
+	| tChar, tCharString:
+	    [ @EquivalentCharTypes
+		| yes:
+		    >> yes
+		| *:
+	    ]
+	| tOpaque:
+	    [ oTypeChooseKind
+		| tOpaque:
+		    [ oTypeChooseSameOpaqueTypeNumbers
+			| yes:
+			    >> yes
+			| *:
+		    ]
+		| *:
+	    ]
+	| tProcedure:
+	    [ oTypeChooseKind
+		| tProcedure:
+		    [ @EquivalentSubprograms
+			| yes:
+			    >> yes
+			| *:
+		    ]
+		| *:
+	    ]
+	| tFunction:
+	    [ oTypeChooseKind
+		| tFunction:
+		    [ @EquivalentSubprograms
+			| yes:
+			    oTypePushLeftResultType
+			    oTypePushLeftResultType
+			    [ @EquivalentTypes
+				| yes:
+				    oTypePop
+				    oTypePop
+				    >> yes
+				| *:
+				    oTypePop
+				    oTypePop
+			    ]
+			| *:
+		    ]
+		| *:
+	    ]
+	| tNotFound:
+	    >> yes
+	| *:
+    ]
+    [ oTypeChooseKind
+	| tNotFound:
+	    >> yes
+	| *:
+	    >> no
+    ];
+
+EquivalentInts >> Boolean:
+    % left, right
+    oTypePushBuiltin(tInt4)		% l, r, i4
+    [ oTypeChooseSameKinds
+	| yes:
+	    % l, i4, i4
+	    oTypePop		% l, i4
+	    oTypeSwapTypes	% i4, l
+	    oTypePushBuiltin(tInt)	% i4, l, i
+	    [ oTypeChooseSameKindsAndSizes
+		| yes:
+		    % left is int, right is int4
+		    #eIntInt4Equivalence
+		    oTypePop		% i4, l
+		    oTypeSwapTypes	% l, r
+		    >> yes
+		| *:
+		    oTypePop		% i4, l
+		    oTypeSwapTypes	% l, r
+	    ]
+	| *:
+	    oTypePop				% l, r
+	    oTypePushBuiltin(tInt)		% l, r, i
+	    [ oTypeChooseSameKindsAndSizes
+		| yes:
+		    % l, i, i
+		    oTypePop		% l, i
+		    oTypeSwapTypes	% i, l
+		    oTypePushBuiltin(tInt4)	% i, l, i4
+		    [ oTypeChooseSameKinds
+			| yes:
+			    % right is int, left is int4
+			    #eIntInt4Equivalence
+			    oTypePop		% i, l
+			    oTypeSwapTypes	% l, r
+			    >> yes
+			| *:
+			    oTypePop		% i, l
+			    oTypeSwapTypes	% l, r
+		    ]
+		| *:
+		    oTypePop		% l, r
+	    ]
+    ]
+    >> no;
+
+EquivalentNats >> Boolean:
+    % left, right
+    oTypePushBuiltin(tNat4)		% l, r, n4
+    [ oTypeChooseSameKinds
+	| yes:
+	    % l, n4, n4
+	    oTypePop		% l, n4
+	    oTypeSwapTypes	% n4, l
+	    oTypePushBuiltin(tNat)	% n4, l, n
+	    [ oTypeChooseSameKindsAndSizes
+		| yes:
+		    % left is nat, right is nat4
+		    #eNatNat4Equivalence
+		    oTypePop		% n4, l
+		    oTypeSwapTypes	% l, r
+		    >> yes
+		| *:
+		    oTypePop		% n4, l
+		    oTypeSwapTypes	% l, r
+	    ]
+	| *:
+	    oTypePop				% l, r
+	    oTypePushBuiltin(tNat)		% l, r, n
+	    [ oTypeChooseSameKindsAndSizes
+		| yes:
+		    % l, n, n
+		    oTypePop		% l, n
+		    oTypeSwapTypes	% n, l
+		    oTypePushBuiltin(tNat4)	% n, l, n4
+		    [ oTypeChooseSameKinds
+			| yes:
+			    % right is nat, left is nat4
+			    #eNatNat4Equivalence
+			    oTypePop		% n, l
+			    oTypeSwapTypes	% l, r
+			    >> yes
+			| *:
+			    oTypePop		% n, l
+			    oTypeSwapTypes	% l, r
+		    ]
+		| *:
+		    oTypePop		% l, r
+	    ]
+    ]
+    >> no;
+
+EquivalentReals >> Boolean:
+    % left, right
+    oTypePushBuiltin(tReal8)		% l, r, R8
+    [ oTypeChooseSameKinds
+	| yes:
+	    % l, R8, R8
+	    oTypePop		% l, R8
+	    oTypeSwapTypes	% R8, l
+	    oTypePushBuiltin(tReal)	% r8, l, R
+	    [ oTypeChooseSameKindsAndSizes
+		| yes:
+		    % left is real, right is real8
+		    #eRealReal8Equivalence
+		    oTypePop		% R8, l
+		    oTypeSwapTypes	% l, r
+		    >> yes
+		| *:
+		    oTypePop		% R8, l
+		    oTypeSwapTypes	% l, r
+	    ]
+	| *:
+	    oTypePop				% l, r
+	    oTypePushBuiltin(tReal)		% l, r, R
+	    [ oTypeChooseSameKindsAndSizes
+		| yes:
+		    % l, R, R
+		    oTypePop		% l, R
+		    oTypeSwapTypes	% R, l
+		    oTypePushBuiltin(tReal8)	% R, l, R8
+		    [ oTypeChooseSameKinds
+			| yes:
+			    % right is real, left is real8
+			    #eRealReal8Equivalence
+			    oTypePop		% R, l
+			    oTypeSwapTypes	% l, r
+			    >> yes
+			| *:
+			    oTypePop		% R, l
+			    oTypeSwapTypes	% l, r
+		    ]
+		| *:
+		    oTypePop		% l, r
+	    ]
+    ]
+    >> no;
+
+EquivalentCharTypes >> Boolean:
+    [ oTypeChooseKind
+	| tChar, tCharString:
+	    oTypePushBuiltin(tChar)	% t1, t2, tChar
+	    [ oTypeChooseSameTypes
+		| yes:
+		    oTypePop		% t1, t2
+		    >> no		% because t1 != t2
+		| *:
+		    oTypePop		% t1, t2
+		    oTypeSwapTypes	% t2, t1
+		    oTypePushBuiltin(tChar)	% t2, t1, tChar
+		    [ oTypeChooseSameTypes
+			| yes:
+			    oTypePop		% t2, t1
+			    oTypeSwapTypes	% t1, t2
+			    >> no		% because t1 != t2
+			| *:
+			    oTypePop		% t2, t1
+			    oTypeSwapTypes	% t1, t2
+			    % neither is builtin char, so the chars
+			    % are equivalent if they have the same bounds
+			    [ oTypeChooseSameStringBounds
+				| yes:
+				    >> yes
+				| *:
+			    ]
+		    ]
+	    ]
+	| *:
+    ]
+    >> no;
+
+EquivalentParameterTypes >> Boolean:
+    [ @EquivalentTypes
+	| yes:
+	    >> yes
+	| *:
+    ]
+    % formal, actual
+    [ oTypeChooseLeftKind
+	| tString:
+	    oTypeSwapTypes
+	    oValuePushStringLength	% length of formal string
+	    oTypeSwapTypes
+	    [ oValuePopAndChooseKind
+		| vRunTime:	% only if string(*)
+		    [ oTypeChooseKind
+			| tString:
+			    >>yes	% all strings match string(*)
+			| *:
+		    ]
+		| *:
+	    ]
+	| tFlexArray:	% array n..* {, n..*} of <type>
+	    [ oTypeChooseKind
+		| tArray, tFlexArray:
+		    oTypeSwapTypes
+		    oCountPushTypeArrayNumberOfIndices
+		    oValuePushCount
+		    oCountPop
+		    oTypeSwapTypes
+		    oCountPushTypeArrayNumberOfIndices
+		    oValuePushCount
+		    oCountPop
+		    [ oValueChooseSameValues	% same number of indices?
+			| yes:
+			    oTypePushLeftComponentType
+			    oTypePushLeftComponentType
+			    [ @EquivalentParameterTypes
+				| yes:
+				    oTypePop
+				    oTypePop
+				    oValuePop
+				    oValuePop
+				    oCountPushTypeArrayNumberOfIndices
+				    {
+					[ oCountChooseZero
+					    | yes:
+						oCountPop
+						>
+					    | *:
+					]
+					% get low bounds of matching indices
+					oTypePushCountIndexType
+					oValuePushTypeRangeValues
+					oValuePop		% upper bound
+					oTypePop		% index type
+					oTypeSwapTypes
+					oTypePushCountIndexType
+					oValuePushTypeRangeValues
+					oValuePop		% upper bound
+					oTypePop		% index type
+					oTypeSwapTypes
+					[ oValueChooseSameValues
+					    | yes:
+						oValuePop
+						oValuePop
+					    | *:
+						oValuePop
+						oValuePop
+						oCountPop
+						>> no
+					]
+					oCountDecrement
+				    }
+				    >> yes
+				| *:
+				    oTypePop
+				    oTypePop
+			    ]
+			| *:
+		    ]
+		    oValuePop
+		    oValuePop
+		| *:
+	    ]
+	| tFlexChar:
+	    % any char() can be passed to a flex char
+	    [ oTypeChooseKind
+		| tCharString, tFlexChar:
+		    >> yes
+		| *:
+	    ]
+	| *:
+    ]
+    >> no;
+
+EquivalentSubprograms >> Boolean:
+    oTypeSwapTypes
+    oScopePushTypeFormals
+    oCountPushScopeNumberOfEntries
+    oScopePop
+    oValuePushCount
+    oCountPop
+    oTypeSwapTypes
+    oScopePushTypeFormals
+    oCountPushScopeNumberOfEntries
+    oScopePop
+    oValuePushCount
+    [ oValueChooseSameValues
+	| yes:			% same number of formals
+	    oValuePop
+	    oValuePop
+	| *:
+	    oCountPop
+	    oValuePop
+	    oValuePop
+	    >> no		% easier logic to return here
+    ]
+    {
+	[ oCountChooseZero
+	    | yes:	>
+	    | *:
+	]
+	oTypeSwapTypes
+	oScopePushTypeFormals
+	oSymbolPushCountScope
+	oScopePop
+	oTypeSwapTypes
+	oTypePushSymbolType
+	oTypeSwapTypes
+	oScopePushTypeFormals
+	oSymbolPushCountScope
+	oScopePop
+	oTypeSwapTypes
+	oTypePushSymbolType
+
+	% must check that var-ness of parametric formals matches
+	[ oSymbolPopAndChooseKind
+	    | sVariable:
+		[ oSymbolPopAndChooseKind
+		    | sVariable:
+		    | *:
+			oTypePop
+			oTypePop
+			oCountPop
+			>> no	%easier to return from here
+		]
+	    | *:
+		[ oSymbolPopAndChooseKind
+		    | sVariable:
+			oTypePop
+			oTypePop
+			oCountPop
+			>> no	%easier to return from here
+		    | *:
+		]
+	]
+
+	% must use special equivalence rule for formals of parametrics
+	[ @EquivalentParametricFormalTypes
+	    | yes:
+		oTypePop
+		oTypePop
+	    | *:
+		oTypePop
+		oTypePop
+		oCountPop
+		>> no	%easier to return from here
+	]
+	oCountDecrement
+    }
+    oCountPop
+    >> yes;
+
+EquivalentParametricFormalTypes >> Boolean:
+
+    % Special rule for equivalence of formal parameter types
+    % of parametric procedures and functions
+
+    [ @EquivalentTypes	% includes string(*) = string(*)
+			% but doesn't handle array n..* = array n..*
+	| yes:
+	    >> yes
+	| *:
+	    [ oTypeChooseLeftKind
+		| tFlexArray:		% array n..* {, n..*} of <type>
+		    [ oTypeChooseKind
+			| tFlexArray:	% must also be flex array
+			    oTypeSwapTypes
+			    oCountPushTypeArrayNumberOfIndices
+			    oValuePushCount
+			    oCountPop
+			    oTypeSwapTypes
+			    oCountPushTypeArrayNumberOfIndices
+			    oValuePushCount
+			    oCountPop
+			    [ oValueChooseSameValues	% same number of indices?
+				| yes:
+				    oTypePushLeftComponentType
+				    oTypePushLeftComponentType
+				    [ @EquivalentParameterTypes
+					| yes:
+					    oTypePop
+					    oTypePop
+					    oValuePop
+					    oValuePop
+					    oCountPushTypeArrayNumberOfIndices
+					    {
+						[ oCountChooseZero
+						    | yes:
+							oCountPop
+							>
+						    | *:
+						]
+						% get low bounds of matching indices
+						oTypePushCountIndexType
+						oValuePushTypeRangeValues
+						oValuePop		% upper bound
+						oTypePop		% index type
+						oTypeSwapTypes
+						oTypePushCountIndexType
+						oValuePushTypeRangeValues
+						oValuePop		% upper bound
+						oTypePop		% index type
+						oTypeSwapTypes
+						[ oValueChooseSameValues
+						    | yes:
+							oValuePop
+							oValuePop
+						    | *:
+							oValuePop
+							oValuePop
+							oCountPop
+							>> no
+						]
+						oCountDecrement
+					    }
+					    >> yes
+					| *:
+					    oTypePop
+					    oTypePop
+				    ]
+				| *:
+			    ]
+			    oValuePop
+			    oValuePop
+			| *:
+		    ]
+		| *:
+	    ]
+    ]
+    >> no;
+
+CompatibleTypes >> Boolean:
+    @ResolveType
+    oTypeSwapTypes
+    @ResolveType
+    oTypeSwapTypes
+    % are the root types equivalent?
+    [ @EquivalentTypes
+	| yes:
+	    [ oTypeChooseKind
+		| tFlexChar, tFlexArray:
+		    >> no
+		| * :
+		    >> yes
+	    ]
+	| *:
+	    [ oTypeChooseLeftKind
+		| tInt, tIntNat, tNat:
+		    [ oTypeChooseKind
+			| tInt, tIntNat, tNat:
+			    >> yes
+			| *:
+		    ]
+		| tString:
+		    [ oTypeChooseKind
+			| tChar, tFlexChar, tString:
+			    >> yes
+			| tCharString:
+			    % string(m), char(n) :: n <= m
+			    oTypeSwapTypes
+			    oValuePushStringLength	% slen
+			    oTypeSwapTypes
+			    oValuePushStringLength	% slen, cslen
+			    oValueSubtractValues
+			    [ oValueChooseNonNegative
+				| yes:
+				    oValuePop
+				    >> yes
+				| *:
+				    oValuePop
+				    >> no
+			    ]
+			| *:
+		    ]
+		| tChar:
+		    % can only assign string(1), char, char(* == 1)
+		    [ oTypeChooseKind
+			| tString:
+			    [ oValueChooseKind
+				| vString:
+				    % manifest string expn
+				    oValuePushStringLiteralLength
+				    oValuePush(viOne)
+				    [ oValueChooseSameValues
+					| yes:
+					    oValuePop
+					    oValuePop
+					    >> yes
+					| *:
+					    oValuePop
+					    oValuePop
+					    >> no
+				    ]
+				| *:
+				    >> yes
+			    ]
+			| tFlexChar, tChar:  % tChar is equiv.
+			    >> yes
+			| tCharString:
+			    oValuePushStringLength
+			    oValuePush(viOne)
+			    [ oValueChooseSameValues
+				| yes:
+				    oValuePop
+				    oValuePop
+				    >> yes
+				| *:
+				    oValuePop
+				    oValuePop
+				    >> no
+			    ]
+			| *:
+		    ]
+		| tCharString:
+		    % can only assign string(>=n), char(n), char(* == n)
+		    [ oTypeChooseKind
+			| tChar:
+			    % only if n == 1
+			    oTypeSwapTypes		% char, charstring
+			    oValuePushStringLength	% cslen
+			    oTypeSwapTypes		% charstring, char
+			    oValuePush(viOne)
+			    [ oValueChooseSameValues
+				| yes:
+				    oValuePop
+				    oValuePop
+				    >> yes
+				| *:
+				    oValuePop
+				    oValuePop
+				    >> no
+			    ]
+			| tFlexChar:
+			    >> yes
+			| tString:
+			    oValuePushStringLength	% slen
+			    oTypeSwapTypes
+			    oValuePushStringLength	% slen, cslen
+			    oTypeSwapTypes
+			    oValueSubtractValues
+			    [ oValueChooseNonNegative
+				| yes:
+				    oValuePop
+				    >> yes
+				| *:
+				    oValuePop
+				    >> no
+			    ]
+			| tCharString:
+			    % would have been equivalent!
+			    >> no
+			| *:
+		    ]
+		| tReal :
+		    [ oTypeChooseKind
+			| tInt, tIntNat, tNat, tReal :
+			    >> yes
+			| * :
+		    ]
+		| * :
+	    ]
+    ]
+    >> no;
+
+ValueInRange >> Boolean:
+    [ oValueChooseKind
+	| vRunTime :
+	    >> maybe
+	| vInteger :
+	    [ oTypeChooseKind
+		| tSubrange, tEnumeratedRange, tNat, tNat4, tInt, tInt4 :
+		    [ oValueChooseInTypeRange
+			| yes:
+			    >> yes
+			| *:
+			    >> no
+		    ]
+		| * :
+		    >> yes
+	    ]
+	| *:
+	    >> yes
+    ];
+
+
+end

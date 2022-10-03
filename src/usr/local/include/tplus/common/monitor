@@ -1,0 +1,66 @@
+#if not TL_MONITOR then
+#define TL_MONITOR
+
+var TL_Condition     : unchecked collection of forward TL_ConditionDescriptor
+type *TL_CDpointer   : pointer to TL_Condition
+
+var TL_Monitor		: unchecked collection of forward TL_MonitorDescriptor
+type *TL_MDpointer	: pointer to TL_Monitor
+
+
+ % record used for queues of process Descriptors
+type *TL_queue_t :
+    record
+        head : TL_PDpointer
+        tail : TL_PDpointer
+    end record
+
+%
+% NOTE: this must be kept consistent with definitions in 
+%       %cinterface file
+%
+type *TL_MonitorDescriptor :
+    record 
+	mQLock		: TL_lock_t	% binary semaphore -for multi-cpu access
+	entryParameter  : int
+	monitorPriority	: int		% For device monitors
+	deviceMonitor   : boolean	% true if a device monitor
+	entryQ		: TL_queue_t	% queue of processes entering monitor
+	reEntryQ	: TL_queue_t	% queue of processes re-entering monitor
+	name		: addressint
+	firstCondition	: TL_CDpointer
+	nextMonitor	: TL_MDpointer	% link to next monitor
+	prevMonitor	: TL_MDpointer	% link to previous monitor
+	otherInfo	: addressint   % ptr for user defined info
+    end record
+
+%
+% NOTE: this must be kept consistent with files :
+%       /local/include/tplus/SUN3/cinterface
+%       /local/lib/tplus/t+tocSUN3.mdp and
+%       /local/lib/tplus/allocSUN3.mdp
+%
+% record used for signal/waits
+type *TL_ConditionDescriptor :
+    record
+	signalQ		: TL_queue_t
+	md		: TL_MDpointer
+ % These fields are used to store info about each condition variable and 
+ % the corresponding monitor keeps a linked list of these records so that all
+ % condition queues can be scanned
+	name		: addressint
+	index		: nat4	  	% index num when array of conditions
+	nextCondition	: TL_CDpointer	% ptr to next conditionDescriptor
+	prevCondition	: TL_CDpointer	% ptr to previous conditionDescriptor
+	otherInfo	: addressint   % ptr for user defined info
+    end record
+
+ %
+ % compiler passes a collection of an array of conditions
+ % to the library (TLKC?INI) routines
+ %
+var TL_ConditionArray	: unchecked collection of
+				 array 1 .. 65535 of TL_ConditionDescriptor
+type *TL_CApointer	: pointer to TL_ConditionArray
+
+#end if

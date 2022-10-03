@@ -1,0 +1,866 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+% 
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+% 
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+/*
+ *    Turing Plus to C Translator
+ *    Module:Expression Tree Construction & Manipulation Module 
+ *    By:    Mark Mendell
+ *    Date:  28 Oct 1986
+ *    From:
+ *
+ *	Turing Source Level Global Optimizer
+ *	Module:Expression Tree Construction & Manipulation Module 
+ *	By:    Peter Ashwood-Smith
+ *	Date:  May 1986.
+ */
+
+body "expn.st" module Expression
+
+/* 
+ * Expression Module Internal Constants. Define the upper limits etc. 
+ * for internal storage used by the Expression Module. Next Available
+ * Identifier keeps track of the maximum Identifier seen so far in 
+ * the program. We log these on every EnterIdentifier call and use the
+ * info for allocating id's for optimizer use.
+ */
+    const *maxWorkStack := 100             % construction stack max size 
+    var nextAvailableIdentifier := 0
+
+/*
+ * Array and Top marker used to define the work hold stack on which 
+ * temporary results are placed when building trees from postfix calls.
+ */
+    var workStack : array 1 .. maxWorkStack of ExpressionPointer
+    var workStackTop : int := 0 
+
+/*
+ * Procedure to push a pointer on to the hold stack. This is used   
+ * when building the tree in prefix form to hold intermediate subtrees.
+ */
+    procedure Push(x : ExpressionPointer)
+	if workStackTop >= maxWorkStack then
+	    Error(expressionStackOverflow, nil(tNode), fatalError)
+	end if   
+	if workStackTop < 0 then
+	    Error(expressionStackInvalidTop, nil(tNode), fatalError)
+	end if    
+	workStackTop += 1     
+	workStack(workStackTop) := x
+    end Push    
+
+/*
+ * Procedure to pop a pointer off the hold stack. This is used when 
+ * when building the tree in prefix form to hold intermediate subtrees.
+ */
+    body procedure Pop % (var x: ExpressionPointer)
+	if workStackTop < 1 then
+	    Error(expressionStackUnderflow, nil(tNode), fatalError)
+	end if
+	if workStackTop > maxWorkStack then
+	    Error(expressionStackInvalidTop, nil(tNode), fatalError)
+	end if    
+	x := workStack(workStackTop)
+	workStackTop -= 1
+    end Pop
+
+/*
+ * Procedure to return the top of the hold stack. This is used when 
+ * when building the tree in prefix form to hold intermediate subtrees.
+ */
+    procedure Top(var x : ExpressionPointer)
+	if workStackTop > maxWorkStack or workStackTop < 1 then
+	    Error(expressionStackInvalidTop, nil(tNode), fatalError)
+	end if    
+	x := workStack(workStackTop)
+    end Top
+
+/*
+ * Function to tell us if the stack is empty or not. Jut test top=0
+ */
+    function TheStackIsNotEmpty : boolean
+	result not (workStackTop = 0)
+    end TheStackIsNotEmpty 
+
+/*
+ * Function to tell us if an expression node is a leaf, ie does it
+ * have a special value and no kids this is true if the tag 'n' is
+ * one of aIdent, aIntegerLit, aStringLit, aCharLit, aRealLit ..
+ * Note - compound tokens must be leaves otherwise their extra info
+ * is lost. We also provide a routine to identify if a node is a 
+ * constant for use by constant folding routines. Only integers, strings
+ * characters and booleans can be operated on by the folding module.
+ */
+    function NodeIsLeaf(n : int) : boolean
+	case n of
+	  label aIdent, aIntegerLit, aStringLit, aRealLit,
+	    aCharLit, aStar, aTrue, aFalse , aAll, aBoolean, aInt,
+	    aAddressint, aNat, aString, aChar, aPredefinedId, aEndSubstring,
+	    aType :
+		result true
+	  label :
+	    result false
+	end case
+    end NodeIsLeaf
+
+
+    function SEqual (s1, s2 : StringPtr, l : int) : boolean
+	bind register str1 to strings(s1),
+	    register str2 to strings(s2)
+
+	for i : 1..l
+	    if str1(i) not= str2(i) then
+		result false
+	    end if
+	end for
+	result true
+    end SEqual
+
+
+    body function AreEqual % (e1,e2:ExpressionPointer) : boolean
+       bind register ep1 to eNode(e1).u, register ep2 to eNode(e2).u
+
+       if ep1.operatorNumber not = ep2.operatorNumber then
+	  result false
+       else
+	  case ep1.operatorNumber of
+	    label  aIntegerLit:   
+		result ep1.integerValue = ep2.integerValue
+
+	    label  aRealLit:      
+		result ep1.realLen = ep2.realLen and
+		    SEqual(ep1.realValue, ep2.realValue, ep1.realLen)
+
+	    label  aStringLit:    
+		result ep1.stringLen = ep2.stringLen and
+			SEqual(ep1.stringValue, ep2.stringValue, ep1.stringLen)
+
+	    label  aCharLit:      
+		result ep1.charLen = ep2.charLen and
+			SEqual(ep1.charValue, ep2.charValue, ep1.charLen)
+
+	    label  aTrue,aFalse,aBoolean,aInt,aNat,aString,aChar,aStar,aAll,
+		      aAddressint, aType:
+		  result true
+
+	    label  aPredefinedId: 
+		result ep1.funcOrProcNumber = ep2.funcOrProcNumber
+
+	    label  aIdent:	 
+		result ep1.referenceValue = ep2.referenceValue
+
+	    label  aEndSubstring: 
+		result ep1.substringKind = ep2.substringKind
+
+	    label  :
+		var register kidsEqual := true
+		var register e1Next := ep1.operand 
+		var register e2Next := ep2.operand
+
+		loop
+		    exit when e1Next = nil(eNode) or e2Next = nil(eNode)
+		    kidsEqual := AreEqual(e1Next,e2Next)
+		    exit when not kidsEqual
+		    e1Next := eNode(e1Next).sibling 
+		    e2Next := eNode(e2Next).sibling
+		end  loop
+		result kidsEqual and e1Next = e2Next
+	  end case
+       end if
+   end AreEqual
+
+/*
+ * procedure to check that an expression node is valid and if not
+ * to abort with failCode. A node is valid if it is non nil and its
+ * operatorNumber makes sense.
+ */
+    procedure CheckValidNode(e : ExpressionPointer,failCode:int)
+       var temp : int
+       if e = nil(eNode) then 
+	  Error(failCode, nil(tNode), fatalError) 
+       end if
+       temp := eNode(e).u.operatorNumber
+       if temp < 0 or temp > 255 then
+	  Error(failCode, nil(tNode), fatalError)
+       end if
+    end CheckValidNode
+
+/*
+ * Procedure to init the module to a good start up configuration.   
+ * We reset the stack top, and all the PutAway table indexcies.
+ */
+    body procedure Init 
+	 workStackTop := 0
+    end Init 
+
+/*
+ * Procedure to push a new node onto the stack and to initialize its
+ * fields as given by the parameters to the call.
+ */
+    procedure PushNewOpNode(op : int, i : int4, iKind : int,
+			    s:TokenString, slen : int,
+			    m:boolean)
+	var t : ExpressionPointer
+	const nilNode := nil(eNode)
+
+	new eNode, t
+	tag eNode(t).u,op
+	begin
+	   bind var register u to eNode(t).u
+	   case op of
+	      label aCharLit:
+		    new strings, u.charValue
+		    strings(u.charValue) := s
+		    u.charLen := slen
+	      label aIntegerLit:
+		    u.integerValue := i
+		    u.integerKind := iKind
+	      label aPredefinedId:
+		    u.funcOrProcNumber := i
+	      label aIdent:
+		    u.referenceValue := i
+	      label aRealLit:
+		    new strings, u.realValue
+		    strings(u.realValue) := s
+		    u.realLen := slen
+	      label aStringLit:
+		    new strings, u.stringValue
+		    strings(u.stringValue) := s
+		    u.stringLen := slen
+	      label aEndSubstring:
+		    u.substringKind := i
+	      label aTrue,aFalse,
+		aStar,aAll,aBoolean,
+		aInt,aNat,aString,aChar, aAddressint:
+	      label:
+		    u.operand := nilNode
+		    u.nodeIsMarked := m
+	   end case
+	end
+	eNode(t).sibling := nil(eNode)
+	Push(t)
+    end PushNewOpNode
+
+/*
+ * Procedure to force the n top elements on the stack to be popped,  
+ * linked together as a child list, and the placed as the operandlist
+ * of a new node with operator type 'op' which is then pushed onto the
+ * stack.
+ */
+    body procedure EndOp % (op, n : int)
+       var temp, last, Op : ExpressionPointer
+
+       if not n > 0 then
+	  Error(expressionEndOpBadKidCount, nil(tNode), fatalError)
+       end if
+       if op < FirstToken or op > LastToken then
+	  Error(expressionEndOpBadOpNumber, nil(tNode), fatalError)
+       end if
+       if NodeIsLeaf(op) then
+	  Error(expressionBadoperatorNumber, nil(tNode), fatalError)
+       end if
+       last := nil(eNode)
+       for : 1..n                                      
+	   Pop(temp)
+	   eNode(temp).sibling := last
+	   last := temp 
+       end for                                         
+       new eNode,Op
+       tag eNode(Op).u, op
+       eNode(Op).u.operand := last                   
+       eNode(Op).u.nodeIsMarked := false
+       eNode(Op).sibling := nil(eNode)
+       Push(Op)                                         
+    end EndOp
+
+/*
+ * Function to return 'true' if the node 't' is infact a marked operator
+ * node and 'false' if it is unmarked or not an operator node.
+ */
+    function nodeIsMarkedOperator(t : ExpressionPointer) : boolean
+       if NodeIsLeaf(eNode(t).u.operatorNumber) then
+	  result false
+       else
+	  result eNode(t).u.nodeIsMarked
+       end if
+    end nodeIsMarkedOperator
+
+/*
+ * The stack contains a marked operator, followed by some unknown number
+ * of kids. We pop the stack linking the kids together until we hit the
+ * marked operator node. We then make the kids the marked operator node's
+ * operand, unmark the node and push it back onto the stack.
+ */
+    body proc ConstructMarkedOperator % ()
+       var temp, last: ExpressionPointer
+       last := nil(eNode)
+       loop
+	   Pop(temp)
+	   exit when nodeIsMarkedOperator(temp)
+	   eNode(temp).sibling := last
+	   last := temp 
+       end loop
+       eNode(temp).u.operand := last                   
+       eNode(temp).u.nodeIsMarked := false
+       eNode(temp).sibling := nil(eNode)
+       Push(temp)                                         
+    end ConstructMarkedOperator
+
+/*
+ * Procedure End, the stack should now contain a finished expression
+ * tree on the top of the stack. We pop this from the stack and return it.
+ * If the stack is empty then return a Nil expression node. This is used
+ * when the SSL thinks an expr is comming but one does not and allows
+ * the TransferExpressionToTreeLeaf operation to have no effect on parse
+ * tree.
+ */
+    body procedure End % (var z : ExpressionPointer)
+       if TheStackIsNotEmpty then
+	  Pop(z)
+       else
+	  z := nil(eNode)
+       end if
+    end End  
+
+/*
+ * Procedure AssertStackIsEmpty - Die if the stack is non empty. This
+ * is used by the walker.ssl program to make sure that no dangling exprs
+ * are on the work stack when the entire program is supposed to be done.
+ */
+    body procedure AssertStackIsEmpty % ()
+       if TheStackIsNotEmpty then
+	  Error(expressionBadCallSequence, nil(tNode), fatalError)
+       end if
+    end AssertStackIsEmpty
+
+/*
+ * Next come the access functions which are used to construct the leaves
+ * of the tree. They all call PushNewOpNode to get their work done but 
+ * will set operator number to force correct node value.
+ */
+    body proc EnterString % (s : TokenString, slen : int)
+	PushNewOpNode(aStringLit, 0, 0, s, slen, false)
+    end EnterString
+
+
+    body proc EnterReal % (r : TokenString, slen : int)
+	PushNewOpNode(aRealLit, 0, 0, r, slen, false)
+    end EnterReal
+
+    var dummyChar : TokenString
+
+    body proc EnterIdentifier % (i : int)
+	PushNewOpNode(aIdent, i, 0, dummyChar, 0, false)
+	if i > nextAvailableIdentifier then
+	   nextAvailableIdentifier := i
+	end if
+    end EnterIdentifier
+
+
+    body proc SetMaximumIdentifier % (i : int)
+	if i > nextAvailableIdentifier then
+	    nextAvailableIdentifier := i
+	end if
+    end SetMaximumIdentifier
+
+
+    body proc CreateUniqueIdentifier % (var e1:ExpressionPointer)
+	var id := nextAvailableIdentifier+1
+
+	nextAvailableIdentifier += 1
+	EnterIdentifier(id)
+	End(e1)
+	var tstring : TokenString
+	const tid := idNameString+intstr(id)
+	for i : 1.. length(tid)
+	    tstring(i) := tid(i)
+	end for
+	Identifier.SetIdentText(id, tstring, length(tid))
+    end CreateUniqueIdentifier
+
+
+    body procedure CreateNamedId % (var e1: ExpressionPointer,
+				 %      refVal, count : int)
+	var id := nextAvailableIdentifier+1
+
+	nextAvailableIdentifier += 1
+	EnterIdentifier(id)
+	End(e1)
+	var tstring : TokenString
+	const tid := Identifier.String(refVal) + "Z" +intstr(count)
+	for i : 1 .. length(tid)
+	    tstring(i) := tid(i)
+	end for
+	Identifier.SetIdentText(id, tstring, length(tid))
+    end CreateNamedId
+
+
+    body proc EnterSubstringKind % (k : int)
+	PushNewOpNode(aEndSubstring, k, 0, dummyChar, 0, false)
+    end EnterSubstringKind
+
+
+    body proc EnterPredefinedId % (i,j : int)
+	PushNewOpNode(aPredefinedId, j + 1, 0, dummyChar, 0, false)
+    end EnterPredefinedId
+
+
+    body proc EnterInteger % (i : int4, kind : int)
+	PushNewOpNode(aIntegerLit, i, kind, dummyChar, 0, false)
+    end EnterInteger
+
+
+    body proc EnterChar % (s : TokenString, slen : int)
+	PushNewOpNode(aCharLit, 0, 0, s, slen, false)
+    end EnterChar
+
+
+    body proc EnterSimpleLeaf % (l : int)
+	PushNewOpNode(l, 0, 0, dummyChar, 0, false)
+    end EnterSimpleLeaf
+
+
+    body proc EnterMarkedOperator % (o : int)
+	if NodeIsLeaf(o) then
+	   Error(expressionBadoperatorNumber, nil(tNode), fatalError)
+	end if
+	PushNewOpNode(o, 0, 0, dummyChar, 0, true)
+    end EnterMarkedOperator
+
+
+    body proc EnterTree % (tp : TreePointer)
+	var register t : ExpressionPointer
+
+	new eNode, t
+	tag eNode(t).u, aType
+	eNode(t).u.expnType := tp
+	eNode(t).sibling := nil(eNode)
+	Push(t)
+    end EnterTree
+
+
+    body proc SwapTopTwoExpressions % ()
+	var x,y : ExpressionPointer
+
+	Pop(x)
+	Pop(y)
+	Push(x)
+	Push(y)
+    end SwapTopTwoExpressions
+
+/*
+ * Free the expression tree, simply traverses the tree in a postorder  
+ * fashion. Must be postorder so that we can free the nodes from the leaves
+ * upwards. Otherwise we could get corrupted by the memory manager.
+ */
+    body procedure Free % (e : ExpressionPointer)
+	if e not = nil(eNode) then
+	   if not NodeIsLeaf(eNode(e).u.operatorNumber) then
+	      Free(eNode(e).u.operand)
+	   end if 
+	   Free(eNode(e).sibling)
+	   var t := e 
+	   free eNode,t
+	end if
+    end Free
+
+/*
+ * Make a New Operand Node with operator label 'op'.
+ * Check the op to make sure it is not a Leaf.
+ */
+    body procedure NewOperatorNode % (var e : ExpressionPointer, op:int )
+       if NodeIsLeaf(op) then
+	  Error(expressionBadNewOp, nil(tNode), fatalError)
+       end if
+       new eNode,e
+       tag eNode(e).u,op
+    end NewOperatorNode
+
+
+    function StringValue(s : StringPtr, slen : int) : string
+	result strings(s)(1..slen)
+    end StringValue
+
+
+    function Octal (register n : nat1) : string
+	result intstr((n shr 6) and 8#7) + intstr((n shr 3) and 8#7) +
+	       intstr(n and 8#7)
+    end Octal
+
+
+    #if CMS then
+	external function isprint (c : int) : boolean
+    #else
+	function isprint (c : int) : boolean
+	    result c >= 8#40 and c < 8#177
+	end isprint
+    #end if
+
+
+    body procedure OutputStringValue % (s : StringPtr, slen : int, stream : int)
+	for i : 1..slen
+	    const register c := strings(s)(i)
+	    case c of
+		label '\t':
+		    put :stream, "\\t" ..
+
+		label '\f':
+		    put :stream, "\\f" ..
+
+		label '\n':
+		    put :stream, "\\n" ..
+
+		label '\r':
+		    put :stream, "\\r" ..
+
+		label '\b':
+		    put :stream, "\\b" ..
+
+		label '\0':
+		    put :stream, "\\0" ..
+
+		label '\'':
+		    put :stream, "\\'" ..
+
+		label '"':
+		    put :stream, "\\\"" ..
+
+		label '\d':
+		    put :stream, "\\", Octal (macdepDeleteOrd) ..
+
+		label '\e':
+		    put :stream, "\\", Octal (macdepEscapeOrd) ..
+
+		label '\\':
+		    put :stream, "\\\\" ..
+
+		label :
+		    if isprint (#c) then
+			put :stream, c ..
+		    else
+			put :stream, "\\", Octal (#c) ..
+		    end if
+	    end case
+	end for
+    end OutputStringValue
+
+
+    body procedure OutputChar % (c : char, stream : int)
+	case c of
+	    label '\t':
+		put :stream, "\\t" ..
+
+	    label '\f':
+		put :stream, "\\f" ..
+
+	    label '\n':
+		put :stream, "\\n" ..
+
+	    label '\r':
+		put :stream, "\\r" ..
+
+	    label '\b':
+		put :stream, "\\b" ..
+
+	    label '\0':
+		put :stream, "\\0" ..
+
+	    label '\'':
+		put :stream, "\\'" ..
+
+	    label '"':
+		put :stream, "\"" ..
+
+	    label '\d':
+		put :stream, "\\", Octal (macdepDeleteOrd) ..
+
+	    label '\e':
+		put :stream, "\\", Octal (macdepEscapeOrd) ..
+
+	    label '\\':
+		put :stream, "\\\\" ..
+
+	    label :
+		if isprint (#c) then
+		    put :stream, c ..
+		else
+		    put :stream, "\\", Octal (#c) ..
+		end if
+	end case
+    end OutputChar
+
+
+    procedure OutputCharValue (s : StringPtr, stream : int)
+	const register c := strings(s)(1)
+	OutputChar(c, stream)
+    end OutputCharValue
+
+
+    body procedure Output % (e : ExpressionPointer, stream: int)
+	if e not = nil(eNode) then
+	   case eNode(e).u.operatorNumber of
+		label aIntegerLit :
+		    case eNode(e).u.integerKind of
+			label iInteger, iIntegerNat:
+			    if eNode(e).u.integerValue = -2147483648 then
+				put :stream, "(", macdepType(mInt4),
+					") -0x80000000" ..
+			    else
+				put :stream, eNode(e).u.integerValue ..
+			    end if
+			label iNat:
+			    put :stream, "0x", 
+				natstr(#eNode(e).u.integerValue, 0, 16),
+				unsignedLiteralTerminator ..
+		    end case
+
+		label aRealLit :
+		    OutputStringValue(eNode(e).u.realValue,
+			eNode(e).u.realLen, stream)
+
+		label aStringLit :
+		    put :stream, "\"" ..
+		    OutputStringValue(eNode(e).u.stringValue,
+			eNode(e).u.stringLen, stream)
+		    put :stream, "\"" ..
+
+		label aCharLit :
+		    if eNode(e).u.charLen = 1 then
+			put :stream, "'" ..
+			OutputCharValue(eNode(e).u.charValue, stream)
+			put :stream, "'" ..
+		    else
+			put :stream, "\"" ..
+			OutputStringValue(eNode(e).u.charValue,
+			    eNode(e).u.charLen, stream)
+			put :stream, "\"" ..
+		    end if
+
+		label aPredefinedId :
+		    put :stream, predefNames(eNode(e).u.funcOrProcNumber) ..
+
+		label aIdent :
+		    Identifier.OutputIdentifier(eNode(e).u.referenceValue,
+						stream)
+
+		label aEndSubstring:
+		    const i := eNode(e).u.substringKind
+		    put :stream, "#", i div 256, " ", i mod 256 ..
+	    end case
+	end if
+    end Output
+
+
+    body function String % (e : ExpressionPointer) : string
+	if e = nil(eNode) then
+	    result ""
+	end if
+       case eNode(e).u.operatorNumber of
+	    label aIntegerLit :
+		result intstr(eNode(e).u.integerValue)
+
+	    label aRealLit :
+		result StringValue(eNode(e).u.realValue,eNode(e).u.realLen)
+
+	    label aStringLit :
+		result "\"" + StringValue(eNode(e).u.stringValue,
+					 eNode(e).u.stringLen) + "\""
+
+	    label aCharLit :
+		result "'" + StringValue(eNode(e).u.charValue,
+					 eNode(e).u.charLen) + "'"
+
+	    label aPredefinedId :
+		result predefNames(eNode(e).u.funcOrProcNumber)
+
+	    label aIdent :
+		result Identifier.String(eNode(e).u.referenceValue)
+	end case
+    end String
+
+
+/*
+ * Dump will simply dump a tree giving it an indent so that it can be 
+ * read more easily. We provide the indent to the caller so that he can
+ * format it on a page with other info. If a node is nil we dump nothing
+ * otherwise we check to see if it is a leaf, if so we print the simple
+ * leaf data, otherwise it is an operation node so we print the operation
+ * number and then print each of the operands indented by 2 extra spaces.
+ */
+    body procedure Dump % (e : ExpressionPointer, indent,stream : int)
+#if DEBUG then
+	handler (quitCode)
+	    if quitCode = excpSIGINT then
+		quit >
+	    else
+		put : stream, repeat (" ", indent), "*** Expn Dump Abort ***"
+	    end if
+	end handler
+#end if
+	var l : ExpressionPointer    
+	if e not = nil(eNode) then
+	   put :stream, repeat(" ", indent) ..
+	   case eNode(e).u.operatorNumber of
+		label aIntegerLit :
+		    put :stream, "Expr Leaf: Int = ", eNode(e).u.integerValue ..
+		    case eNode(e).u.integerKind of
+			label iInteger:
+			    put :stream, " (i)"
+			label iIntegerNat:
+			    put :stream, " (in)"
+			label iNat:
+			    put :stream, " (n)"
+			label :
+			    put :stream, " (?", eNode(e).u.integerKind, ")"
+		    end case
+
+		label aRealLit :
+		    put :stream, "Expr Leaf: Real = " ..
+		    OutputStringValue(eNode(e).u.realValue,
+			eNode(e).u.realLen, stream)
+		    put :stream, ""
+
+		label aStringLit :
+		    put :stream, "Expr Leaf: String = \"" ..
+		    OutputStringValue(eNode(e).u.stringValue,
+			eNode(e).u.stringLen, stream)
+		    put :stream, "\""
+
+		label aPredefinedId :
+		    put :stream, "Expr Leaf: PredefinedId# = ", 
+			predefNames(eNode(e).u.funcOrProcNumber)
+
+		label aIdent :
+		    put :stream, "Expr Leaf: Ident# = ",
+			eNode(e).u.referenceValue, " (" ..
+		    Identifier.OutputIdentifier(
+			eNode(e).u.referenceValue, stream)
+		    put :stream, ")"
+
+		label aEndSubstring:
+		    put :stream,"substringKind = ", eNode(e).u.substringKind
+
+		label aCharLit :
+		    put :stream, "Expr Leaf: Char = '" ..
+		    OutputStringValue(eNode(e).u.charValue,
+			eNode(e).u.charLen, stream)
+		    put :stream, "'"
+
+		label aTrue, aFalse, aBoolean, aInt, aNat, aAddressint,
+		  aString, aChar, aStar, aAll  :
+		    put :stream, "Expr Leaf: [" ..
+		    put :stream,
+			Token.TokenToString(eNode(e).u.operatorNumber), "]"
+
+		label aType:
+		    put :stream, "Expr Type Leaf:"
+		    TreeDump(eNode(e).u.expnType, indent+2, stream)
+
+		label : 
+		    put :stream, "Expr Node: [" .. 
+		    put :stream,
+			Token.TokenToString(eNode(e).u.operatorNumber), "]"
+		    l := eNode(e).u.operand;
+		    loop
+		       exit when l = nil(eNode)
+		       Dump(l,indent+2,stream)
+		       l := eNode(l).sibling
+		    end loop
+	   end case
+	end if
+    end Dump
+
+
+    body proc DumpTop % (stream:int)
+	var x : ExpressionPointer
+	Top(x)
+	Dump(x,0,stream)
+    end DumpTop
+
+/*
+ * Get the Integer value stored in integer leaf 'E' and return it in 'i'
+ * Check that passed operands are correct ie make sense.
+ */
+    body function GetInteger % (e:ExpressionPointer) : int4
+	if e = nil(eNode) then
+	   Error(expressionGetSetIntBadOperand, nil(tNode), fatalError)
+	elsif eNode(e).u.operatorNumber = aIntegerLit then
+	    result eNode(e).u.integerValue
+	elsif eNode(e).u.operatorNumber = aCharLit then
+	    assert eNode(e).u.charLen = 1
+	    result #strings(eNode(e).u.charValue)(1)
+	else
+	   Error(expressionGetSetIntBadOperand, nil(tNode), fatalError)
+	end if
+    end GetInteger
+
+/*
+ * Set b true iff the node e is a leaf ie has no children.
+ * Check that passed operands are correct ie make sense.
+ */
+    body function IsLeafNode % (e:ExpressionPointer) : boolean
+	CheckValidNode(e,expressionBadIsLeafOperand)
+	result NodeIsLeaf(eNode(e).u.operatorNumber)
+    end IsLeafNode
+
+
+/*
+ * NewCopy(e1,e2) Makes e2 a new copy of e1 but nil's out the kids and
+ * next fields. 
+ */
+    body proc NewCopy % (e1:ExpressionPointer,var e2:ExpressionPointer)
+       if e1 = nil(eNode) then
+	  e2 := nil(eNode)
+       else
+	  new eNode,e2
+	  eNode(e2) := eNode(e1)
+	  eNode(e2).sibling := nil(eNode)
+	  if not NodeIsLeaf(eNode(e2).u.operatorNumber) then
+	     eNode(e2).u.operand := nil(eNode)
+	  end if
+       end if
+    end NewCopy
+
+/*
+ * Copy(e1,e2) Makes e2 a recursive copy of e1. We use the recursive
+ * CopyList function to make a copy of the children under a node. Note
+ * the tail recursion will be removed by the optimizer.
+ */
+    procedure CopyList(e1:ExpressionPointer,var e2:ExpressionPointer)
+       if e1 = nil(eNode) then
+	  e2 := nil(eNode)
+       else
+	  Copy(e1,e2)
+	  CopyList(eNode(e1).sibling,eNode(e2).sibling)
+       end if
+    end CopyList
+
+
+    body proc Copy % (e1:ExpressionPointer,var e2:ExpressionPointer)
+       if e1 = nil(eNode) then
+	  e2 := nil(eNode)
+       else
+	  new eNode,e2
+	  eNode(e2) := eNode(e1)
+	  eNode(e2).sibling := nil(eNode)
+	  if not NodeIsLeaf(eNode(e2).u.operatorNumber) then
+	     CopyList(eNode(e1).u.operand,eNode(e2).u.operand)
+	  end if
+       end if
+    end Copy
+
+end Expression

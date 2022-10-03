@@ -1,0 +1,664 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+% 
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+% 
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+body "outputio.st" module OutputIo
+
+    procedure OutputDereferenceExpression(expn : ExpressionPointer)
+	if ImplicitReference(expn) then
+	    OutputExpression(expn, noParen)
+	else
+	    put :outFile, "&" ..
+	    OutputExpression(expn, paren)
+	end if
+    end OutputDereferenceExpression
+
+
+    procedure OutputColonChain (t : TreePointer)
+	var register tp := t
+
+	if tp not= nil(tNode) then
+	    assert tNode(tp).operatorNumber = aColon
+	    tp := tNode(tp).operand
+	    OutputColonChain(tNode(tp).sibling)
+	    OutputCastedExpression(tNode(tp).leaf)
+	    put :outFile, ", " ..
+	end if
+	end OutputColonChain
+
+
+    % Print these backwards!!!!
+    procedure OutputExpnColons (t : TreePointer)
+	OutputColonChain(tNode(t).sibling)
+	OutputCastedExpression(tNode(t).leaf)
+    end OutputExpnColons
+
+
+    % Print these backwards!!!!
+    procedure OutputRealExpnColons (t : TreePointer)
+	OutputColonChain(tNode(t).sibling)
+	put :outFile, "(", realCast ..
+	OutputCastedExpression(tNode(t).leaf)
+	put :outFile, ")" ..
+    end OutputRealExpnColons
+
+
+    function IsSubstring (e : ExpressionPointer) : boolean
+	var register x := e
+
+	if eNode(x).u.operatorNumber = aCall then
+	    x := eNode(x).u.operand
+	    if eNode(x).u.funcOrProcNumber = pAddr or
+		    eNode(x).u.funcOrProcNumber = pInternalAddr then
+		x := eNode(eNode(x).sibling).u.operand
+		result eNode(x).u.operatorNumber = aSubstring
+	    end if
+	end if
+	result false
+    end IsSubstring
+
+
+    var stdOutStream, stdInStream : ExpressionPointer
+
+    new eNode, stdOutStream
+    tag eNode(stdOutStream).u, aIntegerLit
+    eNode(stdOutStream).u.integerValue := -1
+    eNode(stdOutStream).u.integerKind := iInteger
+    eNode(stdOutStream).sibling := nil(eNode)
+
+    new eNode, stdInStream
+    tag eNode(stdInStream).u, aIntegerLit
+    eNode(stdInStream).u.integerValue := -2
+    eNode(stdInStream).u.integerKind := iInteger
+    eNode(stdInStream).sibling := nil(eNode)
+
+
+    procedure OutputPut (t:TreePointer, indent : int)
+	var register tp := t
+	var streamNo : ExpressionPointer
+
+	tp := tNode(tp).operand
+	if tNode(tp).operatorNumber = aStreamNumber then
+	    put :outFile, predefNames(pSetStream), " (" ..
+	    OutputCastedExpression (tNode(tNode(tp).operand).leaf)
+	    put :outFile, ", (", macdepType(mInt2), ") ", ioPut, ")" ..
+	    streamNo := tNode(tNode(tp).operand).leaf
+	    tp := tNode(tp).sibling
+	else
+	    % standard output
+	    put :outFile, predefNames(pSetStdOutputStream), " ()" ..
+	    streamNo := stdOutStream
+	end if
+	loop
+	    exit when tp = nil(tNode) or tNode(tp).operatorNumber = aPutContinue
+	    put :outFile, ";"
+	    OutputIndent (indent)
+	    case tNode(tp).operatorNumber of
+		label aSkip:
+		    put :outFile, predefNames(pPutSkip), " ((",
+			macdepType(mInt2), ") " ..
+		    OutputExpression(streamNo, false)
+		    put :outFile, ")" ..
+
+		label aReal:
+		    /*
+		     * have to decide what format of real to print
+		     */
+		    tp := tNode(tp).sibling
+		    const oldtp := tp
+		    var numColons := 1
+
+		    tp := tNode(tp).sibling
+		    assert tNode(tp).operatorNumber = aColon
+		    loop
+			tp := tNode(tNode(tp).operand).sibling
+			exit when tp = nil(tNode)
+			numColons += 1
+		    end loop
+		    tp := oldtp
+
+		    if numColons = 1 then
+			put :outFile, predefNames(pPutReal)," (" ..
+		    elsif numColons = 2 then
+			put :outFile, predefNames(pPutFReal), " (" ..
+		    else
+			assert numColons = 3
+			put :outFile, predefNames(pPutEReal), " (" ..
+		    end if
+		    OutputExpnColons(tp)
+		    put :outFile, ", (", macdepType(mInt2), ") " ..
+		    OutputExpression(streamNo, false)
+		    put :outFile, ")" ..
+		    tp := tNode(tp).sibling
+
+		label aInt:
+		    /*
+		     * have to decide what format of int to print
+		     */
+		    tp := tNode(tp).sibling
+		    const oldtp := tp
+		    var numColons := 1
+
+		    tp := tNode(tp).sibling
+		    assert tNode(tp).operatorNumber = aColon
+		    loop
+			tp := tNode(tNode(tp).operand).sibling
+			exit when tp = nil(tNode)
+			numColons += 1
+		    end loop
+		    tp := oldtp
+
+		    if numColons = 1 then
+			put :outFile, predefNames(pPutInt), " (" ..
+			OutputExpnColons(tp)
+		    elsif numColons = 2 then
+			put :outFile, predefNames(pPutFReal), " (" ..
+			OutputRealExpnColons(tp)
+		    else
+			assert numColons = 3
+			put :outFile, predefNames(pPutEReal), " (" ..
+			OutputRealExpnColons(tp)
+		    end if
+		    put :outFile, ", (", macdepType(mInt2), ") " ..
+		    OutputExpression(streamNo, false)
+		    put :outFile, ")" ..
+		    tp := tNode(tp).sibling
+
+		label aChar:
+		    put :outFile, predefNames(pPutChar), " (" ..
+		    tp := tNode(tp).sibling		% expn
+		    OutputCastedExpression(
+			tNode(tNode(tNode(tp).sibling).operand).leaf)
+		    put :outFile, ", " ..
+		    OutputExpression(tNode(tp).leaf, noParen)
+		    put :outFile, ", ", intCast ..
+		    if eNode(tNode(tp).leaf).u.operatorNumber = aCharLit then
+			put :outFile, eNode(tNode(tp).leaf).u.charLen ..
+		    else
+			const id := VariableId(tNode(tp).leaf)
+			if id = nil(eNode) then
+			    /* this better have been a char substring */
+			    assert IsSubstring (tNode(tp).leaf)
+			    put :outFile, "1" ..
+			else
+			    if IsSubstring (tNode(tp).leaf) then
+				put :outFile, "1" ..
+			    else
+				const as := Types.ArrayStringInformation(id)
+
+				if asNode(as).u.kind = manifestStringLength then
+				    put :outFile, asNode(as).u.mStringUpper ..
+				else
+				    OutputExpression(
+					asNode(as).u.nmStringUpper, noParen)
+				end if
+			    end if
+			end if
+		    end if
+		    put :outFile, ", (", macdepType(mInt2), ") " ..
+		    OutputExpression(streamNo, false)
+		    put :outFile, ")" ..
+		    tp := tNode(tp).sibling
+
+		label aNat:
+		    put :outFile, predefNames(pPutNat) ..
+		    tp := tNode(tp).sibling		% expn
+		    put :outFile, " ("..
+		    OutputCastedExpression(
+			tNode(tNode(tNode(tp).sibling).operand).leaf)
+		    put :outFile, ", ", natCast ..
+		    OutputExpression(tNode(tp).leaf, paren)
+		    put :outFile, ", (", macdepType(mInt2), ") " ..
+		    OutputExpression(streamNo, false)
+		    put :outFile, ")" ..
+		    tp := tNode(tp).sibling
+
+		label aString:
+		    put :outFile, predefNames(pPutString) ..
+		    tp := tNode(tp).sibling		% expn
+		    put :outFile, " (" ..
+		    OutputCastedExpression(
+			tNode(tNode(tNode(tp).sibling).operand).leaf)
+		    put :outFile, ", " ..
+		    OutputCastedExpression(tNode(tp).leaf)
+		    put :outFile, ", (", macdepType(mInt2), ") " ..
+		    OutputExpression(streamNo, false)
+		    put :outFile, ")" ..
+		    tp := tNode(tp).sibling
+	    end case
+	    tp := tNode(tp).sibling
+	end loop
+	if tp = nil(tNode) then
+	    % must not be a aPutContinue
+	    put :outFile, ";"
+	    OutputIndent(indent)
+	    put :outFile, predefNames(pPutSkip), " ((",
+		macdepType(mInt2), ") " ..
+	    OutputExpression(streamNo, false)
+	    put :outFile, ")" ..
+	else
+	    assert tNode(tp).operatorNumber = aPutContinue
+	end if
+    end OutputPut
+
+
+    procedure OutputVariableTypeSize (register e : ExpressionPointer)
+	case ExpnType(e) of
+	    label tString:
+		const register as := Types.ArrayStringInformation(VariableId(e))
+		put :outFile, asNode(as).u.mStringUpper ..
+
+	    label tParameterString, tParameterCharString,
+		    tFlexCharString:
+		const register as := Types.ArrayStringInformation(VariableId(e))
+		OutputExpression(asNode(as).u.nmStringUpper, noParen)
+
+	    label tParameterArray, tFlexArray:
+		var register as := Types.ArrayStringInformation(VariableId(e))
+		loop
+		    exit when asNode(as).u.kind = componentType
+		    assert asNode(as).u.kind = nonManifestUpperBound
+		    if asNode(as).u.nmLower = 1 then
+			OutputExpression(asNode(as).u.nmUpper, noParen)
+		    else
+			put :outFile, "(" ..
+			OutputExpression(asNode(as).u.nmUpper, noParen)
+			put :outFile, " - ", asNode(as).u.nmLower - 1, ")" ..
+		    end if
+		    put :outFile, " * " ..
+		    as := asNode(as).next
+		end loop
+		put :outFile, "sizeof " ..
+		if not Types.HasAttribute(asNode(as).u.id, aaNoDeclaration) then
+		    OutputExpression(asNode(as).u.id, noParen)
+		else
+		    put :outFile, "(" ..
+		    CTypes.Output(Types.GetType(asNode(as).u.id), nil(tNode),
+			outFile, 0)
+		    put :outFile, ")" ..
+		end if
+
+	    label tParameterArrayParameterCharString,
+		    tParameterArrayParameterString:
+		var register as := Types.ArrayStringInformation(VariableId(e))
+		loop
+		    exit when asNode(as).u.kind = componentType
+		    assert asNode(as).u.kind = nonManifestUpperBound
+		    if asNode(as).u.nmLower = 1 then
+			OutputExpression(asNode(as).u.nmUpper, noParen)
+		    else
+			put :outFile, "(" ..
+			OutputExpression(asNode(as).u.nmUpper, noParen)
+			put :outFile, " - ", asNode(as).u.nmLower - 1, ")" ..
+		    end if
+		    put :outFile, " * " ..
+		    as := asNode(as).next
+		end loop
+		as := Types.ArrayStringInformation(asNode(as).u.id)
+		assert asNode(as).u.kind = nonManifestStringLength
+		OutputExpression(asNode(as).u.nmStringSize, noParen)
+
+	    label :
+		put :outFile, "sizeof " ..
+		OutputExpression(e, paren)
+	end case
+    end OutputVariableTypeSize
+
+
+    procedure OutputGet (t:TreePointer, indent : int)
+	var register tp := t
+	var register x : TreePointer
+	var streamNo : ExpressionPointer
+
+	tp := tNode(tp).operand
+	if tNode(tp).operatorNumber = aStreamNumber then
+	    put :outFile, predefNames(pSetStream), " (" ..
+	    OutputCastedExpression (tNode(tNode(tp).operand).leaf)
+	    put :outFile, ", (", macdepType(mInt2), ") ", ioGet, ")" ..
+	    streamNo := tNode(tNode(tp).operand).leaf
+	    tp := tNode(tp).sibling
+	else
+	    % standard output
+	    put :outFile, predefNames(pSetStdInputStream), " ()" ..
+	    streamNo := stdInStream
+	end if
+	loop
+	    exit when tp = nil(tNode)
+	    put :outFile, ";"
+	    OutputIndent (indent)
+	    case tNode(tp).operatorNumber of
+		label aSkip:
+		    put :outFile, predefNames(pGetSkip), " ((",
+			macdepType(mInt2), ") " ..
+		    OutputExpression(streamNo, false)
+		    put :outFile, ")" ..
+
+		label aSubrange:
+		    x := tNode(tp).operand
+		    if tNode(x).operatorNumber = aChar then
+			put :outFile, predefNames(pGetCharSubrange),
+			    " (" ..
+			x := tNode(x).sibling
+		    else
+			put :outFile, predefNames(pGetSubrange),
+			    " (" ..
+		    end if
+		    % output upper, lower, variable
+		    OutputCastedExpression (
+			tNode(tNode(tNode(x).sibling).sibling).leaf)
+		    put :outFile, ", " ..
+		    OutputCastedExpression (tNode(tNode(x).sibling).leaf)
+		    put :outFile, ", " ..
+		    OutputDereferenceExpression(tNode(x).leaf)
+		    put :outFile, ", " ..
+		    OutputVariableTypeSize(tNode(x).leaf)
+		    put :outFile, ", (", macdepType(mInt2), ") " ..
+		    OutputExpression(streamNo, false)
+		    put :outFile, ")" ..
+
+		label aString:
+		    x := tNode(tNode(tp).operand).sibling
+		    if x = nil(tNode) then
+			% get string
+			put :outFile, predefNames(pGetWord), " (", intCast ..
+			OutputVariableTypeSize (tNode(tNode(tp).operand).leaf)
+		    else
+			assert tNode(x).operatorNumber = aColon
+			x := tNode(x).operand
+			if tNode(x).nodeKind = NodeKinds.SimpleLeaf then
+			    assert tNode(x).operatorNumber = aStar
+			    % get string : *
+			    put :outFile, predefNames(pGetStringStar),
+				"(", intCast ..
+			    OutputVariableTypeSize (
+				tNode(tNode(tp).operand).leaf)
+			else
+			    % get string : size
+			    put :outFile, predefNames(pGetString), " (" ..
+			    put :outFile, intCast ..
+			    OutputVariableTypeSize (
+				tNode(tNode(tp).operand).leaf)
+			    put :outFile, ", " ..
+			    OutputCastedExpression(tNode(x).leaf)
+			end if
+		    end if
+		    put :outFile, ", " ..
+		    OutputDereferenceExpression(tNode(tNode(tp).operand).leaf)
+		    put :outFile, ", (", macdepType(mInt2), ") " ..
+		    OutputExpression(streamNo, false)
+		    put :outFile, ")" ..
+
+		label aChar:
+		    put :outFile, predefNames(pGetCharString), " (" ..
+		    x := tNode(tNode(tp).operand).sibling
+		    if x = nil(tNode) then
+			% get char
+			put :outFile, "", intCast ..
+			OutputVariableTypeSize (tNode(tNode(tp).operand).leaf)
+			put :outFile, ", " ..
+			OutputDereferenceExpression(
+			    tNode(tNode(tp).operand).leaf)
+			put :outFile, ", ", intCast ..
+			OutputVariableTypeSize (tNode(tNode(tp).operand).leaf)
+		    else
+			assert tNode(x).operatorNumber = aColon
+			x := tNode(x).operand
+			% get char : size
+			OutputCastedExpression(tNode(x).leaf)
+			put :outFile, ", " ..
+			OutputDereferenceExpression(
+			    tNode(tNode(tp).operand).leaf)
+			put :outFile, ", ", intCast ..
+			OutputVariableTypeSize (tNode(tNode(tp).operand).leaf)
+		    end if
+		    put :outFile, ", (", macdepType(mInt2), ") " ..
+		    OutputExpression(streamNo, false)
+		    put :outFile, ")" ..
+
+		label :
+		    case tNode(tp).operatorNumber of
+			label aInt:
+			    put :outFile, predefNames(pGetInt) ..
+
+			label aNat:
+			    put :outFile, predefNames(pGetNat) ..
+
+			label aReal:
+			    put :outFile, predefNames(pGetReal) ..
+		    end case
+		    put :outFile, " (" ..
+		    OutputDereferenceExpression(tNode(tNode(tp).operand).leaf)
+		    put :outFile, ", ", intCast ..
+		    OutputVariableTypeSize (tNode(tNode(tp).operand).leaf)
+		    put :outFile, ", (", macdepType(mInt2), ") " ..
+		    OutputExpression(streamNo, false)
+		    put :outFile, ")" ..
+	    end case
+	    tp := tNode(tp).sibling
+	end loop
+    end OutputGet
+
+
+    procedure OutputReadWrite (t : TreePointer, indent, predef : int)
+	var register tp := t
+	var register x : TreePointer
+	var stream, status : ExpressionPointer
+
+	tp := tNode(tp).operand
+	stream := tNode(tp).leaf
+	if tNode(tNode(tp).sibling).operatorNumber = aReadWriteStatus then
+	    put :outFile, predefNames(pSetStreamAndStatus), " (" ..
+	    x := tNode(tNode(tp).sibling).operand
+	    OutputDereferenceExpression(tNode(x).leaf)
+	    status := tNode(x).leaf
+	    put :outFile, ", " ..
+	    OutputCastedExpression (tNode(tp).leaf)
+	    tp := tNode(tNode(tp).sibling).sibling
+	else
+	    put :outFile, predefNames(pSetStream), " (" ..
+	    OutputCastedExpression (tNode(tp).leaf)
+	    status := nil(eNode)
+	    tp := tNode(tp).sibling
+	end if
+	if predef = pRead then
+	    put :outFile, ", (", macdepType(mInt2), ") ", ioRead, ")" ..
+	else
+	    put :outFile, ", (", macdepType(mInt2), ") ", ioWrite, ")" ..
+	end if
+
+	loop
+	    exit when tp = nil(tNode)
+	    put :outFile, ";"
+	    OutputIndent (indent)
+	    x := tNode(tp).sibling
+	    if x not= nil(tNode) and
+		    tNode(x).operatorNumber = aReadWriteSize then
+		const y := tNode(x).sibling
+		if y not= nil(tNode) and
+			tNode(y).operatorNumber = aReadWriteSizeResult then
+		    if predef = pRead then
+			put :outFile, predefNames(pReadWithResult), " (" ..
+		    else
+			put :outFile, predefNames(pWriteWithResult), " (" ..
+		    end if
+		    OutputDereferenceExpression(tNode(tNode(y).operand).leaf)
+		    put :outFile, ", " ..
+		    OutputDereferenceExpression(tNode(tp).leaf)
+		    put :outFile, ", " ..
+		    OutputCastedExpression (tNode(tNode(x).operand).leaf)
+		    if status not= nil(eNode) then
+			put :outFile, ", " ..
+			OutputDereferenceExpression(status)
+		    else
+			put :outFile, ", (", macdepType(mAddressint), ") 0" ..
+		    end if
+		    put :outFile, ", (", macdepType(mInt2), ") " ..
+		    OutputExpression(stream, false)
+		    put :outFile, ")" ..
+		    tp := tNode(tp).sibling
+		else
+		    put :outFile, predefNames(predef), " (" ..
+		    OutputDereferenceExpression(tNode(tp).leaf)
+		    put :outFile, ", " ..
+		    OutputCastedExpression (tNode(tNode(x).operand).leaf)
+		    if status not= nil(eNode) then
+			put :outFile, ", " ..
+			OutputDereferenceExpression(status)
+		    else
+			put :outFile, ", (", macdepType(mAddressint), ") 0" ..
+		    end if
+		    put :outFile, ", (", macdepType(mInt2), ") " ..
+		    OutputExpression(stream, false)
+		    put :outFile, ")" ..
+		end if
+		tp := tNode(tp).sibling
+	    else
+		put :outFile, predefNames(predef), " (" ..
+		OutputDereferenceExpression(tNode(tp).leaf)
+		put :outFile, ", ", intCast ..
+		OutputVariableTypeSize (tNode(tp).leaf)
+		if status not= nil(eNode) then
+		    put :outFile, ", " ..
+		    OutputDereferenceExpression(status)
+		else
+		    put :outFile, ", (", macdepType(mAddressint), ") 0" ..
+		end if
+		put :outFile, ", (", macdepType(mInt2), ") " ..
+		OutputExpression(stream, false)
+		put :outFile, ")" ..
+	    end if
+	    tp := tNode(tp).sibling
+	end loop
+    end OutputReadWrite
+
+
+    procedure OutputFileMode(t : TreePointer)
+	var register tp := t
+	var register mode : nat := 0
+	loop
+	    exit when tp = nil(tNode)
+	    case tNode(tp).operatorNumber of
+		label aGet:
+		    mode or= 1 shl ioGet
+		label aPut:
+		    mode or= 1 shl ioPut
+		label aSeek:
+		    mode or= 1 shl ioSeek
+		label aRead:
+		    mode or= 1 shl ioRead
+		label aWrite:
+		    mode or= 1 shl ioWrite
+		label aMod:
+		    mode or= 1 shl ioMod
+	    end case
+	    tp := tNode(tp).sibling
+	end loop
+	/* N.B.  Hard code open mode as short (16 bit set!!) */
+	put :outFile, "(", macdepType(mNat2), ") ", mode ..
+    end OutputFileMode
+
+
+    procedure OutputOpen (t : TreePointer)
+	var register tp := t
+	var register x : TreePointer
+
+	tp := tNode(tp).operand
+	x := tNode(tp).sibling
+	if tNode(x).operatorNumber = aInt then
+	    % open argument	open :id, int, mode
+	    put :outFile, predefNames(pOpenArg), " (" ..
+	    OutputFileMode(tNode(tNode(x).sibling).sibling)
+	else
+	    % open argument	open (id, stringName, stringMode)
+	    % or 		open :id, stringName, mode
+	    case tNode(tNode(tNode(x).sibling).sibling).operatorNumber of
+		label aGet, aPut, aSeek, aRead, aWrite, aMod:
+		    put :outFile, predefNames(pOpenFile), " (" ..
+		    OutputFileMode(tNode(tNode(x).sibling).sibling)
+	        label :
+		    put :outFile, predefNames(pOpen), " (" ..
+		    OutputCastedExpression(
+			tNode(tNode(tNode(x).sibling).sibling).leaf)
+	    end case
+	end if
+	put :outFile, ", " ..
+	OutputCastedExpression (tNode(tNode(x).sibling).leaf)
+	put :outFile, ", " ..
+	OutputDereferenceExpression(tNode(tp).leaf)
+	put :outFile, ")" ..
+    end OutputOpen
+
+
+    procedure OutputSeek (t : TreePointer)
+	var register tp := t
+
+	tp := tNode(tp).operand
+	if tNode(tNode(tp).sibling).operatorNumber = aStar then
+	    % seek :id, *
+	    put :outFile, predefNames(pSeekToEnd), " (" ..
+	    OutputCastedExpression (tNode(tp).leaf)
+	else
+	    % seek :id, expn
+	    put :outFile, predefNames(pSeek), " (" ..
+	    OutputCastedExpression (tNode(tNode(tp).sibling).leaf)
+	    put :outFile, ", " ..
+	    OutputCastedExpression (tNode(tp).leaf)
+	end if
+	put :outFile, ")" ..
+    end OutputSeek
+
+
+    body procedure OutputIo % (t:TreePointer, indent : int)
+	var register tp := t
+	OutputIndent (indent)
+	case tNode(tp).operatorNumber of
+	    label aPut:
+		OutputPut (tp, indent)
+
+	    label aGet:
+		OutputGet (tp, indent)
+
+	    label aRead:
+		OutputReadWrite(tp, indent, pRead)
+
+	    label aWrite:
+		OutputReadWrite(tp, indent, pWrite)
+
+	    label aTell:
+		const register ttp := tNode(tp).operand
+
+		% tell :id, var
+		put :outFile, predefNames(pTell), " (" ..
+		OutputDereferenceExpression(tNode(tNode(ttp).sibling).leaf)
+		put :outFile, ", " ..
+		OutputCastedExpression (tNode(ttp).leaf)
+		put :outFile, ")" ..
+
+	    label aSeek:
+		OutputSeek(tp)
+
+	    label aOpen:
+		OutputOpen(tp)
+
+	    label aClose :
+		put : outFile, predefNames (pClose), " (" ..
+		OutputCastedExpression (tNode(tNode(tp).operand).leaf)
+		put : outFile, ")" ..
+	end case
+    end OutputIo
+
+end OutputIo

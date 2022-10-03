@@ -1,0 +1,272 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+% 
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+% 
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+/*
+ * Turing Plus to C Translator
+ *   Module:Identifier Name Module
+ *   By:    Mark Mendell
+ *   Date:  30 Oct 1986
+ */
+
+body "identifier.st" module Identifier
+
+#if BIG then
+    const *maxNameDepth := 200
+#else
+    const *maxNameDepth := 40
+#end if
+
+    /* stack of current names */
+    type NamesRecord :
+	record
+	    names	: array 1 .. maxNameDepth of int
+	    len		: 0 .. maxNameDepth
+	end record
+
+    var nameStack	: NamesRecord
+    nameStack.len := 0
+
+    var names : unchecked collection of NamesRecord
+
+    type IdentifierType :
+	record
+	    name:	StringPtr
+	    len:	0 .. 256 : 2
+	    fullName:	pointer to names
+	end record
+
+    const *maxIdentifier := maxScannerIdents + 2000
+    const *maxIdentifierChars := 45000
+
+    type identCharsBuf : char(maxIdentifierChars)
+    var ib : unchecked collection of identCharsBuf		/* temporary space!! */
+    type ibPtr : pointer to ib
+
+    const *numCKeywords := 31
+
+    const CKeywords : array 1..numCKeywords of string(11) := init
+       ("asm", "auto", "break", "case", "char", "continue",
+	"default", "do", "double", "else", "entry", "extern",
+	"float", "for", "fortran", "goto", "if", "int", "long",
+	"register", "return", "short", "sizeof", "static", "struct",
+	"switch", "typedef", "union", "unsigned", "void", "while")
+
+    var ident : array 0..maxIdentifier of IdentifierType
+
+    body procedure SetIdentText % (i : int, s : TokenString, slen : int)
+	if ident(i).len = 0 then
+	    new strings, ident(i).name
+
+	    /* ensure that no C keywords are used */
+	    var found := false
+	    var register stringS := s(1..slen)
+	    for j : 1..numCKeywords
+		exit when stringS < CKeywords(j)
+		if stringS = CKeywords(j) then
+		    found := true
+		    exit
+		end if
+	    end for
+
+	    bind var register id to ident(i)
+	    if found then
+		for j : 1.. slen
+		    strings(id.name)(j+2) := s(j)
+		end for
+		id.len := slen + 2
+		strings(id.name)(1) := 'T'
+		strings(id.name)(2) := 'L'
+	    else
+		strings(id.name) := s
+		id.len := slen
+	    end if
+	end if
+    end SetIdentText
+
+
+    body procedure OverrideIdentText % (i : int, s : TokenString, slen : int)
+	bind var register id to ident(i)
+
+	if id.len = 0 then
+	    new strings, id.name
+	end if
+
+	strings(id.name) := s
+	id.len := slen
+    end OverrideIdentText
+
+
+    body procedure AppendText % (id : int, s : char(*))
+	bind var register nm to ident(id)
+	const register len := upper(s)
+	const register slen := nm.len
+
+	for i : 1..len
+	    strings(nm.name)(i+slen) := s(i)
+	end for
+	nm.len += len
+    end AppendText
+
+
+    body procedure PushName % (i : int)
+	nameStack.len += 1
+	nameStack.names(nameStack.len) := i
+    end PushName
+
+
+    body procedure PushBoundary
+	nameStack.len += 1 
+	nameStack.names(nameStack.len) := -1
+    end PushBoundary
+
+
+    body procedure PopName
+	nameStack.len -= 1 
+    end PopName
+
+
+    body procedure EnterName % (i : int)
+	bind var register nm to ident(i)
+
+	if prefixIdentifiers then
+	    var startIndex := 1
+
+	    new names, nm.fullName
+	    for decreasing j : nameStack.len .. 1
+		if nameStack.names(j) = -1 then
+		    startIndex := j + 1
+		    exit
+		end if
+	    end for
+
+	    var register k := 1
+	    for j : startIndex .. nameStack.len
+		names(nm.fullName).names(k) := nameStack.names(j)
+		k += 1
+	    end for
+	    names(nm.fullName).len := k - 1
+	end if
+    end EnterName
+
+
+    body procedure OutputIdentifier % (i : int, stream : int)
+	var register id := ident(i)
+
+	if id.fullName not= nil(names) then
+	    bind register nm to names(id.fullName)
+
+	    for j : 1 .. nm.len
+		bind var register pid to ident(nm.names(j))
+
+		put :stream, strings(pid.name)(1..pid.len), "_" ..
+	    end for
+	end if
+
+	if id.len > 0 then
+	    put :stream, strings(id.name)(1..id.len) ..
+	else
+	    put :stream, idNameString, i ..
+	end if
+    end OutputIdentifier
+
+
+    body function String % (i : int) : string
+	var register id := ident(i)
+	var str := ""
+
+	if id.fullName not= nil(names) then
+	    bind register nm to names(id.fullName)
+
+	    for j : 1 .. nm.len
+		bind register pid to ident(nm.names(j))
+
+		str += strings(pid.name)(1..pid.len) + "_"
+	    end for
+	end if
+
+	if id.len > 0 then
+	    result str + strings(id.name)(1..id.len)
+	else
+	    result str + idNameString + intstr(i)
+	end if
+    end String
+
+
+    body procedure ReadMapNames
+	var buf : ibPtr
+	var identIndex : array 0..maxScannerIdents of 1..maxIdentifierChars
+	var register identCharsTop : 1..maxIdentifierChars+1 := 1
+	var s : string
+	new ib, buf
+
+	begin
+	    bind var register ch to ib(buf)
+
+	    /* read in all the hashed names */
+	    var t : int
+	    open :t, idHashFile, get
+	    for i : 0..maxScannerIdents-1
+		get :idHashFile, s:*
+		bind register st to s
+		identIndex(i) := identCharsTop
+		for j : 1..length(st)
+		    ch(identCharsTop) := st(j)
+		    identCharsTop += 1
+		end for
+		ch(identCharsTop) := '\n'
+		identCharsTop += 1
+	    end for
+	    close :idHashFile
+
+	    /* walk through the map file indicies */
+	    open :t, idMapFile, read
+	    var symbolIndex : int
+	    var hashIndex : int2
+	    loop
+		exit when eof(idMapFile)
+		read :idMapFile, symbolIndex, hashIndex
+		if hashIndex not= 0 and ident(symbolIndex).len = 0 then
+		    /* transfer the name to permanent space */
+		    var register ts : TokenString
+		    var register i := identIndex(hashIndex)
+		    var register j := 1
+		    loop
+			exit when ch(i) = '\n'
+			ts(j) := ch(i)
+			j += 1
+			i += 1
+		    end loop
+		    SetIdentText(symbolIndex, ts, j-1)
+		    if symbolIndex > maxIdentSeen then
+			maxIdentSeen := symbolIndex
+		    end if
+		end if
+	    end loop
+	    close :idMapFile
+	end
+	free ib, buf
+    end ReadMapNames
+
+
+    /* initialize the ident array */
+    for i : 0..maxIdentifier
+	ident(i).len := 0
+	ident(i).fullName := nil(names)
+    end for
+
+end Identifier

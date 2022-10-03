@@ -1,0 +1,112 @@
+This directory contains the machine-independent implementations of the
+Turing Plus kernel concurrency support library routines.
+
+The various routines are as follows:
+
+TLM.ch		(internal)
+	The TLM parent module.
+
+TLMUDUMP.ch	(OutputState)
+	This process prints out a dump of the state of all processes
+	blocked in or waiting on a monitor and its conditions.
+
+TLMCDSIG.ch	(pDeferredSignal)
+	This routine performs a "signal" on a deferred condition.
+
+TLMCDWT.ch	(pDeferredWait)
+	This routine performs a "wait" on a deferred condition.
+
+TLMCDINI.ch	(pDeferredConditionInitialize)
+	This routine performs the initialization of a deferred condition
+	required for its definition.
+
+TLMCEMP.ch	(pEmpty)
+	This routine implements the "empty" function.
+
+TLMCLEN.ch       (length of condition queue)
+	A fuction to return the length of the wait queue.
+	(used experimentally for now - could become part of language later)
+
+TLMCPSIG.ch	(pPrioritySignal)
+	This routine performs a "signal" on a priority condition.
+
+TLMCPWT.ch	(pPriorityWait)
+	This routine performs a "wait" on a priority condition.
+
+TLMCPINI.ch	(pPriorityConditionInitialize)
+	This routine performs the initialization of a priority condition
+	required for its definition.
+
+TLMCRSIG.ch	(pSignal)
+	This routine performs a "signal" on a regular condition.
+
+TLMCRWT.ch	(pWait)
+	This routine performs a "wait" on a regular condition.
+
+TLMCRINI.ch	(pConditionInitialize)
+	This routine performs the initialization of a regular condition
+	required for its definition.
+
+TLMRENT.ch	(pEnterMonitor)
+	This routine performs the exclusive access required to enter a
+	regular monitor.
+
+TLMREXT.ch	(pExitMonitor)
+	This routine is called when a process leaves a regular monitor.
+
+TLMRINI.ch	(pInitializeMonitor)
+	This routine performs the initialization of a regular monitor
+	required for its definition.
+
+TLMCTSIG.ch	(pTimeOutSignal)
+	This routine performs a "signal" on a timeout condition.
+
+TLMCTWT.ch	(pTimeOutWait)
+	This routine performs a "wait" on a timeout condition.
+
+TLMCTINI.ch	(pTimeOutConditionInitialize)
+	This routine performs the initialization of a timeout condition
+	required for its definition.
+
+TLMDENT.ch	(pEnterDeviceMonitor)
+	This routine performs the exclusive access required to enter a
+	device monitor.
+
+#if removed then
+ /* these have been moved to TLK */
+TLMDEXT.ch	(pExitDeviceMonitor)
+	This routine is called when a process leaves a device monitor.
+
+TLMDINI.ch	(pInitializeDeviceMonitor)
+	This routine performs the initialization of a device monitor
+	required for its definition.
+
+TLMIPINI.ch	(pInitializeInterruptProcedure)
+	This routine performs all necessary initialization of an
+	interrupt procedure.
+
+TLMIPEXT.ch	(pInterruptProcedureExit)
+	exit from device procedure
+
+TLMPFORK.ch	(pStartProcess)
+	This routine is responsible for starting a new process from a
+	"fork" statement.  It calls TLMCZ to perform the machine-dependent
+	initialization.
+
+TLMPPGET.ch	(pGetPriority)
+	This routine returns the current process' dispatch priority.
+
+TLMPPSET.ch	(pSetPriority)
+	This routine sets the current process' dispatch priority.
+
+TLMPPAU.ch	(pPause)
+	This routine implements the "pause" statement.
+
+TLMTROUT.ch	(pLoopTimeSlice)
+	This routine is called at the top of every loop to possibly
+	cause a context switch.
+
+TLMTLOOP.ch	(pRoutineTimeSlice)
+	This routine is called at the top of every procedure to possibly
+	cause a context switch.
+#end if

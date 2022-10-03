@@ -1,0 +1,16 @@
+#if not TL_KERNEL then
+#define TL_KERNEL
+
+include "%kernelTypes"
+include "%monitor"
+
+  % -- definitions so that users can get at the run queues
+  %
+  external "TL_TLKPD"      var runningProcess	: TL_PDpointer
+  external "TL_TLK_TLKTQH" var timeoutQueueHead	: TL_PDpointer
+
+  % -- pointer to head of link list of monitor descriptors
+  %
+  external "TL_TLM_TLMMLH" var monitorListHead	: TL_MDpointer
+
+#end if

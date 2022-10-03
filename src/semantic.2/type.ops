@@ -1,0 +1,321 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+%
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+%
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+label oTypePushBuiltIn :
+    Types.PushBuiltInType (parameterValue)
+
+label oTypePushNew :
+    Types.PushNewType (parameterValue)
+
+label oTypePushCountIndexType:
+    Types.PushCountIndexType(Count.CountValue)
+
+label oTypePushComponentType :
+    Types.PushComponentType
+
+label oTypePushLeftComponentType :
+    Types.PushLeftComponentType
+
+label oTypePushResultType :
+    Types.PushResultType
+
+label oTypePushLeftResultType :
+    Types.PushLeftResultType
+
+label oTypePushSymbolType :
+    Types.PushType (Symbol.SymbolType)
+
+label oTypePushCharStringDummy :
+    var v : ValueIndex
+    Value.PushValue(vInteger, false, Value.TopValueLength)
+    Value.ValueIndexx(v)
+    Types.PushCharStringDummyType (v)
+    Value.PopValue
+
+label oTypePushBuiltinFromValue :
+    var vv : Value.ValueDescriptor
+    Value.ValueValue(vv)
+    assert vv.kind = vInteger
+    if vv.negative then
+	Types.PushBuiltInType (tInt)
+    elsif vv.intval <= maxint then
+	Types.PushBuiltInType (tIntNat)
+    else
+	Types.PushBuiltInType (tNat)
+    end if
+
+label oTypeReplaceFromValue :
+    var vv : Value.ValueDescriptor
+    Value.ValueValue(vv)
+    % only modify if integer
+    if vv.kind = vInteger then
+	if vv.negative then
+	    Types.ReplaceBuiltInType (tInt)
+	elsif vv.intval <= maxint then
+	    Types.ReplaceBuiltInType (tIntNat)
+	else
+	    Types.ReplaceBuiltInType (tNat)
+	end if
+    end if
+
+label oTypeReplaceBuiltIn :
+    Types.ReplaceBuiltInType (parameterValue)
+
+label oTypeReplaceComponentType :
+    Types.ReplaceComponentType
+
+label oTypeReplaceResultType :
+    Types.ReplaceResultType
+
+label oTypeReplaceRootType :
+    Types.ReplaceRootType
+
+label oTypeEnterSymbol :
+    Types.TypEnterSymbol (Symbol.SymbolIndexx)
+
+label oTypeEnterFieldsScope :
+    Scope.SaveScope
+    Types.EnterFields (Scope.SavedScopeIndex)
+
+label oTypeEnterFormalsScope :
+    Scope.SaveScope
+    Types.EnterFormals (Scope.SavedScopeIndex)
+
+label oTypeEnterExportsScope :
+    Scope.SaveScope
+    Types.EnterExports (Scope.SavedScopeIndex)
+
+label oTypeEnterFirstArrayIndex :
+    Types.EnterFirstArrayIndex
+
+label oTypeEnterLastArrayIndex :
+    Types.EnterLastArrayIndex
+
+label oTypeEnterArrayBound :
+    Types.EnterArrayBound
+
+label oTypeEnterLeftComponentType :
+    Types.EnterLeftComponentType
+
+label oTypeEnterLeftResultType :
+    Types.EnterLeftResultType
+
+label oTypeEnterLeftRootType :
+    Types.EnterLeftRootType
+
+label oTypeEnterLeftTypeSizeFromRight:
+    Types.EnterLeftTypeSizeFromRight
+
+label oTypeEnterAttribute :
+    Types.TypEnterAttribute (parameterValue)
+
+label oTypeReplaceTypeWithSameKindAndStorageSize :
+    var v: ValueIndex
+    Value.ValueIndexx(v)
+    Types.ReplaceTypeWithSameKindAndStorageSize (v)
+
+label oTypeReplaceTypeWithSameKindAndValue :
+    var v: ValueIndex
+    Value.ValueIndexx(v)
+    Types.ReplaceTypeWithSameKindAndValue (v)
+
+label oTypeEnterRangeValues :
+    var v, v2: ValueIndex
+    Value.LeftValueIndex(v)
+    Value.ValueIndexx(v2)
+    Types.EnterRangeBounds (v, v2, false)
+
+label oTypeEnterFlexRangeValues :
+    var v, v2: ValueIndex
+    Value.LeftValueIndex(v)
+    Value.ValueIndexx(v2)
+    Types.EnterRangeBounds (v, v2, true)
+
+label oTypeEnterKind :
+    Types.TypEnterKind (parameterValue)
+
+label oTypeMakeOpaque:
+    Types.EnterOpaqueTypeNumber
+
+label oTypeUnMakeOpaque:
+    Types.UnMakeOpaque
+
+label oTypeReMakeOpaque:
+    Types.ReMakeOpaque
+
+label oTypeEnterStringBound :
+    var v: ValueIndex
+    Value.ValueIndexx(v)
+    Types.EnterStringBound(v)
+
+label oTypeEnterEnumeratedElementRoot :
+    Types.EnterEnumeratedElementRoot
+
+label oTypeEnterSetBase :
+    Types.EnterLeftSetBase
+
+label oTypeClearAttribute :
+    Types.TypClearAttribute (parameterValue)
+
+label oTypePop :
+    Types.PopType
+
+label oTypePopAndChooseKind :
+    resultValue := Types.TypeKind
+    Types.PopType
+
+label oTypeChooseKind :
+    resultValue := Types.TypeKind
+
+label oTypeChooseLeftKind :
+    resultValue := Types.LeftTypeKind
+
+label oTypeChooseAttribute :
+    if Types.TypeHasAttribute (parameterValue) then
+	resultValue := trueResult
+    else
+	resultValue := falseResult
+    end if
+
+label oTypeChooseLeftAttribute :
+    if Types.LeftTypeHasAttribute (parameterValue) then
+	resultValue := trueResult
+    else
+	resultValue := falseResult
+    end if
+
+label oTypeChooseSameRanges :
+    if Types.TypeBoundsSame then
+	resultValue := trueResult
+    else
+	resultValue := falseResult
+    end if
+
+label oTypeChooseSameSymbols :
+    if Types.TypeSymbolsSame then
+	resultValue := trueResult
+    else
+	resultValue := falseResult
+    end if
+
+label oTypeChooseSameEnumeratedRanges :
+    if Types.TypeEnumeratedSame then
+	resultValue := trueResult
+    else
+	resultValue := falseResult
+    end if
+
+label oTypeChooseSameKinds :
+    if Types.TypeKind = Types.LeftTypeKind then
+	resultValue := trueResult
+    else
+	resultValue := falseResult
+    end if
+
+label oTypeChooseSameKindsAndSizes :
+    if Types.SameKindsAndSizes then
+	resultValue := trueResult
+    else
+	resultValue := falseResult
+    end if
+
+label oTypeChooseSameStringBounds :
+    var v : ValueIndex
+    Types.SameStringBounds(v,b)
+    if b then
+	if Value.CompileTimeValue(v) then
+	    resultValue := trueResult
+	else
+	    resultValue := falseResult
+	end if
+    else
+	resultValue := falseResult
+    end if
+
+label oTypeChooseSameOpaqueTypeNumbers :
+    if Types.TypeOpaqueTypeNumbersSame then
+	resultValue := trueResult
+    else
+	resultValue := falseResult
+    end if
+
+label oTypeChooseSameTypes :
+    if Types.SameTypes then
+	resultValue := trueResult
+    else
+	resultValue := falseResult
+    end if
+
+label oTypeChooseSameArrayRanges :
+    if Types.SameArrayRanges then
+	resultValue := trueResult
+    else
+	resultValue := falseResult
+    end if
+
+label oTypeCopy :
+    Types.PushType(Types.TypeIndexx)
+
+label oTypeCopyLeftType :
+    Types.CopyLeftType
+
+label oTypeCopyLeftRangeValues :
+    Types.CopyLeftBounds
+
+label oTypeSwapTypes :
+    Types.SwapTypes
+
+label oTypeSwapSecondAndThirdTypes :
+    Types.SwapSecondAndThirdTypes
+
+label oUnionMapPush :
+    Types.UnionMapPush
+
+label oUnionMapPop :
+    Types.UnionMapPop
+
+label oUnionMapEnter :
+    var v : ValueIndex
+    Value.ValueIndexx(v)
+    Types.UnionMapEnter(v, Count.UnionBodyCountValue+1)
+
+label oTypeUnionTagValueLegal :
+    var v : ValueIndex
+    Value.ValueIndexx(v)
+    Types.UnionTagValueLegal(v,b)
+    if b then
+	resultValue := yes
+    else
+	resultValue := no
+    end if
+
+label oTypeCheatSizeValueMatchesType:
+    var v : Value.ValueDescriptor
+    Value.ValueValue(v)
+    var t := v.intval
+    if v.negative then
+	t := -t
+    end if
+    if Types.TypeCheatSizeLegal(t) then
+	resultValue := yes
+    else
+	resultValue := no
+    end if
+
+label oTypeEnterUnionMap:
+    Types.EnterUnionMap

@@ -1,0 +1,275 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+%
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+%
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+const tokenNames : array FirstToken..LastToken of string(23) :=
+    init("id",			/* aIdent */
+	"predefinedid",		/* aPredefinedId */
+	"integer lit",		/* aIntegerLit */
+	"string lit",		/* aStringLit */
+	"char lit",		/* aCharLit */
+	"real lit",		/* aRealLit */
+	"#DataDescriptor#",	/* aDataDescriptor */
+	"#RoutineIndex#",	/* aRoutineIndex */
+	"#IdentText#",		/* aIdentText */
+	"#StabInformation#",	/* aStabInformation */
+	"#EndSubstring#",	/* aEndSubstring */
+	" =",			/* aConstInit */
+	"#Then#",		/* aThen */
+	"#ProcessInit#",	/* aProcessInit */
+	"#Root#",		/* aRoot */
+	"#NoOp#",		/* aNoOp */
+	"#Comma#",		/* aComma */
+	" =",			/* aTempAssign */
+	"#18",
+	"#19",
+	"+",			/* aAdd */
+	"addressint",		/* aAddressint */
+	"abs",			/* aAbs */
+	"#AliasCheck#",		/* aAliasCheck */
+	"#All#",		/* aAll */
+	"#Allocate#",		/* aAllocate */
+	"&",			/* aAnd */
+	" &=",			/* aAndEqual */
+	"[",			/* aArray */
+	"#aAsm#",		/* aAsm */
+	"#aAssert#",		/* aAssert */
+	" =",			/* aAssign */
+	"#AssignInverted#",	/* aAssignInverted */
+	"#At#",			/* aAt */
+	"{",			/* aBegin */
+	"#BeginAsm#",		/* aBeginAsm */
+	"#Bind#",		/* aBind */
+	"#Bits#",		/* aBits */
+	"#Body#",		/* aBody */
+	"#Boolean#",		/* aBoolean */
+	" &=",			/* aBooleanAndEqual */
+	" |=",			/* aBooleanOrEqual */
+	"#ByReference#",	/* aByReference */
+	"#Call#",		/* aCall */
+	"#CallVariable#",	/* aCallVariable */
+	"#Case#",		/* aCase */
+	"#CaseBody#",		/* aCaseBody */
+	"char",			/* aChar */
+	"#Child#",		/* aChild */
+	"#Checked#",		/* aChecked */
+	"#Close#",		/* aClose */
+	"#Collection#",		/* aCollection */
+	":",			/* aColon */
+	"#Compile#",		/* aCompile */
+	"#Concatenate#",	/* aConcatenate */
+	"#ConcatenateAssign#",	/* aConcatenateAssign */
+	"#Condition#",		/* aCondition */
+	"#Const#",		/* aConst */
+	"#Deallocate#",		/* aDeallocate */
+	"#Decreasing#",		/* aDecreasing */
+	"#Deferred#",		/* aDeferred */
+	"/",			/* aDiv */
+	" /=",			/* aDivEqual */
+	" /",			/* aDivideReal */
+	"#Else#",		/* aElse */
+	"#Elsif#",		/* aElse */
+	"#EndAsm#",		/* aEndAsm */
+	"#EndAliasCheck#",	/* aEndAliasCheck */
+	"#EndArrayIndexList#",	/* aEndArrayIndexList */
+	"#EndBegin#",		/* aEndBegin */
+	"#EndBind#",		/* aEndBind */
+	"#EndCase#",		/* aEndCase */
+	"#EndCaseBody#",	/* aEndCaseBody */
+	"#EndEnum#",		/* aEndEnum */
+	"#EndExport#",		/* aEndExport */
+	"#EndExpression#",	/* aEndExpression */
+	"#EndExpressionList#",	/* aEndExpressionList */
+	"#EndFor#",		/* aEndFor */
+	"#EndGet#",		/* aEndGet */
+	"#EndGrant#",		/* aEndGrant */
+	"#EndIf#",		/* aEndIf */
+	"#EndImport#",		/* aEndImport */
+	"#EndInit#",		/* aEndInit */
+	"#EndLoop#",		/* aEndLoop */
+	"#EndModule#",		/* aEndModule */
+	"#EndMonitor#",		/* aEndMonitor */
+	"#EndOpen#",		/* aEndOpen */
+	"#EndPut#",		/* aEndPut */
+	"#EndRead#",		/* aEndRead */
+	"#EndRecord#",		/* aEndRecord */
+	"#EndResult#",		/* aEndResult */
+	"#EndSubprogramBody#",	/* aEndSubprogramBody */
+	")",			/* aEndSubs */
+	"#EndUnion#",		/* aEndUnion */
+	"#EndUnionLabelBody#",	/* aEndUnionLabelBody */
+	"#EndWrite#",		/* aEndWrite */
+	"#Enum#",		/* aEnum */
+	"==",			/* aEqual */
+	"#Exit#",		/* aExit */
+	"#ExitWhen#",		/* aExitWhen */
+	"#Exponentiate#",	/* aExponentiate */
+	"#ExponentiateEqual#",	/* aExponentiateEqual */
+	"#Export#",		/* aExport */
+	"external",		/* aExternal */
+	"#ExternalAddress#",	/* aExternalAddress */
+	"0",			/* aFalse */
+	".",			/* aField */
+	"#For#",		/* aFor */
+	"#Fork#",		/* aFork */
+	"#ForkAddress#",	/* aForkAddress */
+	"#ForkStackSize#",	/* aForkStackSize */
+	"#ForkStatus#",		/* aForkStatus */
+	"#ForRange#",		/* aForRange */
+	"#Forward#",		/* aForward */
+	"#Free#",		/* aFree */
+	"#Function#",		/* aFunction */
+	"#Get#",		/* aGet */
+	"#Grant#",		/* aGrant */
+	">",			/* aGreater */
+	">=",			/* aGreaterEqual */
+	"#Handler#",		/* aHandler */
+	"#",			/* aHash */
+	"if",			/* aIf */
+	"#Imply#",		/* aImply */
+	"#Import#",		/* aImport */
+	"#In#",			/* aIn */
+	"&&",			/* aInfixAnd */
+	"#InfixBooleanCompare#",/* aInfixBooleanCompare */
+	"#InfixCompare#",	/* aInfixCompare */
+	"#InfixImply#",		/* aInfixImply */
+	"||",			/* aInfixOr */
+	"#Init#",		/* aInit */
+	"#Int#",		/* aInt */
+	"#InterruptNumber#",	/* aInterruptNumber */
+	"#Invariant#",		/* aInvariant */
+	"#Is#",			/* aIs */
+	"#Label#",		/* aLabel */
+	"<",			/* aLess */
+	"<=",			/* aLessEqual */
+	"&",			/* aLogicalAnd */
+	"|",			/* aLogicalOr */
+	"\^",			/* aLogicalXor */
+	"#Loop#",		/* aLoop */
+	"#Max#",		/* aMax */
+	"#Min#",		/* aMin */
+	"- ",			/* aMinus */
+	" -=",			/* aMinusEqual */
+	"#MissingStub#",	/* aMissingStub */
+	"%",			/* aMod */
+	" %=",			/* aModEqual */
+	"#Module#",		/* aModule */
+	"#Monitor#",		/* aMonitor */
+	"#MonitorPriority#",	/* aMonitorPriority */
+	"*",			/* aMultiply */
+	"#Nat#",		/* aNat */
+	"#New#",		/* aNew */
+	"#Nil#",		/* aNil */
+	"#NoAlias#",		/* aNoAlias */
+	"#NoEnclosure#",	/* aNoEnclosure */
+	"#NonManifest#",	/* aNonManifest */
+	"#NonScalar#",		/* aNonScalar */
+	"~",			/* aNot */
+	"!=",			/* aNotEqual */
+	"#NotIn#",		/* aNotIn */
+	"#Opaque#",		/* aOpaque */
+	"#Open#",		/* aOpen */
+	"||",			/* aOr */
+	" |=",			/* aOrEqual */
+	"#Otherwise#",		/* aOtherwise */
+	"#Packed#",		/* aPacked */
+	"#Parent#",		/* aParent */
+	"#Pause#",		/* aPause */
+	"#Pervasive#",		/* aPervasive */
+	"+",			/* aPlus */
+	" +=",			/* aPlusEqual */
+	"#Pointer#",		/* aPointer */
+	"#Post#",		/* aPost */
+	"#Pre#",		/* aPre */
+	"#Priority#",		/* aPriority */
+	"#Procedure#",		/* aProcedure */
+	"#Process#",		/* aProcess */
+	"#ProcessStackSize#",	/* aProcessStackSize */
+	"#Put#",		/* aPut */
+	"#PutContinue#",	/* aPutContinue */
+	"#Quit#",		/* aQuit */
+	"#QuitReason#",		/* aQuitReason */
+	"#RangeCheck#",		/* aRangeCheck */
+	"#RangeCheck2#",	/* aRangeCheck2 */
+	"#Read#",		/* aRead */
+	"#ReadWriteSize#",	/* aReadWriteSize */
+	"#ReadWriteSizeResult#",/* aReadWriteSizeResult */
+	"#ReadWriteStatus#",	/* aReadWriteStatus */
+	"#Real#",		/* aReal */
+	" /=",			/* aRealDivEqual */
+	"#Record#",		/* aRecord */
+	"#RecordElementType#",	/* aRecordElementType */
+	"#Register#",		/* aRegister */
+	"#Result#",		/* aResult */
+	"return",		/* aReturn */
+	"#Seek#",		/* aSeek */
+	"#Set#",		/* aSet */
+	" & ~",			/* aSetDifference */
+	" &= ~",		/* aSetDifferenceAssign */
+	"#SetGreaterEqual#",	/* aSetGreaterEqual */
+	"&",			/* aSetIntersection */
+	" &=",			/* aSetIntersectionAssign */
+	"#SetLessEqual#",	/* aSetLessEqual */
+	"|",			/* aSetUnion */
+	" |=",			/* aSetUnionAssign */
+	"\^",			/* aSetXor */
+	" \^=",			/* aSetXorAssign */
+	"<<",			/* aShiftLeft */
+	" <<=",			/* aShiftLeftEqual */
+	">>",			/* aShiftRight */
+	" >>=",			/* aShiftRightEqual */
+	"#Signal#",		/* aSignal */
+	"#Skip#",		/* aSkip */
+	"#Star#",		/* aStar */
+	" *=",			/* aStarEqual */
+	"#StorageSize#",	/* aStorageSize */
+	"#StreamNumber#",	/* aStreamNumber */
+	"#String#",		/* aString */
+	"#StringSizeBound#",	/* aStringSizeBound */
+	"#Stub#",		/* aStub */
+	"#Subrange#",		/* aSubrange */
+	"(",			/* aSubs */
+	"#Substring#",		/* aSubstring */
+	"-",			/* aSubtract */
+	"#Tag#",		/* aTag */
+	"#TagCheck#",		/* aTagCheck */
+	"#Tell#",		/* aTell */
+	"#Timeout#",		/* aTimeout */
+	"1",			/* aTrue */
+	"#Type#",		/* aType */
+	"#TypeCheat#",		/* aTypeCheat */
+	"#TypeCheatSize#",	/* aTypeCheatSize */
+	"#Unchecked#",		/* aUnchecked */
+	"#Uninitialize#",	/* aUninitialize */
+	"#Union#",		/* aUnion */
+	"#UnionLabelBody#",	/* aUnionLabelBody */
+	"#Unqualified#",	/* aUnqualified */
+	"#Var#",		/* aVar */
+	" =",			/* aVarInit */
+	"#VaryingParameter#",	/* aVaryingParameter */
+	"#Wait#",		/* aWait */
+	"#WaitPriorityOrTimeout#",/* aWaitPriorityOrTimeout */
+	"#Write#",		/* aWrite */
+	"\^",			/* aXor */
+	" \^=",			/* aXorEqual */
+	"#aCheckedStmt#",
+	"#aUncheckedStmt#",
+	"#251",
+	"#FileName#",		/* aFileName */
+	"#NewLine#",		/* aNewLine */
+	"#NewFile#",		/* aNewFile */
+	"#EndOfFile")		/* aEndOfFile */

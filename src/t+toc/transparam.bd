@@ -1,0 +1,394 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+% 
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+% 
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+/*
+ *  Turing Plus to C Translator
+ *  Module: Transform Parameters
+ *  By:    Mark Mendell
+ *  Date:  18 Dec 1986
+ */
+body "transparam.st" module TransformParameters
+
+
+    function Array (id : ExpressionPointer) : boolean
+	case Types.GetKind(id) of
+	    label tFlexArray, tFlexCharString, tParameterArray,
+		  tParameterCharString, tParameterArrayParameterCharString,
+		  tParameterString, tParameterArrayParameterString, tString,
+		  tCharString, tArray:
+		result true
+
+	    label tSet:
+		result CTypes.NonScalar(Types.GetType(id))
+
+	    label :
+		result false
+	end case
+    end Array
+
+
+    function ParamArray (t : TreePointer) : boolean
+	case CTypes.TypeKind(t) of
+	    label tParameterArray, tParameterArrayParameterCharString,
+		  tParameterArrayParameterString:
+		result true
+	    
+	    label :
+		result false
+	end case
+    end ParamArray
+
+
+    procedure TransformVarParameters (tp, param : TreePointer)
+	pre tNode(param).operatorNumber = aVar
+	var register t := tNode(param).operand
+	var register x : TreePointer
+
+	var isReg := false
+	var firstId := t
+	if tNode(t).operatorNumber = aRegister then
+	    isReg := true
+	    t := tNode(t).sibling
+	    firstId := t
+	end if
+	loop
+	    exit when tNode(t).operatorNumber = aType
+	    if not Array(tNode(t).leaf) then
+		Types.EnterAttribute(tNode(t).leaf, aaReference)
+		Types.IncreaseIndirection(tNode(t).leaf, inPointer)
+	    end if
+	    if isReg then
+		Types.EnterAttribute(tNode(t).leaf, aaRegister)
+	    end if
+	    Types.EnterAttribute(tNode(t).leaf, aaVar)
+	    t := tNode(t).sibling
+	end loop
+	if tNode(tNode(t).operand).operatorNumber = aType then
+	    /* bump it all up one level */
+	    tNode(t).operand := tNode(tNode(t).operand).operand
+	    t := firstId
+	    loop
+		exit when tNode(t).operatorNumber = aType
+		Types.EnterAttribute(tNode(t).leaf, aaTypeCheat)
+		t := tNode(t).sibling
+	    end loop
+	end if
+	const register tipe := tNode(t).operand
+
+	if ParamArray(tNode(t).operand) then
+	    /*
+	     * Simplify its component type, if necessary
+	     */
+	    var register tt := tNode(t).operand
+	    var register lastTt : TreePointer
+
+	    assert tNode(tt).operatorNumber = aArray
+	    tt := tNode(tt).operand
+	    loop
+		exit when tNode(tt).sibling = nil(tNode)
+		lastTt := tt
+		tt := tNode(tt).sibling
+	    end loop
+
+	    if not SimpleType(tt) then
+		SimplifyType(tp, tNode(lastTt).sibling)
+
+		/* reset the type for all the variables */
+		x := firstId
+		loop
+		    exit when x = t
+		    Types.SetType(tNode(x).leaf, tNode(t).operand)
+		    x := tNode(x).sibling
+		end loop
+	    end if
+	elsif not SimpleType(tNode(t).operand) then
+	    SimplifyType(tp, tNode(t).operand)
+	    /* we must now find the subprogram definition again */
+	    /* reset the type for all the variables */
+	    x := firstId
+	    loop
+		exit when x = t
+		Types.SetType(tNode(x).leaf, tNode(t).operand)
+		x := tNode(x).sibling
+	    end loop
+	end if
+
+	/* set the proper indirection */
+	const tKind := CTypes.TypeKind(tipe)
+	x := firstId
+	loop
+	    exit when x = t
+	    SetIndirection(tNode(x).leaf, tKind, tipe)
+	    x := tNode(x).sibling
+	end loop
+    end TransformVarParameters
+
+
+    procedure CreateParameterList (var res : TreePointer, list : TreePointer)
+	if list = nil(tNode) then
+	    res := nil(tNode)
+	else
+	    case tNode(list).operatorNumber of
+		label aRegister, aType:
+		    CreateParameterList(res, tNode(list).sibling)
+
+		label aProcedure, aFunction:
+		    new tNode, res
+		    tNode(res) := tNode(tNode(list).operand)
+		    CreateParameterList(tNode(res).sibling, tNode(list).sibling)
+
+		label aVar:
+		    CreateParameterList(res, tNode(list).operand)
+
+		    /* find the end of this list */
+		    var register dummy := res
+		    loop
+			exit when tNode(dummy).sibling = nil(tNode)
+			dummy := tNode(dummy).sibling
+		    end loop
+		    CreateParameterList(tNode(dummy).sibling,
+					tNode(list).sibling)
+
+		label :
+		    new tNode, res
+		    tNode(res) := tNode(list)
+		    CreateParameterList(tNode(res).sibling, tNode(list).sibling)
+	    end case
+	end if
+    end CreateParameterList
+
+
+    /*
+     * remove all but the identifiers
+     */
+    procedure CleanseParameters (param : TreePointer)
+	pre tNode(param).operatorNumber = aSubs
+
+	CreateParameterList(tNode(param).operand, tNode(param).operand)
+
+	/*
+	 * walk through the parameter list, and create the array/string
+	 * information if necessary
+	 */
+	var register t := tNode(param).operand
+	loop
+	    exit when t = nil(tNode)
+	    Types.EnterTypeInfo(tNode(t).leaf)
+	    t := tNode(t).sibling
+	end loop
+    end CleanseParameters
+
+
+    procedure TransformSubprogramParameter (tp : TreePointer,
+					    register param : TreePointer)
+	const subprogName := tNode(tNode(param).operand).leaf
+
+	if tNode(param).operatorNumber = aProcedure then
+	    varTransformProcedure(tp, param, false, false)
+	else
+	    varTransformFunction(tp, param, false)
+	end if
+
+	/* reset the type entry */
+	assert tNode(param).operatorNumber = aProcedure or
+	    tNode(param).operatorNumber = aFunction
+
+	var dummy : TreePointer
+	Tree.Copy(param, dummy)
+	Types.SetType(subprogName, dummy)
+	SetIndirection(subprogName, Types.GetKind(subprogName), dummy)
+
+	/* replace the subprogram parameter by the name */
+	tNode(param).nodeKind := NodeKinds.ExpressionLeaf
+	tNode(param).operatorNumber := 0
+	tNode(param).operand := nil(tNode)
+	tNode(param).leaf := subprogName
+    end TransformSubprogramParameter
+
+
+    body procedure TransformParameters % (tp, param : TreePointer)
+	pre tNode(param).operatorNumber = aSubs
+	var register t := tNode(param).operand
+	var register x : TreePointer
+
+	loop
+	    exit when t = nil(tNode)
+	    if tNode(t).operatorNumber = aVar then
+		TransformVarParameters(tp, t)
+	    elsif tNode(t).operatorNumber = aProcedure or
+		    tNode(t).operatorNumber = aFunction then
+		TransformSubprogramParameter(tp, t)
+	    else
+		var isReg := false
+		if tNode(t).operatorNumber = aRegister then
+		    isReg := true
+		    t := tNode(t).sibling
+		end if
+		const firstId := t
+		loop
+		    exit when tNode(t).operatorNumber = aType
+		    if isReg then
+			Types.EnterAttribute(tNode(t).leaf, aaRegister)
+		    end if
+		    t := tNode(t).sibling
+		end loop
+		const register tipe := t
+		if tNode(tNode(t).operand).operatorNumber = aType then
+		    /* bump it all up one level */
+		    tNode(t).operand := tNode(tNode(t).operand).operand
+		    x := firstId
+		    loop
+			exit when x = t
+			if not Array(tNode(x).leaf) then
+			    Types.EnterAttribute(tNode(x).leaf, aaReference)
+			    Types.EnterAttribute(tNode(x).leaf, aaTypeCheat)
+			    Types.IncreaseIndirection(tNode(x).leaf, inPointer)
+			end if
+			x := tNode(x).sibling
+		    end loop
+		elsif CTypes.NonScalar(tNode(t).operand) then
+		    x := firstId
+		    loop
+			exit when x = t
+			if not Array(tNode(x).leaf) then
+			    Types.EnterAttribute(tNode(x).leaf, aaReference)
+			    Types.IncreaseIndirection(tNode(x).leaf, inPointer)
+			end if
+			x := tNode(x).sibling
+		    end loop
+		elsif tNode(tNode(t).operand).operatorNumber =
+			aVaryingParameter then
+		    Types.EnterAttribute(tNode(firstId).leaf,
+			aaVaryingParameter)
+		end if
+		if ParamArray(tNode(tipe).operand) then
+		    /*
+		     * Simplify its component type, if necessary
+		     */
+		    var register tt := tNode(tipe).operand
+		    var register lastTt : TreePointer
+
+		    assert tNode(tt).operatorNumber = aArray
+		    tt := tNode(tt).operand
+		    loop
+			exit when tNode(tt).sibling = nil(tNode)
+			lastTt := tt
+			tt := tNode(tt).sibling
+		    end loop
+
+		    if not SimpleType(tt) then
+			SimplifyType(tp, tNode(lastTt).sibling)
+
+			/* reset the type for all the variables */
+			x := firstId
+			loop
+			    exit when x = t
+			    Types.SetType(tNode(x).leaf, tNode(tipe).operand)
+			    x := tNode(x).sibling
+			end loop
+		    end if
+		elsif not SimpleType(tNode(tipe).operand) then
+		    SimplifyType(tp, tNode(tipe).operand)
+		    /* we must now find the subprogram definition again */
+		    /* reset the type for all the variables */
+		    x := firstId
+		    loop
+			exit when x = t
+			Types.SetType(tNode(x).leaf, tNode(tipe).operand)
+			x := tNode(x).sibling
+		    end loop
+		end if
+
+		/* set the proper indirection */
+		const tKind := CTypes.TypeKind(tipe)
+		x := firstId
+		loop
+		    exit when x = t
+		    SetIndirection(tNode(x).leaf, tKind, tipe)
+		    x := tNode(x).sibling
+		end loop
+	    end if
+	    t := tNode(t).sibling
+	end loop
+	CleanseParameters(param)
+    end TransformParameters
+
+
+    body procedure AddFunctionResultToParameterList% (t : TreePointer,
+					           % id : ExpressionPointer)
+	var register tp := t
+
+	/* find the function definition again */
+	loop
+	    exit when tNode(tp).operatorNumber = aFunction
+	    tp := tNode(tp).sibling
+	end loop
+
+	tp := tNode(tp).operand
+
+	/* tp points to the function id;  are there parameters? */
+	if tNode(tNode(tp).sibling).operatorNumber = aSubs then
+	    /* find the end of the parameter list */
+	    tp := tNode(tNode(tp).sibling).operand
+	    loop
+		exit when tNode(tp).sibling = nil(tNode)
+		tp := tNode(tp).sibling
+	    end loop
+
+	    /* now a node for the id */
+	    new tNode, tNode(tp).sibling
+	    tp := tNode(tp).sibling
+	    tNode(tp).operatorNumber := 0
+	    tNode(tp).nodeKind := NodeKinds.ExpressionLeaf
+	    tNode(tp).sibling := nil(tNode)
+	    tNode(tp).operand := nil(tNode)
+	    tNode(tp).leaf := id
+	    tNode(tp).transformed := true
+	    tNode(tp).lineNumber := 0
+	else
+	    /* must create a parameter list */
+	    var register x : TreePointer
+	    new tNode, x
+	    tNode(x).operatorNumber := aSubs
+	    tNode(x).nodeKind := NodeKinds.OperatorNode
+	    tNode(x).sibling := tNode(tp).sibling
+	    tNode(x).leaf := nil(eNode)
+	    tNode(x).transformed := true
+	    tNode(x).lineNumber := 0
+	    tNode(tp).sibling := x
+
+	    /* now a node for the id */
+	    new tNode, tNode(x).operand
+	    x := tNode(x).operand
+	    tNode(x).operatorNumber := 0
+	    tNode(x).nodeKind := NodeKinds.ExpressionLeaf
+	    tNode(x).sibling := nil(tNode)
+	    tNode(x).operand := nil(tNode)
+	    tNode(x).leaf := id
+	    tNode(x).transformed := true
+	    tNode(x).lineNumber := 0
+	end if
+
+	/* must be a non-scalar ! */
+	if not Array(id) then
+	    Types.EnterAttribute(id, aaReference)
+	    Types.IncreaseIndirection(id, inPointer)
+	end if
+    end AddFunctionResultToParameterList
+
+end TransformParameters

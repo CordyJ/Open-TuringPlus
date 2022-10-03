@@ -1,0 +1,61 @@
+This directory contains the machine-independent implementations of the
+Turing Plus abort processing library routines.
+
+The various routines are as follows:
+
+TLE.ch		(internal)
+	The TLE parent module.
+
+TLEABT.ch	(Abort)
+	This routine takes the specification of some in-line coder abort
+	(eg. array index out of range) and generates the appropriate exception.
+
+TLECR.ch	(pCheckRange)
+	This function checks the range of its argument, calling TLEABT if
+	out of range, and returns the argument.
+	NOTE: This is required for the C-translator only.
+
+TLECRL.ch	(pCheckRangeSubtractLower)
+	This function checks the range of its argument, calling TLEABT if
+	out of range, and returns the argument minus the lower bound.
+	NOTE: This is required for the C-translator only.
+
+TLECRS.ch	(pRangeCheckString)
+	This function checks the length of its string argument, calling
+	TLEABT if it is too long, and returns the address of the argument.
+	NOTE: This is required for the C-translator only.
+
+TLEDH.st	(DispatchHandler)
+	The machine-dependent body of this stub should dispatch the currently
+	active handler.  It must work hand-in-hand with the TLEHE routine to
+	restore a stack context and begin execution of the handler.  This is
+	the "longjmp" in the analogous setjmp/longjmp pair.
+
+TLEH.ch		(SystemHandler)
+	This is the final system handler routine.  It takes the quit code and
+	any library error messages, outputs them, and exits.
+
+TLEHE.st	(pHandler)
+	The machine-dependent body of this stub inserts a handler routine
+	into the list of active handlers and saves the context state for
+	TLEDH to use when dispatching the handler.  This is the "setjmp" in
+	the analogous setjmp/longjmp pair.
+
+TLEHX.ch	(pExitHandler)
+	This routine removes the top handler from the handler chain.  This is
+	done when the scope defining the handler is exited.
+
+TLELF.ch	(LineAndFile)
+	This utility routine takes the line number variable (with the file
+	number encoded) and the file table address and returns the actual
+	line number and file name.
+
+TLEQ.ch		(pQuit)
+	This routine implements the quit statement, and dispatches the next
+	handler in the chain.
+
+TLETR.st	(TrapHandler)
+	The machine-dependent body of this module stub must implement the
+	system trap handling.  For example, for UNIX systems, this module
+	would set up a signal handler and cause it to be called when a
+	signal occurs.

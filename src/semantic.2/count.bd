@@ -1,0 +1,148 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+% 
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+% 
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+body "count.st" module Count
+
+    /*
+     * File:	Turing Plus Semantic Pass 1 Count Mechanism
+     * Author:	M. Mendell
+     * Date:	12 March 1986
+     */
+
+    /*
+     * This mechanism is used to count items in formals and other
+     * lists and to index entries in the current scope.	
+     */
+
+    /* Count Stack */
+    var countStack: array 1..maxCounts of 0..maxCountValue
+    var countTop: 0..maxCounts := 0
+    var maxCountTop: 0..maxCounts := 0
+
+
+    /* Union Body Count Stack */
+    var unionBodyCountStack: array 1..maxCounts of 0..maxCountValue
+    var unionBodyCountTop: 0..maxCounts := 0
+    var maxUnionBodyCountTop: 0..maxCounts := 0
+
+
+    body procedure PushCount % (count: 0..maxCountValue)
+	if countTop < maxCounts then
+	    countTop += 1
+	    if statistics and maxCountTop < countTop then
+		maxCountTop := countTop
+	    end if
+
+	    if count <= maxCountValue then
+		countStack(countTop) := count
+	    else
+		Error (eCountValueOverflow)
+	    end if
+	else
+	    Error (eCountOverflow)
+	end if
+    end PushCount
+
+
+    body procedure PushUnionBodyCount % (count: 0..maxCountValue)
+	if unionBodyCountTop < maxUnionBodyCounts then
+	    unionBodyCountTop += 1
+	    if statistics and maxUnionBodyCountTop < unionBodyCountTop then
+		maxUnionBodyCountTop := unionBodyCountTop
+	    end if
+
+	    if count <= maxUnionBodyCountValue then
+		unionBodyCountStack(unionBodyCountTop) := count
+	    else
+		Error (eUnionBodyCountValueOverflow)
+	    end if
+	else
+	    Error (eUnionBodyCountOverflow)
+	end if
+    end PushUnionBodyCount
+
+
+
+    body procedure DecrementCount
+	assert countTop > 0 and countStack(countTop) > 0
+	countStack(countTop) -= 1
+    end DecrementCount
+
+
+    body procedure IncrementCount
+	assert countTop > 0
+	if countStack(countTop) < maxCountValue then
+	    countStack(countTop) += 1
+	else
+	    Error (eCountValueOverflow)
+	end if
+    end IncrementCount
+
+
+    body procedure IncrementUnionBodyCount
+	pre unionBodyCountTop > 0
+	if unionBodyCountStack(unionBodyCountTop) < maxUnionBodyCountValue then
+	    unionBodyCountStack(unionBodyCountTop) += 1
+	else
+	    Error (eUnionBodyCountValueOverflow)
+	end if
+    end IncrementUnionBodyCount
+
+
+    body function CountValue % : 0..maxCountValue
+	assert countTop > 0
+	result countStack(countTop)
+    end CountValue
+
+
+    body function UnionBodyCountValue % : 0..maxUnionBodyCountValue
+	pre unionBodyCountTop > 0
+	result unionBodyCountStack(unionBodyCountTop)
+    end UnionBodyCountValue;
+
+
+    body procedure PopCount
+	pre countTop > 0
+	countTop -= 1
+    end PopCount
+
+
+    body procedure PopUnionBodyCount
+	pre unionBodyCountTop > 0
+	unionBodyCountTop -= 1
+    end PopUnionBodyCount
+
+
+    body function CouStackEmpty % : boolean
+	result countTop = 0
+    end CouStackEmpty
+
+
+    body procedure CountStats
+	put "Count\n\tCount Stack = ", maxCountTop, "/", maxCounts
+    end CountStats
+
+
+    body procedure DumpCounts
+	put "\n\tCountStack\n\tCountValue"
+	for decreasing i : countTop..1
+	    put i, "\t", countStack(i)
+	end for
+	put "------------------------------------------------------"
+    end DumpCounts
+end Count

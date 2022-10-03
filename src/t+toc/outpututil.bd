@@ -1,0 +1,236 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+% 
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+% 
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+body "outpututil.st" module Misc
+
+    body procedure OutputIndent % (indent : nat)
+	if indent > 0 then
+	    put :outFile, repeat("\t", indent div 8),
+		repeat(" ", indent mod 8) ..
+	end if
+    end OutputIndent
+
+
+    var lastLineNumber : nat2 := 0
+    var lastFileNumber : nat2 := 0
+
+
+    body procedure OutputLineNumber % (tp : TreePointer, indent : int)
+	const register t := tp
+
+	if needStackCheck then
+	    OutputIndent(indent)
+	    if needSaveLineFile then
+		put :outFile, predefNames(pStackCheckAndSaveLineFile),
+		    "(", tNode(tp).fileNumber * 100000 + tNode(tp).lineNumber,
+		    ");"
+		needSaveLineFile := false
+	    else
+		put :outFile, predefNames(pStackCheck), "();"
+	    end if
+	    needStackCheck := false
+	end if
+	if not (not lineNumbering or tNode(t).lineNumber = 0 or
+		tNode(t).fileNumber = 0 or
+		(tNode(t).lineNumber = lastLineNumber and 
+		 tNode(t).fileNumber = lastFileNumber)) then
+	    if needSetFileTable then
+		OutputIndent(indent)
+		put :outFile, predefNames(pSetFileTable), "();"
+		needSetFileTable := false
+		lastFileNumber := 0
+	    end if
+
+	    OutputIndent(indent)
+	    if tNode(t).fileNumber = lastFileNumber and
+		    tNode(t).lineNumber = lastLineNumber + 1 then
+		put :outFile, predefNames(pIncrementLineNumber), "();"
+	    else
+		put :outFile, predefNames(pSetLineNumber), "(", 
+		    tNode(t).fileNumber * 100000 + tNode(t).lineNumber, ");"
+	    end if
+	    lastLineNumber := tNode(t).lineNumber
+	    lastFileNumber := tNode(t).fileNumber
+	end if
+	if needLoopTimeSlice then
+	    /* null for loop */
+	    OutputIndent(indent)
+	    put :outFile, predefNames(pLoopTimeSlice), "();"
+	    needLoopTimeSlice := false
+	end if
+    end OutputLineNumber
+
+
+    body procedure ForceLineNumberAssignment
+	lastLineNumber := 0
+	lastFileNumber := 0
+    end ForceLineNumberAssignment
+
+
+    body function TokenToName % (lab : int) : string
+	include "toktoname.in"
+	result tokenNames(lab)
+    end TokenToName
+
+
+    body function ImplicitReference % (expn : ExpressionPointer) : boolean
+	case ExpnType(expn) of
+	    label tString, tArray, tFlexArray, tCharString,
+		    tFlexCharString, tParameterArray, tParameterCharString,
+		    tParameterArrayParameterCharString, tParameterString,
+		    tParameterArrayParameterString:
+		result true
+
+	    label tProcedure, tFunction:
+		result Types.HasAttribute(VariableId(expn), aaRealSubprogram)
+
+	    label tSet:
+		result CTypes.NonScalar(Types.GetType(VariableId(expn)))
+
+	    label :
+		result false
+	end case
+    end ImplicitReference
+
+
+    body procedure OutputType % (t : TreePointer, indent : int)
+	const tKind := Types.GetKind(tNode(t).leaf)
+
+	OutputIndent(indent)
+	if tKind = tRecord or tKind = tUnion then
+	    if tNode(tNode(t).sibling).nodeKind = NodeKinds.ExpressionLeaf then
+		put :outFile, "typedef\t" ..
+		CTypes.Output(tNode(t).sibling, t, outFile, 0)
+	    else
+		CTypes.OutputStructure (tNode(t).sibling, t, outFile, 0)
+	    end if
+	else
+	    put :outFile, "typedef\t" ..
+	    CTypes.Output(tNode(t).sibling, t, outFile, 0)
+	end if
+    end OutputType
+
+
+    function ArgumentSize (param : ExpressionPointer) : int
+	case ExpnType(param) of
+	    label tBoolean, tChar, tInt, tNat, tSubrange, tEnumeration:
+		result 4
+	    
+	    label tReal:
+		result 8
+
+	    label tSet:
+		const stype := Types.GetType(VariableId(param))
+
+		if CTypes.NonScalar(stype) then
+		    result macdepAddressSize
+		else
+		    var e : ExpressionType
+		    CTypes.EnterTypeSize(e, stype, false)
+		    result e.u.integerValue
+		end if
+
+	    label :
+		result macdepAddressSize
+	end case
+    end ArgumentSize
+
+
+    function ArgumentTypeSize (param : ExpressionPointer) : int
+	case Types.GetKind(param) of
+	    label tBoolean, tChar, tInt, tNat, tSubrange, tEnumeration:
+		result 4
+
+	    label tReal:
+		result 8
+
+	    label tSet:
+		const stype := Types.GetType(VariableId(param))
+
+		if CTypes.NonScalar(stype) then
+		    result macdepAddressSize
+		else
+		    var e : ExpressionType
+		    CTypes.EnterTypeSize(e, stype, false)
+		    result e.u.integerValue
+		end if
+	    
+	    label tParameterCharString, tParameterString:
+		result macdepAddressSize+4
+
+	    label tParameterArray, tParameterArrayParameterCharString,
+		    tParameterArrayParameterString:
+		var register as := Types.ArrayStringInformation(param)
+		var register psize := 0
+
+		loop
+		    exit when asNode(as).u.kind = componentType
+		    psize += 4
+		    as := asNode(as).next
+		end loop
+
+		if Types.GetKind(param) not= tParameterArray then
+		    psize += 4 + 4
+		end if
+
+		result macdepAddressSize+psize
+
+	    label :
+		result macdepAddressSize
+	end case
+    end ArgumentTypeSize
+
+
+    body function ParameterSize % (eFunc, eParams : ExpressionPointer) : int
+	if eParams = nil(eNode) then
+	    result 0
+	else
+	    var register psize := 0
+	    var register params := eParams
+	    var register args :=
+		tNode(tNode(Types.GetType(eFunc)).operand).sibling
+
+	    assert tNode(args).operatorNumber = aSubs
+	    args := tNode(args).operand
+
+	    assert eNode(params).u.operatorNumber = aSubs
+	    params := eNode(params).u.operand
+
+	    loop
+		exit when args = nil(tNode) or
+		    Types.HasAttribute(tNode(args).leaf, aaVaryingParameter)
+		
+		psize += ArgumentTypeSize(tNode(args).leaf)
+		args := tNode(args).sibling
+		params := eNode(params).sibling
+	    end loop
+
+	    if args not= nil(tNode) then
+		/* varying parameters */
+		loop
+		    exit when params = nil(eNode)
+		    psize += ArgumentSize(params)
+		    params := eNode(params).sibling
+		end loop
+	    end if
+	    result psize
+	end if
+    end ParameterSize
+
+
+end Misc

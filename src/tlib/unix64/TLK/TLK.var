@@ -1,0 +1,105 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+%
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+%
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+    grant( 
+	/*
+	 * variables
+	 */
+	var TLKRQH,	% list of ready-to-run but not scheduled processes
+	var TLKPC,	% # of processes alive
+	var TLKMULTI,	% is this program multi-process?
+	var TLKFQH,	% list of terminated processes whose stack must be freed
+	var TLKDISP,	% true when TLKPD is acting as a process dispatcher
+
+	var TLKEPOCH, 	% current epoch
+	var TLKTIME,	% current time in epoch
+	var TLKTQH,	% current epoch timeout queue
+	var TLKTQ2H,	% next epoch timeout queue
+
+	var TLKRND, 	% random number used for time-slicing
+
+	/*
+	 * routines
+	 */
+	TLKCS,
+	TLKSP,
+
+	TLKUDMPP,
+	TLKUDMPA,
+	TLKUEXIT,
+
+	TLKRQI,
+
+	TLKTQI,
+	TLKTQD,
+	TLKTQU,
+	TLKTQR,
+
+	TLKPCS,
+	TLKRQD,
+	TLKRGETP,
+	TLKRSETP,
+
+	TLKPRUN,
+	TLKPDINI
+	)
+
+include "TLK.def"
+
+/*------------+
+|  run queue  |
++------------*/
+
+% -- the currently running process is stored in TLKPD,
+% -- which is imported into TLK from TL.  A machine-dependent
+% -- trick is used to make TLKPD refer to the correct location.
+
+% -- pointer to the list of non-running, but ready-to-run, processes
+var TLKRQH: TL_PDpointer := nil(TL_Process)
+
+% -- count of the number of processes currently alive
+var TLKPC: nat := 0
+
+% -- TRUE iff a fork has taken place
+var TLKMULTI: boolean := false
+
+% -- list of processes that have terminated and whose stacks must be freed
+var TLKFQH: TL_PDpointer := nil(TL_Process)
+
+% -- true when TLKPD is acting as a process dispatcher (in TLKRQD)
+var TLKDISP: boolean := false
+
+
+/*-------+
+|  time  |
++-------*/
+
+% -- Time since clock was started.
+var TLKEPOCH : nat := 0 % * maxnat msec
+var TLKTIME  : nat := 0 % msec
+
+% -- TQH is the list of processes waiting to timeout sometime in the current 
+% -- epoch (ordered on timeout deadline).
+var TLKTQH: TL_PDpointer := nil(TL_Process)
+
+% -- TQ2H is the list of processes waiting to timeout in the next epoch
+% -- (also ordered on timeout deadline).
+var TLKTQ2H: TL_PDpointer := nil(TL_Process) % Timeout queue 2 head
+
+% -- random variable used for simulation time slicing
+var TLKRND: nat4 := RandMultiplier

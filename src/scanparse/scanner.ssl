@@ -1,0 +1,2153 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+%
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+%
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+%	Computer Systems Research Institute
+%	University of Toronto
+
+%	File:	Turing Plus Scanner/Screener  V1.0
+%	Author:	Mark Mendell
+%	    From:	Turing Scanner/Screener  V1.2
+%	    Author:	Stephen Perelgut
+%	Date:	6 November 1985
+
+input:
+    % The input filter will classify characters into one of the following
+    % input classes.  All input choices in the S/SL are based on the
+    % character class, not the actual character.  The classes are mutually
+    % exclusive.  When some characters within a class have a special
+    % meaning outside of the meaning of the class, a semantic mechanism
+    % will be defined to differentiate (for example "E" may be a letter,
+    % or it may have the special meaning of exponent.
+
+    cFirstChar
+    cLetter	'a-z A-Z'	= cFirstChar
+    cDigit	'0-9'
+    cWhiteSpace	'<blank>, <tab>, <FormFeed>'
+    cEOF	'<EOF>'
+    cEOL	'<EOL>'
+    cUnderscore	'_'
+    cQuote	'"'
+    cPercent	'%'
+    cBackslash	'\'
+    cPlus	'+'
+    cMinus	'-'
+    cStar	'*'
+    cSlash	'/'
+    cLess	'<'
+    cGreater	'>'
+    cEqual	'='
+    cDot	'.'
+    cColon	':'
+    cComma	','
+    cSemiColon	';'
+    cParen	'('
+    cEndParen	')'
+    cBracket	'['
+    cEndBracket	']'
+    cBrace	'{'
+    cEndBrace	'}'
+    cBar	'|'
+    cAmpersand	'&'
+    cTilde	'~'
+    cBang	'!'
+    cQuestion	'?'
+    cAt		'@'
+    cHash	'#'
+    cSingleQuote
+    cCaret	'^'
+    cIllegal
+    cLastChar		= cIllegal
+    ;
+
+output:
+    % There are five types of output tokens.  Compound tokens are output
+    % with an associated value.  Keyword tokens are all sent to the emitter
+    % as "tIdent" and the emitter maps to the correct value.
+    % PredefinedId tokens are similar to identifiers and keywords.  They are
+    % all emitted as tIdent and mapped correctly by the emitter.  Special
+    % character and multi-character special tokens such as ":=" are emitted
+    % as simple tokens.  Finally, there is a group of meta-tokens which are
+    % used to identify the  state of the input source file, line, text, etc.
+
+    % Compound tokens are output with an associated value
+    firstOutputToken
+    firstCompoundToken = firstOutputToken
+
+    tIdent		% an integer identifier index, an integer length,
+			% and the text
+	    = firstOutputToken
+    tPredefinedId	% an identifier index, a predefined identifier number,
+			% an integer length and the text.
+    tStringLit		% an integer length and the text
+    tCharLit		% an integer length and the text
+    tIntegerLit		% an integer class and the value of the integer.
+			% The value will be 2 bytes for signed (0..32767) and
+			% unsigned integers (32768..65535), and will be
+			% 4 bytes for long ints (65536 .. (2**31)-1)
+    tRealLit		% an integer length and the text for the mantissa, and
+			% integer length and the text for the exponent
+			% (length 0 means no exponent was given)
+
+    lastCompoundToken = tRealLit
+
+    % Keyword Tokens are all sent to the emitter as tKeyword and the emitter
+    % maps them into the correct token value.
+    tKeyword
+    firstKeywordToken	= tKeyword
+
+    tAddressInt		= tKeyword
+    tAll
+    tAnd
+    tArray
+    tAsm
+    tAssert
+    tBegin
+    tBind
+    tBits
+    tBody
+    tBoolean
+    tCase
+    tChar
+    tChecked
+    tChild
+    tClose
+    tCollection
+    tCondition
+    tConst
+    tDecreasing
+    tDeferred
+    tDiv
+    tElse
+    tElsif
+    tEnd
+    tEndCase
+    tEndFor
+    tEndIf
+    tEndLoop
+    tEnum
+    tExit
+    tExport
+    tExternal
+    tFalse
+    tFcn
+    tFor
+    tFork
+    tForward
+    tFree
+    tFunction
+    tGet
+    tGrant
+    tHandler
+    tIf
+    tImport
+    tIn
+    tInclude
+    tInit
+    tInt
+    tInt1
+    tInt2
+    tInt4
+    tInvariant
+    tLabel
+    tLoop
+    tMod
+    tModule
+    tMonitor
+    tNat
+    tNat1
+    tNat2
+    tNat4
+    tNew
+    tNot
+    tOf
+    tOpaque
+    tOpen
+    tOr
+    tPacked
+    tParent
+    tPause
+    tPervasive
+    tPointer
+    tPost
+    tPre
+    tPriority
+    tProc
+    tProcedure
+    tProcess
+    tPut
+    tQuit
+    tRead
+    tReal
+    tReal4
+    tReal8
+    tRecord
+    tRegister
+    tResult
+    tReturn
+    tSeek
+    tSet
+    tShl
+    tShr
+    tSignal
+    tSkip
+    tString
+    tStub
+    tTag
+    tTell
+    tThen
+    tTimeout
+    tTo
+    tTrue
+    tType
+    tUnchecked
+    tUnion
+    tUnqualified
+    tVar
+    tWait
+    tWhen
+    tWrite
+    tXor
+
+    lastKeywordToken = tXor
+
+    % Special tokens
+    tPlus
+    tMinus
+    tStar
+    tSlash
+    tLess
+    tGreater
+    tEqual
+    tDot
+    tColon
+    tComma
+    tSemiColon
+    tParen
+    tEndParen
+    tBracket
+    tEndBracket
+    tBrace
+    tEndBrace
+    tBar
+    tAmpersand
+    tTilde
+    tBang
+    tQuestion
+    tDollar
+    tStarStar
+    tDotDot
+    tAssign
+    tLessEqual
+    tGreaterEqual
+    tImply
+    tShortExit
+    tShortReturnResult
+    tAt
+    tHash
+
+    % Meta Tokens to indentify source file and line states
+    tEndCompilationUnit
+    tNewFile
+    tNewLine
+    tEndOfFile
+    tDummyTokenForStart
+
+    lastOutputToken = tDummyTokenForStart
+    ;
+
+error:
+    eFirstWarning	= 10
+    eIllegalChar	= eFirstWarning
+    eEndCase
+    eEndFor
+    eEndIf
+    eEndLoop
+    eCommentBracketInsideComment
+    eIllegalOperatorAssumeNotEqual
+
+    % Macro warnings
+    eRecursiveMacro
+
+    % Preprocessor warnings
+    eMissingIf
+    eMissingThen
+    eMissingEndParen
+    eExtraneousTextOnPreprocLine
+
+    eFirstError
+
+    eBadExponentInRealLiteral	= eFirstError
+    eBadEscapeInStringLiteral
+    eBadEscapeInCharLiteral
+    eEOLInStringLiteral
+    eEOLInCharLiteral
+    eEOFTerminatesStringLiteral
+    eEOFTerminatesCharLiteral
+    eEOSInStringLiteral
+    eUninitCharInStringLiteral
+    eNullCharacterLiteral
+    eEOFTerminatesComment
+    eIllegalInclude
+    eBaseZero
+    eBaseTooLarge
+    eDigitNotInBase
+    eNumberTooLarge
+    eIllegalBasedNumber
+    eMacroNeedsBracket
+
+    % Preprocessor errors
+    eIllegalPreProcSyntax
+    firstFatalErrorCode = eIllegalPreProcSyntax
+    eTooFewEndifs
+    eNestedIfs
+    eExpnStackOverflow
+    eTooManyIncludeDirs
+    eTooManySymbols
+    eElsIfWithoutIf
+    eElseWithoutIf
+    eTooManyElses
+
+    % Macro errors
+    eMacroHasParameters
+    eTooManyMacroArguments
+    eTooFewMacroArguments
+    eMacroNestingTooDeep
+    eMacroTextTooBig
+    eTooManyMacros
+    eTooManyMacroParameters
+
+    % Walker errors
+    eSslStackOverflow
+    eCannotFindIncludeFile
+    eCannotOpenFileForInput
+    eIncludesTooDeep
+    eTooManyIdents
+    eTooManyIdentChars
+    eTooManyModuleStubs
+    lastErrorCode = eTooManyModuleStubs
+    ;
+
+type CharacterClass:
+    ccLetter = cLetter
+    ccDigit = cDigit
+    ccWhiteSpace = cWhiteSpace
+    ;
+
+
+
+mechanism Save:
+
+    % This mechanism is used to save the characters in a compound
+    % token to be evaluated or passed on with the token.  The Save
+    % mechanism is actually part of the input/output mechanism of
+    % the Scanner.  Each time a token is output, the save buffer
+    % is automatically reset to empty.
+
+    oSaveCharacter		% save the last accepted character
+				% in the compound token buffer
+
+    oSaveWhile(CharacterClass)	% save the last accepted character
+				% in the compound token buffer;
+				% then continue accepting and saving
+				% input characters until the next
+				% input character is not in the
+				% specified class
+
+    oSaveDefaultCharacter	% save the default character (?) in
+				% the save buffer in place of an
+				% erroneous character
+
+    oSaveExtendedCharacter	% convert a Turing extended character
+				% to the corresponding special character
+				% and save the result in the compound
+				% token buffer;  if the character is not
+				% a legal Turing extended character it is
+				% converted to the default character (?)
+
+    oSaveCaretCharacter		% convert a character to the corresponding
+				% special character (CTRL-<character>)
+				% and save the result in the compound
+				% token buffer.
+
+    oSaveWhiteSpace		% save a single blank in the token buffer
+
+    oSaveReplaceWithDefaultReal	 % replace the token buffer with the default
+				 % real literal, "1.0E0"
+
+    oSaveReset;			% forces a reset of the save buffer
+				% to empty (normally automatic)
+
+
+
+mechanism Skip:
+
+    % This mechanism is actually a part of the input
+    % mechanism of the Scanner.  It provides fast flushing of
+    % cBlanks and other ignored characters
+
+    oSkipWhile(CharacterClass);	% accept and do not save input
+				% characters until the next input
+				% character is not in the specified
+				% class
+
+
+
+type Validity:
+    invalid
+    valid;
+
+
+
+mechanism LookAhead:
+
+    % This mechanism is actually part of the input mechanism of the
+    % scanner.  It provides operations to check that characters
+    % lie in specific subclasses as required.
+
+    oLookaheadForExponentChar >> Validity
+				% check that the next character is either
+				% "e" or "E" (the valid exponent characters)
+
+    oLookaheadForExtendedChar >> Validity;
+				% check that the next character
+				% is a valid Turing extended character
+				% (b, B, d, D, n, N, t, T, f, F, r, R, ", ', \))
+
+
+type ValueClass:
+    ivInt	% minInt..-1
+    ivIntNat	% 0..maxInt
+    ivNat	% maxInt+1..maxNat
+    ;
+
+type ConversionStatus:
+    csNormal	% worked fine
+    csBaseZero
+    csBaseTooLarge
+    csDigitNotInBase
+    csNumberTooLarge
+    ;
+
+
+
+
+mechanism Value:
+
+    % The Evaluator mechanism.  This mechanism is used to evaluate
+    % and validate integer literals.  The value consists of a value
+    % class and nat value.
+    % This value is passed to the Parser with the tIntegerLiteral token
+    % in lieu of the token text.
+
+    oValueEvaluate		% evaluate the integer token and save the value
+
+    oValueReplaceDefault	% replace an erroneous integer value
+				% with a default value
+
+    oValueChooseConversionStatus >> ConversionStatus;
+				% return the status of the last integer
+				% evaluation
+
+
+type IdentToken:
+    idIdent = tIdent
+    idInclude = tInclude
+    idEndCase = tEndCase
+    idEndFor  = tEndFor
+    idEndIf   = tEndIf
+    idEndLoop = tEndLoop
+    idIf      = tIf
+    idThen    = tThen
+    idElse    = tElse
+    idElsif   = tElsif
+    idEnd     = tEnd
+    idAssert  = tAssert
+    idAnd     = tAnd
+    idOr      = tOr
+    idNot     = tNot
+    idTrue    = tTrue
+    idFalse   = tFalse
+    idType    = tType
+    idPredefinedId = tPredefinedId
+    ;
+
+
+
+type PreprocToken:
+    firstPreprocToken
+
+    ppIf = firstPreprocToken
+    ppThen
+    ppElsif
+    ppElse
+    ppEnd
+    ppEndif
+    ppAnd
+    ppOr
+    ppNot
+    ppDefine
+    ppUndef
+    ppMacro
+    ppUnmacro
+    ppDefined
+    lastRealPreprocToken = ppDefined
+
+    % Meta-tokens
+    ppDefinedIdent
+    ppUndefinedIdent
+    ppUnknownToken
+    lastPreprocToken = ppUnknownToken;
+
+
+type Boolean:
+    no
+    yes;
+
+mechanism Ident:
+
+    % The Ident Table mechanism.  This mechanism is used to save,
+    % lookup and identify input identifiers as identifiers or keywords.
+    % Each identifier is assigned a unique identifier number which is
+    % output to the Parser as the value of the tIdent token.
+    % Keywords are emitted as the tKeyword token which is
+    % mapped to the specific keyword token on the way out.
+
+    oIdentLookup		% lookup an identifier in the Ident Table
+				% and save its table index;
+				% if it is not present, enter it
+
+    oIdentChoose >> IdentToken	% return the token corresponding to
+				% the last identifier looked up in the table
+
+    oIdentChoosePreprocToken >> PreprocToken
+				% return the preprocessor token corresponding to
+				% the last identifier looked up in the table
+
+    oIdentDefinePreprocIdent	% set the preprocessor token corresponding to
+				% the last identifier looked up in the table
+				% to ppDefinedIdent
+
+    oIdentUndefPreprocIdent	% set the preprocessor token corresponding to
+				% the last identifier looked up in the table
+				% to ppUndefinedIdent
+
+    oIdentIsMacro >> Boolean	% return whether the last identifier looked up
+				% in the table is a macro or not
+
+    oIdentDefineMacro		% define the last identifier looked up in the
+				% table as a macro
+    ;
+
+
+type Integer:
+    one = 1;
+
+mechanism Include:
+
+    % The Include mechanism.  This mechanism is used to process include
+    % files by saving, reassigning and restoring input files as
+    % required.  This mechanism is actually a part of the input
+    % mechanism of the Scanner.
+
+    oIncludePush		% save the current input file and position
+				% on the include stack and open the
+				% file whose name is in the text save buffer
+				% as the new current input file
+
+    oIncludeDepth >> Integer	% return the current depth of the
+				% include stack
+
+    oIncludePop			% close the current input file and restore
+				% the top file and position on the include
+				% stack as the current input file
+
+    oIncludeNewSourceFile >> Boolean
+				% return yes if the included source file
+				% changed under our feet due  to separate
+				% compilation
+
+    oIncludeRestoreSavedToken	% restore the saved token from the last
+				% compilation unit
+
+    oIncludeIsThisACompilationUnit >> Boolean
+				% return yes if the current include file
+				% is a compilation unit
+
+    ;
+
+type StringTerminator:
+    stQuote
+    stEOL
+    stEOF;
+
+
+mechanism Macro:
+    % This mechanism is used to evaluate and replace macro definitions
+    % in the source file
+
+    oMacroStartNewDefinition	% begin the definition of a new macro
+
+    oMacroEnterParameterName	% enter the current token text as the next
+				% parameter in the current macro definition
+
+    oMacroSaveText		% save the current token text as more text
+				% in the macro
+
+    oMacroSavePossibleParameter	% if the current (identifier) token is a
+				% macro parameter, save a token indicating
+				% the correct parameter number;  otherwise
+				% save the text
+
+    oMacroSaveParameter		% save a token indicating the correct parameter
+				% in the macro text
+
+    oMacroIsBusy >> Boolean	% return whether the current macro identifier
+				% is currently being expanded
+
+    oMacroHasParameters >> Boolean
+				% return whether the current macro identifier
+				% has parameters or not
+
+    oMacroEnterArgument		% enter the current token text as the next
+				% argument for macro expansion
+
+    oMacroPushReplacementText	% use the replaced value of the current macro
+				% as the next text to be input
+
+    oMacroUndefineMacro		% undefine the current macro identifier
+    ;
+
+
+mechanism Preprocessor:
+    % This mechanism is used to evaluate preprocessor directives in the
+    % source file
+    % There is a stack of booleans used to evaluate the expressions,
+    % as well as a stack to decide whether to parse the current input.
+
+    oPreProcStartOfLine >> Boolean
+				% Return yes if the current token is at the
+				% start of the line (ignoring whitespace)
+
+    oPreProcPushLevel		% Enter a new #if scope
+
+    oPreProcPopLevel		% Pop the current #if scope
+
+    oPreProcAnd			% Pop the top 2 values, and push the AND of them
+
+    oPreProcNot			% not the top value
+
+    oPreProcOr			% Pop the top 2 values, and push the OR of them
+
+    oPreProcPushValue(Boolean)	% Push given value
+
+    oPreProcSetIfExpn		% Pop the value stack, and use the value to
+				% decide whether to print the next section
+
+    oPreProcSetElsifExpn	% Pop the value stack, and use the value to
+				% decide whether to print the next section,
+				% using the fact that this is an elsif
+
+    oPreProcSetElse		% Use the status of the if to decide whether
+				% to print the next section
+
+    oPreProcDisableInput >> Boolean
+				% Return yes if the next section of input is
+				% not to be passed to the parser
+
+    oPreProcDefineIdent		% Define the new preprocessor symbol
+
+    oPreProcUndefIdent		% Un-define the preprocessor symbol
+
+    oPreProcSaveToken		% Save the current token (ident or keyword)
+
+    oPreProcResetToken		% Set the saved token to a neutral value
+
+    oPreProcChooseToken	>> PreprocToken
+				% return the saved token
+    ;
+
+type PredefinedIds:
+    firstPredefinedId
+
+    tAbs = firstPredefinedId
+    tAddr
+    tArctan
+    tArctand
+    tCeil
+    tChr
+    tCos
+    tCosd
+    tEmpty
+    tEof
+    tErealstr
+    tExp
+    tFloor
+    tFrealstr
+    tGetpriority
+    tIndex
+    tIntreal
+    tIntstr
+    tLength
+    tLn
+    tLower
+    tMax
+    tMin
+    tNatreal
+    tNatstr
+    tNil
+    tOrd
+    tPred
+    tRand
+    tRandInt
+    tRandNext
+    tRandSeed
+    tRandomize
+    tRealstr
+    tRepeat
+    tRound
+    tSetpriority
+    tSign
+    tSin
+    tSind
+    tSize
+    tSqrt
+    tStrint
+    tStrnat
+    tStrdelete
+    tStrmove
+    tStrreplace
+    tStrreal
+    tSucc
+    tUpper
+
+    lastPredefinedId = tUpper;
+
+rules
+
+Tokens:
+    oIncludePush
+    .tNewFile
+    .tNewLine
+    .tDummyTokenForStart
+    .tDummyTokenForStart
+    {
+	[ oIncludeNewSourceFile
+	    | no:
+		% more common case
+	    | *:
+		.tNewFile
+		.tNewLine
+		oIncludeRestoreSavedToken
+	]
+	[
+	    | cWhiteSpace:
+		oSkipWhile(ccWhiteSpace)
+	    | cEOL:
+		.tNewLine
+	    | '%' :
+		@SkipToEndOfLine
+	    | cLetter, '_':
+		@Identifier
+		oIdentLookup
+		[ oIdentIsMacro
+		    | no:
+			@OutputCorrectId
+		    | *:
+			[ oMacroIsBusy
+			    | no:
+				[ oMacroHasParameters
+				    | yes:
+					@MacroArguments
+				    | *:
+				]
+				oMacroPushReplacementText
+				oSaveReset
+			    | *:
+				#eRecursiveMacro
+				@OutputCorrectId
+			]
+		]
+	    | cDigit:
+		@NumberLiteral	% token will be emitted depending on whether it
+				% is a real or integer literal
+	    | '.':
+		oSaveReset
+		oSaveCharacter	% in case this is part of a real literal
+		[
+		    | cDigit :
+			oSaveCharacter	% this is part of a real literal
+			@RealLitAfterPoint
+		    | '.':
+			.tDotDot
+		    | *:
+			.tDot
+		]
+	    | '+':
+		.tPlus
+	    | '-':
+		.tMinus
+	    | '*':
+		[
+		    | '*' :
+			.tStarStar
+		    | * :
+			.tStar
+		]
+	    | '/' :
+		[
+		    | '*' :
+			@BracketedComment
+		    | * :
+			.tSlash
+		]
+	    | '<':
+		[
+		    | '=':
+			.tLessEqual
+		    | '>':
+			#eIllegalOperatorAssumeNotEqual
+			.tTilde
+			.tEqual
+		    | *:
+			.tLess
+		]
+	    | '>':
+		[
+		    | '=':
+			.tGreaterEqual
+		    | '>':
+			[
+			    | '>' :
+				.tShortReturnResult
+			    | * :
+				.tShortExit
+			]
+		    | * :
+			.tGreater
+		]
+	    | '=':
+		[
+		    | '>':
+			.tImply
+		    | *:
+			.tEqual
+		]
+	    | ':':
+		[
+		    | '=':
+			.tAssign
+		    | *:
+			.tColon
+		]
+	    | ';':
+		.tSemicolon
+	    | '(':
+		.tParen
+	    | ')':
+		.tEndParen
+	    | '[':
+		.tBracket
+	    | '|' :
+		.tBar
+		[
+		    | ':':
+			.tColon
+		    | *:
+		]
+	    | ']':
+		.tEndBracket
+	    | '{':
+		.tBrace
+	    | '}' :
+		.tEndBrace
+	    | '&' :
+		.tAmpersand
+	    | '~' :
+		.tTilde
+	    | '!' :
+		.tBang
+	    | '?' :
+		.tQuestion
+	    | ',':
+		.tComma
+	    | '@' :
+		.tAt
+	    | '#' :
+		[ oPreProcStartOfLine
+		    | yes:
+			@PreprocessorDirective
+		    | *:
+			.tHash
+		]
+	    | cQuote:
+		oSaveReset
+		[ @StringLiteral
+		    | stEOL:
+			.tStringLit
+			.tNewLine
+		    | *:
+			.tStringLit
+		]
+	    | cSingleQuote:
+		oSaveReset
+		[ @CharLiteral
+		    | stEOL:
+			.tCharLit
+			.tNewLine
+		    | *:
+			.tCharLit
+		]
+	    | cEOF:
+		[ oIncludeDepth
+		    | one:
+			>
+		    | *:
+			@EndIncludeFile
+		]
+	    | *:
+		#eIllegalChar
+		?
+	]
+    }
+    oIncludePop
+    .tEndOfFile;
+
+
+OutputCorrectId:
+    [ oIdentChoose
+	| idInclude:
+	    @IncludeFile
+	| idEndLoop:
+	    #eEndLoop
+	    .tEnd
+	    .tLoop
+	| idEndIf:
+	    #eEndIf
+	    .tEnd
+	    .tIf
+	| idEndFor:
+	    #eEndFor
+	    .tEnd
+	    .tFor
+	| idEndCase:
+	    #eEndCase
+	    .tEnd
+	    .tCase
+	| *:
+	    .tKeyword	% mapped to particular keyword by emitter
+    ];
+
+
+SkipToEndOfLine:
+
+    % The alternatives in the following choice are ordered
+    % by their relative frequency as leading scan character
+    % in Turing comments.  This is essential for maximum
+    % efficiency.
+
+    {[
+	| cWhiteSpace:
+	    oSkipWhile(ccWhiteSpace)
+	| cLetter:
+	    oSkipWhile(ccLetter)
+	| cDigit:
+	    oSkipWhile(ccDigit)
+	| cEOL:
+	    .tNewLine
+	    >>
+	| *:
+	    ?	% anything is ok in a comment
+    ]};
+
+
+
+BracketedComment:
+    {[
+	| cWhiteSpace:
+	    oSkipWhile(ccWhiteSpace)
+	| cLetter:
+	    oSkipWhile(ccLetter)
+	| cDigit :
+	    oSkipWhile(ccDigit)
+	| '*' :
+	    [
+		| '/' :
+		    >>
+		| * :
+	    ]
+	| '/' :
+	    [
+		| '*' :
+		    #eCommentBracketInsideComment
+		    [
+			| '/' :
+			    % this is the end of the comment, as the * is
+			    % still "active"
+			    >>
+			| *:
+		    ]
+		| * :
+	    ]
+	| cEOL :
+	    .tNewLine
+	| cEOF :
+	    #eEOFTerminatesComment
+	    >>
+	| * :
+	    ?	% Accept any other character
+    ]};
+
+
+
+Identifier:
+    oSaveReset
+    oSaveWhile(ccLetter)	% 95% of identifiers fully scanned here
+    {[
+	| '_':
+	    oSaveCharacter
+	| cLetter:
+	    oSaveWhile(ccLetter)
+	| cDigit:
+	    oSaveWhile(ccDigit)
+	| *:
+	    >
+    ]};
+
+
+
+NumberLiteral:
+    oSaveReset
+    oSaveWhile(ccDigit)		% 95% of numbers fully scanned here
+    [ oLookaheadForExponentChar
+	| valid :
+	    ?			% consume the "e" or "E"
+	    oSaveCharacter
+	    @ExponentPart
+	| * :
+	    [
+		| '.' :
+		    [
+			| '.' :
+			    oValueEvaluate
+			    [ oValueChooseConversionStatus
+				| csNumberTooLarge :
+				    #eNumberTooLarge
+				    oValueReplaceDefault
+				| csNormal :
+			    ]
+			    .tIntegerLit
+			    .tDotDot
+			| * :
+			    oSaveCharacter
+			    @RealLitAfterPoint
+		    ]
+		| '#' :
+		    oSaveCharacter
+		    % "integer" could be any base up to 36, so characters
+		    % are legal too
+		    % must be at least one 'digit'
+		    [
+			| cDigit, cLetter :
+			    oSaveCharacter
+			    {[
+				| cDigit, cLetter :
+				    oSaveCharacter
+				| * :
+				    >
+			    ]}
+			    oValueEvaluate
+			    [ oValueChooseConversionStatus
+				| csBaseZero:
+				    #eBaseZero
+				    oValueReplaceDefault
+				| csBaseTooLarge:
+				    #eBaseTooLarge
+				    oValueReplaceDefault
+				| csNumberTooLarge:
+				    #eNumberTooLarge
+				    oValueReplaceDefault
+				| csDigitNotInBase :
+				    #eDigitNotInBase
+				    oValueReplaceDefault
+				| csNormal:
+			    ]
+			| * :
+			    #eIllegalBasedNumber
+			    oValueReplaceDefault
+		    ]
+		    .tIntegerLit
+		| * :
+		    oValueEvaluate
+		    [ oValueChooseConversionStatus
+			| csNumberTooLarge:
+			    #eNumberTooLarge
+			    oValueReplaceDefault
+			| csDigitNotInBase :
+			    #eDigitNotInBase
+			    oValueReplaceDefault
+			| csNormal:
+		    ]
+		    .tIntegerLit
+	    ]
+    ];
+
+
+
+ExponentPart:
+    [
+	| '+', '-' :
+	    oSaveCharacter
+	| * :
+    ]
+    [
+	| cDigit :
+	    oSaveWhile(ccDigit)
+	| * :
+	    #eBadExponentInRealLiteral
+	    oSaveReplaceWithDefaultReal
+    ]
+    .tRealLit
+    ;
+
+
+RealLitAfterPoint:
+    [
+	| cDigit :
+	    oSaveWhile(ccDigit)
+	| * :
+    ]
+    [ oLookaheadForExponentChar
+	| valid :
+	    ?			% Consume the exponent char (e or E)
+	    oSaveCharacter
+	    @ExponentPart
+	| * :
+	    .tRealLit
+    ]
+    ;
+
+
+StringLiteral >> StringTerminator:
+    % The following alternatives have been ordered by relative
+    % observed frequency as leading scan character in Turing comments.
+    % This is essential for maximum efficiency.
+    {[
+	| cWhiteSpace:
+	    oSaveWhile(ccWhiteSpace)
+	| cLetter:
+	    oSaveWhile(ccLetter)
+	| cDigit:
+	    oSaveWhile(ccDigit)
+	| cBackslash :
+	    [ oLookaheadForExtendedChar
+		| valid :
+		    ?		% consume extended character
+		    oSaveExtendedCharacter
+		| * :
+		    #eBadEscapeInStringLiteral
+		    oSaveDefaultCharacter	% replace \ with default char
+	    ]
+	| cCaret :
+	    ?	% consume caret character
+	    oSaveCaretCharacter
+	| cQuote:
+	    >> stQuote
+	| cEOL:
+	    #eEOLInStringLiteral
+	    >> stEOL
+	| cEOF:
+	    #eEOFTerminatesStringLiteral
+	    >> stEOF
+	| *:
+	    ?	% anything else ok
+	    oSaveCharacter
+    ]};
+
+
+SaveStringLiteral >> StringTerminator:
+    % The following alternatives have been ordered by relative
+    % observed frequency as leading scan character in Turing comments.
+    % This is essential for maximum efficiency.
+    oSaveCharacter	% Save incoming quote
+    {[
+	| cWhiteSpace:
+	    oSaveWhile(ccWhiteSpace)
+	| cLetter:
+	    oSaveWhile(ccLetter)
+	| cDigit:
+	    oSaveWhile(ccDigit)
+	| cBackslash :
+	    oSaveCharacter
+	    [ oLookaheadForExtendedChar
+		| valid :
+		    ?		% consume extended character
+		    oSaveCharacter
+		| * :
+	    ]
+	| cCaret :
+	    oSaveCharacter
+	    ?	% consume caret character
+	    oSaveCharacter
+	| cQuote:
+	    oSaveCharacter
+	    >> stQuote
+	| cEOL:
+	    >> stEOL
+	| cEOF:
+	    >> stEOF
+	| *:
+	    ?	% anything else ok
+	    oSaveCharacter
+    ]};
+
+
+CharLiteral >> StringTerminator:
+    % The following alternatives have been ordered by relative
+    % observed frequency as leading scan character in Turing comments.
+    % This is essential for maximum efficiency.
+    [
+	| cSingleQuote:
+	    #eNullCharacterLiteral
+	    oSaveDefaultCharacter
+	    >> stQuote
+	| cEOL:
+	    #eEOLInCharLiteral
+	    oSaveDefaultCharacter
+	    >> stEOL
+	| cEOF:
+	    #eEOFTerminatesCharLiteral
+	    oSaveDefaultCharacter
+	    >> stEOF
+	| *:
+    ]
+
+    {[
+	| cWhiteSpace:
+	    oSaveWhile(ccWhiteSpace)
+	| cLetter:
+	    oSaveWhile(ccLetter)
+	| cDigit:
+	    oSaveWhile(ccDigit)
+	| cBackslash :
+	    [ oLookaheadForExtendedChar
+		| valid :
+		    ?		% consume extended character
+		    oSaveExtendedCharacter
+		| * :
+		    #eBadEscapeInCharLiteral
+		    oSaveDefaultCharacter	% replace \ with default char
+	    ]
+	| cCaret :
+	    ?	% consume caret character
+	    oSaveCaretCharacter
+	| cSingleQuote:
+	    >> stQuote
+	| cEOL:
+	    #eEOLInCharLiteral
+	    >> stEOL
+	| cEOF:
+	    #eEOFTerminatesCharLiteral
+	    >> stEOF
+	| *:
+	    ?	% anything else ok
+	    oSaveCharacter
+    ]};
+
+
+SaveCharLiteral >> StringTerminator:
+    % The following alternatives have been ordered by relative
+    % observed frequency as leading scan character in Turing comments.
+    % This is essential for maximum efficiency.
+    oSaveCharacter	% Save incoming quote
+    {[
+	| cWhiteSpace:
+	    oSaveWhile(ccWhiteSpace)
+	| cLetter:
+	    oSaveWhile(ccLetter)
+	| cDigit:
+	    oSaveWhile(ccDigit)
+	| cBackslash :
+	    oSaveCharacter
+	    [ oLookaheadForExtendedChar
+		| valid :
+		    ?		% consume extended character
+		    oSaveCharacter
+		| * :
+	    ]
+	| cCaret :
+	    oSaveCharacter
+	    ?	% consume caret character
+	    oSaveCharacter
+	| cSingleQuote:
+	    oSaveCharacter
+	    >> stQuote
+	| cEOL:
+	    >> stEOL
+	| cEOF:
+	    >> stEOF
+	| *:
+	    ?	% anything else ok
+	    oSaveCharacter
+    ]};
+
+
+IncludeFile:
+    @SkipWhiteSpace
+    [
+	| cQuote:
+	| *:
+	    #eIllegalInclude
+	    >>
+    ]
+    oSaveReset
+    [ @StringLiteral
+	| stQuote:
+	    oIncludePush
+	    .tNewFile
+	    .tNewLine
+	| stEOL:
+	    #eIllegalInclude
+	    .tNewLine
+	| *:
+	    #eIllegalInclude
+    ];
+
+
+
+EndIncludeFile:
+    [ oIncludeIsThisACompilationUnit
+	| no:
+	    oIncludePop
+	    .tNewFile
+	    .tNewLine
+	| *:
+	    % dummy token that should never be read
+	    .tEndCompilationUnit
+    ];
+
+
+
+MacroArguments:
+    % Skip whitespace/newlines until argument list
+    {[
+	| '(':
+	    >
+	| cWhiteSpace:
+	    oSkipWhile(ccWhiteSpace)
+	| cEOL:
+	    .tNewLine
+	| *:
+	    #eMacroHasParameters
+	    >>
+    ]}
+    % Scan and enter each comma-separated macro argument
+    oSaveReset
+    {[
+	| '(':
+	    @MacroMunchUntilBracket
+	| ')':
+	    oMacroEnterArgument
+	    >>
+	| ',':
+	    oMacroEnterArgument
+	    oSaveReset
+	| cLetter:
+	    oSaveWhile(ccLetter)
+	| cDigit:
+	    oSaveWhile(ccDigit)
+	| cWhiteSpace:
+	    oSaveWhiteSpace
+	    oSkipWhile(ccWhiteSpace)
+	| cEOL:
+	    .tNewLine
+	    oSaveWhiteSpace
+	| '/' :
+	    [
+		| '*' :
+		    @BracketedComment
+		| *:
+	    ]
+	| '%' :
+	    @SkipToEndOfLine
+	| cQuote:
+	    oSaveCharacter
+	    [ @StringLiteral
+		| stQuote:
+		    oSaveCharacter
+		| stEOL:
+		    .tNewLine
+		| *:
+		    #eMacroNeedsBracket
+		    >>
+	    ]
+	| cSingleQuote:
+	    oSaveCharacter
+	    [ @CharLiteral
+		| stQuote:
+		    oSaveCharacter
+		| stEOL:
+		    .tNewLine
+		| *:
+		    #eMacroNeedsBracket
+		    >>
+	    ]
+	| cEOF:
+	    #eMacroNeedsBracket
+	    >>
+	| *:
+	    ?
+	    oSaveCharacter
+    ]};
+
+
+MacroMunchUntilBracket:
+    oSaveCharacter
+    {[
+	| '(':
+	    @MacroMunchUntilBracket
+	| ')':
+	    oSaveCharacter
+	    >>
+	| cLetter:
+	    oSaveWhile(ccLetter)
+	| cDigit:
+	    oSaveWhile(ccDigit)
+	| cWhiteSpace:
+	    oSaveWhiteSpace
+	    oSkipWhile(ccWhiteSpace)
+	| cEOL:
+	    .tNewLine
+	    oSaveWhiteSpace
+	| '/' :
+	    [
+		| '*' :
+		    @BracketedComment
+		| *:
+	    ]
+	| '%' :
+	    @SkipToEndOfLine
+	| cQuote:
+	    oSaveCharacter
+	    [ @StringLiteral
+		| stQuote:
+		    oSaveCharacter
+		| stEOL:
+		    .tNewLine
+		| *:
+		    #eMacroNeedsBracket
+		    >>
+	    ]
+	| cSingleQuote:
+	    oSaveCharacter
+	    [ @CharLiteral
+		| stQuote:
+		    oSaveCharacter
+		| stEOL:
+		    .tNewLine
+		| *:
+		    #eMacroNeedsBracket
+		    >>
+	    ]
+	| cEOF:
+	    >>
+	| *:
+	    ?
+	    oSaveCharacter
+    ]};
+
+
+PreprocessorDirective:
+    % We have seen a '#'.  Check for white space, then a directive line
+    @SkipWhiteSpace
+    % now look for the directive
+    [
+	| cLetter:
+	| *:
+	    % this wasn't a directive, so in t+, just pass the '#'
+	    % If we were just passing through, continue the munch
+	    [ oPreProcDisableInput
+		| yes:
+		    @PreprocessorMunchUntilHash
+		| *:
+		    .tHash
+	    ]
+	    >>
+    ]
+    @Identifier
+    oIdentLookup
+    [ oIdentChoosePreprocToken
+	| ppIf:
+	    @PreprocessorIf
+	| ppElsif:
+	    @PreprocessorElsif
+	| ppElse:
+	    @PreprocessorElse
+	| ppEnd:
+	    @PreprocessorEnd
+	| ppEndIf:
+	    @PreprocessorEndif
+	| ppDefine:
+	    @PreprocessorDefine
+	| ppUndef:
+	    @PreprocessorUndef
+	| ppMacro:
+	    @PreprocessorMacro
+	    [ oPreProcDisableInput
+		| yes:
+		    % We've already read the newline from the macro!
+		    @SkipWhiteSpace
+		    [ *
+			| '#':
+			| *:
+			    @PreprocessorMunchUntilHash
+		    ]
+		| *:
+	    ]
+	    >>
+	| ppUnmacro:
+	    @PreprocessorUnmacro
+	| *:
+	    [ oPreProcDisableInput
+		| yes:
+		    @PreprocessorMunchUntilHash
+		| *:
+		    .tHash
+		    @OutputCorrectId
+	    ]
+	    >>
+    ]
+    {
+	@SkipWhiteSpace
+	[ *
+	    | '%', cEOL:
+		>
+	    | '/':
+		?
+		[
+		    | '*':
+			@BracketedComment
+		    | *:
+			#eExtraneousTextOnPreprocLine
+			[ oPreProcDisableInput
+			    | no:
+				.tSlash
+			    | *:
+			]
+			>
+		]
+	    | *:
+		#eExtraneousTextOnPreprocLine
+		>
+	]
+    }
+    [ oPreProcDisableInput
+	| yes:
+	    @PreprocessorMunchUntilHash
+	| *:
+    ];
+
+
+SkipWhiteSpace:
+    [
+	| cWhiteSpace:
+	    oSkipWhile(ccWhiteSpace)
+	| *:
+    ];
+
+
+PreprocessorIf:
+    % have just parsed #if.  Parse expn, then 'then'
+    @PreprocessorExpn
+    oPreProcPushLevel
+    oPreProcSetIfExpn
+    [ oPreProcChooseToken
+	| ppThen:
+	| ppUnknownToken:
+	    #eMissingThen
+	| *:
+	    #eMissingThen
+	    @OutputScannedToken
+    ];
+
+
+PreprocessorElsif:
+    % have just parsed #elsif.  Parse expn, then 'then'
+    @PreprocessorExpn
+    oPreProcSetElsifExpn
+    [ oPreProcChooseToken
+	| ppThen:
+	| ppUnknownToken:
+	    #eMissingThen
+	| *:
+	    #eMissingThen
+	    @OutputScannedToken
+    ];
+
+
+PreprocessorElse:
+    % have just parsed #else
+    oPreProcSetElse;
+
+
+PreprocessorEnd:
+    % have just parsed #end.  Check for the 'if'
+    oPreProcPopLevel
+    @SkipWhiteSpace
+    [
+	| cLetter:
+	    @Identifier
+	    oIdentLookup
+	    [ oIdentChoosePreprocToken
+		| ppIf:
+		| *:
+		    #eMissingIf
+		    @OutputScannedToken
+	    ]
+	| *:
+	    #eMissingIf
+    ];
+
+
+PreprocessorEndif:
+    % have just parsed #endif
+    oPreProcPopLevel;
+
+
+PreprocessorDefine:
+    % have just parsed #define
+    @SkipWhiteSpace
+    [
+	| cLetter, '_':
+	    @Identifier
+	    oIdentLookup
+	    [ oIdentChoosePreprocToken
+		| ppUndefinedIdent:
+		    [ oPreProcDisableInput
+			| no:
+			    oIdentDefinePreprocIdent
+			| *:
+		    ]
+		| ppDefinedIdent:
+		| *:
+		    #eIllegalPreProcSyntax
+	    ]
+	| *:
+	    #eIllegalPreProcSyntax
+    ];
+
+
+PreprocessorUndef:
+    % have just parsed #undef
+    @SkipWhiteSpace
+    [
+	| cLetter, '_':
+	    @Identifier
+	    oIdentLookup
+	    [ oIdentChoosePreprocToken
+		| ppDefinedIdent:
+		    [ oPreProcDisableInput
+			| no:
+			    oIdentUndefPreprocIdent
+			| *:
+		    ]
+		| ppUndefinedIdent:
+		| *:
+		    #eIllegalPreProcSyntax
+	    ]
+	| *:
+	    #eIllegalPreProcSyntax
+    ];
+
+
+PreprocessorMacro:
+    % have just parsed #macro
+    @SkipWhiteSpace
+    [
+	| cLetter, '_':
+	    @Identifier
+	    oIdentLookup
+	    [ oIdentChoose
+		| idIdent:
+		    [ oPreProcDisableInput
+			| no:
+			    oMacroStartNewDefinition
+			    [
+				| '(':
+				    @ParameterMacro
+				| *:
+				    @NoParamMacro
+			    ]
+			| *:
+			    @SkipToEndOfLine
+		    ]
+		| *:
+		    #eIllegalPreProcSyntax
+		    @SkipToEndOfLine
+	    ]
+	| *:
+	    #eIllegalPreProcSyntax
+	    @SkipToEndOfLine
+    ];
+
+ParameterMacro:
+    % Scan parameter list
+    {
+	@SkipWhiteSpace
+	[
+	    | cLetter, '_':
+		@Identifier
+		oMacroEnterParameterName
+	    | *:
+		#eIllegalPreProcSyntax
+		@SkipToEndOfLine
+		>>
+	]
+	@SkipWhiteSpace
+	[
+	    | ')':
+		>
+	    | ',':
+	    | *:
+		#eIllegalPreProcSyntax
+		@SkipToEndOfLine
+		>>
+	]
+    }
+    % Now scan replacement text
+    @SkipWhiteSpace
+    oSaveReset
+    {[
+	| cLetter, '_':
+	    oMacroSaveText
+	    @Identifier
+	    oMacroSavePossibleParameter
+	    oSaveReset
+	| cDigit:
+	    oSaveWhile(ccDigit)
+	    oMacroSaveText
+	    oSaveReset
+	| cWhiteSpace:
+	    oSkipWhile(ccWhiteSpace)
+	    oSaveWhiteSpace
+	| cEOL:
+	    oMacroSaveText
+	    .tNewLine
+	    >>
+	| '%':
+	    oMacroSaveText
+	    @SkipToEndOfLine
+	    >>
+	| '/':
+	    oMacroSaveText
+	    oSaveReset
+	    oSaveCharacter
+	    [
+		| '*':
+		    oSaveReset
+		    @BracketedComment
+		| *:
+	    ]
+	| '\':
+	    oMacroSaveText
+	    oSaveReset
+	    oSaveCharacter
+	    [
+		| cEOL:
+		    oSaveReset
+		    .tNewLine
+		| *:
+	    ]
+	| cQuote:
+	    [ @SaveStringLiteral
+		| stQuote:
+		| stEOL:
+		    oMacroSaveText
+		    .tNewLine
+		    >>
+		| *:
+		    oMacroSaveText
+		    >>
+	    ]
+	    oMacroSaveText
+	    oSaveReset
+	| cSingleQuote:
+	    [ @SaveCharLiteral
+		| stQuote:
+		| stEOL:
+		    oMacroSaveText
+		    .tNewLine
+		    >>
+		| *:
+		    oMacroSaveText
+		    >>
+	    ]
+	    oMacroSaveText
+	    oSaveReset
+	| cEOF:
+	    oMacroSaveText
+	    >>
+	| *:
+	    ?
+	    oSaveCharacter
+    ]};
+
+NoParamMacro:
+    @SkipWhiteSpace
+    oSaveReset
+    {[
+	| cLetter:
+	    oSaveWhile(ccLetter)
+	    oMacroSaveText
+	    oSaveReset
+	| cDigit:
+	    oSaveWhile(ccDigit)
+	    oMacroSaveText
+	    oSaveReset
+	| cWhiteSpace:
+	    oSkipWhile(ccWhiteSpace)
+	    oSaveWhiteSpace
+	| cEOL:
+	    oMacroSaveText
+	    .tNewLine
+	    >>
+	| '%':
+	    oMacroSaveText
+	    @SkipToEndOfLine
+	    >>
+	| '/':
+	    oMacroSaveText
+	    oSaveReset
+	    oSaveCharacter
+	    [
+		| '*':
+		    oSaveReset
+		    @BracketedComment
+		| *:
+	    ]
+	| '\':
+	    oMacroSaveText
+	    oSaveReset
+	    oSaveCharacter
+	    [
+		| cEOL:
+		    oSaveReset
+		    .tNewLine
+		| *:
+	    ]
+	| cQuote:
+	    [ @SaveStringLiteral
+		| stQuote:
+		| stEOL:
+		    oMacroSaveText
+		    .tNewLine
+		    >>
+		| *:
+		    oMacroSaveText
+		    >>
+	    ]
+	    oMacroSaveText
+	    oSaveReset
+	| cSingleQuote:
+	    [ @SaveCharLiteral
+		| stQuote:
+		| stEOL:
+		    oMacroSaveText
+		    .tNewLine
+		    >>
+		| *:
+		    oMacroSaveText
+		    >>
+	    ]
+	    oMacroSaveText
+	    oSaveReset
+	| cEOF:
+	    oMacroSaveText
+	    >>
+	| *:
+	    ?
+	    oSaveCharacter
+    ]};
+
+
+PreprocessorUnmacro:
+    % have just parsed #unmacro
+    @SkipWhiteSpace
+    [
+	| cLetter, '_':
+	    @Identifier
+	    oIdentLookup
+	    [ oIdentChoose
+		| idIdent:
+		    [ oPreProcDisableInput
+			| no:
+			    oMacroUndefineMacro
+			| *:
+		    ]
+		| *:
+		    #eIllegalPreProcSyntax
+	    ]
+	| *:
+	    #eIllegalPreProcSyntax
+    ];
+
+
+PreprocessorMunchString >> Boolean:
+    % Return whether we should exit the main munch loop.
+    {[
+	| cWhiteSpace:
+	    oSkipWhile(ccWhiteSpace)
+	| cLetter:
+	    oSkipWhile(ccLetter)
+	| cDigit:
+	    oSkipWhile(ccDigit)
+	| cQuote:
+	    >> no
+	| cBackslash:
+	    [ oLookaheadForExtendedChar
+		| valid:
+		    ?
+		| *:
+	    ]
+	| cCaret:
+	    ?
+	| cEOL:
+	    .tNewLine
+	    @SkipWhiteSpace
+	    [ *
+		| '#':
+		    >> yes
+		| *:
+		    >> no
+	    ]
+	| cEOF:
+	    #eTooFewEndifs
+	    >> yes
+	| *:
+	    ?
+    ]};
+
+PreprocessorMunchCharString >> Boolean:
+    % Return whether we should exit the main munch loop.
+    {[
+	| cWhiteSpace:
+	    oSkipWhile(ccWhiteSpace)
+	| cLetter:
+	    oSkipWhile(ccLetter)
+	| cDigit:
+	    oSkipWhile(ccDigit)
+	| cSingleQuote:
+	    >> no
+	| cBackslash:
+	    [ oLookaheadForExtendedChar
+		| valid:
+		    ?
+		| *:
+	    ]
+	| cCaret:
+	    ?
+	| cEOL:
+	    .tNewLine
+	    @SkipWhiteSpace
+	    [ *
+		| '#':
+		    >> yes
+		| *:
+		    >> no
+	    ]
+	| cEOF:
+	    #eTooFewEndifs
+	    >> yes
+	| *:
+	    ?
+    ]};
+
+PreprocessorMunchUntilHash:
+    % Discard input until a '#' is seen after a newline.
+    % Pass newlines to the parser to get the correct line number.
+    % If an EOF is seen, then complain.
+    {[
+	| cWhiteSpace:
+	    oSkipWhile(ccWhiteSpace)
+	| cLetter:
+	    oSkipWhile(ccLetter)
+	| cDigit:
+	    oSkipWhile(ccDigit)
+	| cEOL:
+	    .tNewLine
+	    @SkipWhiteSpace
+	    [ *
+		| '#':
+		    >>
+		| *:
+	    ]
+	| '/' :
+	    [
+		| '*' :
+		    @BracketedComment
+		| *:
+	    ]
+	| '%' :
+	    @SkipToEndOfLine
+	    @SkipWhiteSpace
+	    [ *
+		| '#':
+		    >>
+		| *:
+	    ]
+	| cQuote:
+	    [ @PreprocessorMunchString
+		| yes:
+		    >>
+		| *:
+	    ]
+	| cSingleQuote:
+	    [ @PreprocessorMunchCharString
+		| yes:
+		    >>
+		| *:
+	    ]
+	| cEOF:
+	    #eTooFewEndifs
+	    >>
+	| *:
+	    ?
+    ]};
+
+
+PreprocessorExpn:
+    % Expn is term { AND|& term }*
+    @Term
+    {[
+	| '&' :
+	    @Term
+	    oPreProcAnd
+	| *:
+	    [ oPreProcChooseToken
+		| ppAnd:
+		    @Term
+		    oPreProcAnd
+		| *:
+		    >>
+	    ]
+    ]};
+
+Term:
+    % Term is fact { OR factor}*
+    @Factor
+    {[ oPreProcChooseToken
+	| ppOr:
+	    @Factor
+	    oPreProcOr
+	| *:
+	    >>
+    ]};
+
+
+Factor:
+    % Factor is "(" Expn ")" or Ident or NOT|~ factor
+    @GetToken
+    [ oPreProcChooseToken
+	| ppNot:
+	    @Factor
+	    oPreProcNot
+	| ppDefinedIdent:
+	    oPreProcPushValue(yes)
+	    @GetToken
+	| ppUndefinedIdent:
+	    oPreProcPushValue(no)
+	    @GetToken
+	| ppDefined:
+	    @Defined
+	    @GetToken
+	| *:
+	    [
+		| '(':
+		    @PreprocessorExpn
+		    [
+			| ')' :
+			    @GetToken
+			| *:
+			    #eMissingEndParen
+		    ]
+		| '~':
+		    @Factor
+		    oPreProcNot
+		| *:
+		    #eIllegalPreProcSyntax
+	    ]
+    ];
+
+
+Defined:
+    @SkipWhiteSpace
+    [
+	| '(':
+	| *:
+	    #eIllegalPreProcSyntax
+    ]
+    @SkipWhiteSpace
+    [
+	| cLetter, '_':
+	    @Identifier
+	    oIdentLookup
+	    [ oIdentChoose
+		| idIdent:
+		    [ oIdentIsMacro
+			| yes:
+			    oPreProcPushValue(yes)
+			| *:
+			    oPreProcPushValue(no)
+		    ]
+		| *:
+		    #eIllegalPreProcSyntax
+	    ]
+	| *:
+	    #eIllegalPreProcSyntax
+    ]
+    @SkipWhiteSpace
+    [
+	| ')':
+	| *:
+	    #eMissingEndParen
+    ];
+
+
+GetToken:
+    @SkipWhiteSpace
+    [ *
+	| cLetter, '_':
+	    ?
+	    @Identifier
+	    oIdentLookup
+	    oPreProcSaveToken
+	| '(', ')', '~', '&', cEOL:
+	    oPreProcResetToken
+	| *:
+	    oPreProcResetToken
+	    #eIllegalPreProcSyntax
+    ];
+
+
+OutputScannedToken:
+    [ oPreProcDisableInput
+	| no:
+	    @OutputCorrectId
+	| *:
+    ];
+
+end

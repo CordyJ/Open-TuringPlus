@@ -1,0 +1,341 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+% 
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+% 
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+body "emit.st" module Emit
+    /*
+     *  Module:	Semantic Pass 2 Emit Mechanism V1.00
+     *	Author:	Mark Mendell & Stephen Perelgut
+     *	Date:	7 April 86
+     */
+
+
+    /* Output Buffering */
+    var emitBuffer:		char(maxEmitBufferChars)
+    var emitBufferPtr:		0..maxEmitBufferChars := 1
+    var maxEmitBufferPtr:	0..maxEmitBufferChars := 1
+
+    type EmitBufferStackEntry :
+	record
+	    startIndex, endIndex:	1..maxEmitBufferChars
+	    isDirect:			boolean
+	end record
+
+    type *char2 : char(2)
+    type *char4 : char(4)
+
+    var emitBufferStack: array 1..maxEmitBuffers of EmitBufferStackEntry
+    var emitBufferTop:   0..maxEmitBuffers := 0
+    var maxEmitBufferTop:0..maxEmitBuffers := 0
+
+
+    procedure EmitByteToBuffer (val: int1)
+	pre emitBufferTop > 0
+
+	if emitBufferPtr < maxEmitBufferChars then
+	    emitBufferPtr += 1
+	    if statistics and maxEmitBufferPtr < emitBufferPtr then
+		maxEmitBufferPtr := emitBufferPtr
+	    end if
+	    #emitBuffer(emitBufferPtr) := val
+	else
+	    Error (eEmitBufferOverflow)
+	end if
+    end EmitByteToBuffer
+
+
+    procedure EmitIntToBuffer (val: int2)
+	pre emitBufferTop > 0
+
+	if emitBufferPtr+1 < maxEmitBufferChars then
+	    emitBufferPtr += 1
+	    emitBuffer(emitBufferPtr) := type (char2, val)(1)
+	    emitBufferPtr += 1
+	    emitBuffer(emitBufferPtr) := type (char2, val)(2)
+	    if statistics and maxEmitBufferPtr < emitBufferPtr then
+		maxEmitBufferPtr := emitBufferPtr
+	    end if
+	else
+	    Error (eEmitBufferOverflow)
+	end if
+    end EmitIntToBuffer
+
+
+    procedure EmitLongToBuffer (val: int4)
+	pre emitBufferTop > 0
+
+	if emitBufferPtr+3 < maxEmitBufferChars then
+	    bind var register eb to emitBuffer
+            emitBufferPtr += 1
+	    eb(emitBufferPtr) := type (char4, val)(1)
+	    emitBufferPtr += 1
+	    eb(emitBufferPtr) := type (char4, val)(2)
+	    emitBufferPtr += 1
+	    eb(emitBufferPtr) := type (char4, val)(3)
+	    emitBufferPtr += 1
+	    eb(emitBufferPtr) := type (char4, val)(4)
+	    if statistics and maxEmitBufferPtr < emitBufferPtr then
+		maxEmitBufferPtr := emitBufferPtr
+	    end if
+	else
+	    Error (eEmitBufferOverflow)
+	end if
+    end EmitLongToBuffer
+
+
+    procedure EmitLineNumber
+	var t : nat1 := aNewLine
+	write :outStream, t, lineNumber
+	if tracing then
+	    put :traceFile, "## Output new line emitted: ", lineNumber
+	end if
+	emitNewLineNumber := false
+    end EmitLineNumber
+
+
+    body procedure EmitOutputToken % (emittedToken: OutputTokens)
+	/* Emit an output token */
+	if emitNewLineNumber then
+	    EmitLineNumber
+	end if
+	/* Check for a deferred new line */
+	if emitBufferTop > 0 and
+		not emitBufferStack(emitBufferTop).isDirect then
+	    EmitByteToBuffer (emittedToken)
+	else
+	    var t : nat1 := emittedToken
+	    write :outStream, t
+	end if
+	if tracing then
+	    put :traceFile, "### Output token: ", emittedToken
+	end if
+    end EmitOutputToken
+
+
+    body procedure EmitByte % (val: int1)
+	/* Emit a byte value */
+	if emitBufferTop > 0 and
+		not emitBufferStack(emitBufferTop).isDirect then
+	    EmitByteToBuffer (val)
+	else
+	    write :outStream, val
+	end if
+    end EmitByte
+
+
+    body procedure EmitInt % (val: int2)
+	/* Emit an integer value */
+	if emitBufferTop > 0 and
+		not emitBufferStack(emitBufferTop).isDirect then
+	    EmitIntToBuffer (val)
+	else
+	    write :outStream, val
+	end if
+    end EmitInt
+
+
+    body procedure EmitLong % (val: int4)
+	/* Emit an integer value */
+	if emitBufferTop > 0 and
+		not emitBufferStack(emitBufferTop).isDirect then
+	    EmitLongToBuffer (val)
+	else
+	    write :outStream, val
+	end if
+    end EmitLong
+
+
+    body procedure EmitString % (slen : int, s : char(*))
+	/* Emit a string value */
+	EmitInt (slen)
+	for i : 1..slen
+	    EmitByte (#s(i))
+	end for
+    end EmitString
+
+
+    body procedure EmitValue % (valuex: ValueDescriptor)
+	case valuex.kind of
+	    label vInteger:
+		EmitOutputToken (aIntegerLit)
+		if valuex.negative then
+		    EmitByte(vInt)
+		    EmitLong (-valuex.intval)
+		elsif valuex.intval <= maxint then
+		    EmitByte(vIntNat)
+		    EmitLong(valuex.intval)
+		else
+		    EmitByte(vNat)
+		    EmitLong(valuex.intval)
+		end if
+
+	    label vSet:
+		assert valuex.smallset
+		EmitOutputToken (aIntegerLit)
+		EmitByte(vNat)
+		EmitLong(#(valuex.setval))
+
+	    label vTrue :
+		EmitOutputToken (aTrue)
+
+	    label vFalse :
+		EmitOutputToken (aFalse)
+
+	    label vString:
+		EmitOutputToken(aStringLit)
+		EmitString(valuex.stringlen,
+			   Value.ValGetString(valuex.stringval))
+
+	    label vReal:
+		EmitOutputToken(aRealLit)
+		EmitString(valuex.stringlen,
+			   Value.ValGetString(valuex.stringval))
+
+	    label vChar :
+		EmitOutputToken(aCharLit)
+		EmitString(valuex.stringlen,
+			   Value.ValGetString(valuex.stringval))
+
+	    label vNil :
+		EmitOutputToken (aNil)
+		EmitOutputToken (aIdent)
+		EmitInt(valuex.collSym)
+	end case
+    end EmitValue
+
+
+    body procedure EmitValueWithTypeKind % (valuex: ValueDescriptor,
+					 %  typekind : TypeKinds)
+	case valuex.kind of
+	    label vInteger:
+		EmitOutputToken (aIntegerLit)
+		if valuex.negative then
+		    EmitByte(vInt)
+		    EmitLong (-valuex.intval)
+		elsif valuex.intval <= maxint then
+		    case typekind of
+			label tInt, tInt4:
+			    EmitByte(vInt)
+			label tNat, tNat4:
+			    EmitByte(vNat)
+			label :
+			    EmitByte(vIntNat)
+		    end case
+		    EmitLong(valuex.intval)
+		else
+		    EmitByte(vNat)
+		    EmitLong(valuex.intval)
+		end if
+
+	    label :
+		EmitValue(valuex)
+	end case
+    end EmitValueWithTypeKind
+
+
+    body procedure EmitBufferPush % (dir : boolean)
+	if emitBufferTop < maxEmitBuffers then
+	    if emitBufferTop > 0 then
+		emitBufferStack(emitBufferTop).endIndex := emitBufferPtr
+	    end if
+
+	    emitBufferTop += 1
+	    if statistics and maxEmitBufferTop < emitBufferTop then
+		maxEmitBufferTop := emitBufferTop
+	    end if
+	    emitBufferStack(emitBufferTop).startIndex := emitBufferPtr
+	    emitBufferStack(emitBufferTop).isDirect := dir
+	else
+	    Error (eEmitBufferStackOverflow)
+	end if
+    end EmitBufferPush
+
+
+    body procedure EmitBufferPop % (dir : boolean)
+	pre emitBufferTop > 0
+	assert emitBufferStack(emitBufferTop).isDirect = dir
+
+	emitBufferTop -= 1
+
+	if emitBufferTop > 0 then
+	    emitBufferPtr := emitBufferStack(emitBufferTop).endIndex
+	else
+	    emitBufferPtr := 1
+	end if
+    end EmitBufferPop
+
+
+    body procedure EmitBufferEmit
+	pre emitBufferTop > 0
+
+	if emitBufferTop >= 2 then
+	    emitBufferStack(emitBufferTop-1).endIndex := emitBufferPtr
+	else
+	    write :outStream,
+		emitBuffer(emitBufferStack(emitBufferTop).startIndex+1) :
+		   emitBufferPtr - emitBufferStack(emitBufferTop).startIndex
+	end if
+    end EmitBufferEmit
+
+
+    body function EmiStackEmpty % : boolean 
+	result emitBufferTop = 0
+    end EmiStackEmpty
+
+
+    body procedure EmitStats
+	put "Emit\n\tEmitBuffer = ", maxEmitBufferPtr, "/",
+	    maxEmitBufferChars, "\n\tEmit Stack = ", maxEmitBufferTop,
+	    "/", maxEmitBuffers
+    end EmitStats
+
+    body procedure DumpEmits
+	var et := emitBufferTop
+	var eb := emitBufferPtr
+	var maxIndex := emitBufferTop
+
+	if maxIndex < emitBufferPtr then
+	    maxIndex := emitBufferPtr
+	end if
+	assert maxIndex >= 0
+
+	put "\n\tEmitBuffer\t\tEmitBufferStack\n\tChar\t\t\tStart\tEnd\tDirect"
+	for decreasing i : maxIndex .. 1
+	    assert et <= i and eb <= i
+
+	    if eb = i then
+		put i, "\t", #emitBuffer(i), "\t\t" ..
+		eb -= 1
+	    else
+		put "\t\t\t" ..
+	    end if
+	    if et = i then
+		put i, "\t", emitBufferStack(i).startIndex, "\t",
+		    emitBufferStack(i).endIndex, "\t" ..
+		if emitBufferStack(i).isDirect then
+		    put "True"
+		else
+		    put "False"
+		end if
+		et -= 1
+	    else
+		put ""
+	    end if
+	end for
+	put "\n", repeat("-", 79)
+    end DumpEmits
+end Emit

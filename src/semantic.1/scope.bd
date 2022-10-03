@@ -1,0 +1,909 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+% 
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+% 
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+body "scope.st" module Scope
+
+    /*
+     *  Module:	Turing Plus Semantic Pass 1 Scope Mechanism V1.00
+     *	Author: M. Mendell and S.G. Perelgut
+     *	Date:	12 March 1986
+     */
+
+    /*
+     * This mechanism is used to implement scope visibility of
+     * symbols and to create and store formals ans other lists
+     * of symbols.  It implements closed scopes and pervasive symbols
+     * in its identifier lookup facility (LookupSymbol).  It allows
+     * walking through lists of symbols (LookupCountSymbol).  Because
+     * a kind is stored with each symbol index, the kind of a symbol
+     * may be different in each scope.			
+
+     * See Turing Plus working paper 1 for details of scope data structures
+
+     */
+
+
+    /* Scope Entry */
+    type ScopeEntry :
+	record
+	    ident:	IdentifierIndex
+	    symbol:	SymbolIndex
+	    kind:	SymbolKinds
+	end record
+
+    /* Scope Element */
+#if DEBUG then
+    var scopes : collection of forward ScopeElement
+#else
+    var scopes : unchecked collection of forward ScopeElement
+#end if
+
+    type *ScopeElementPtr : pointer to scopes
+
+    const *ScopeEntriesPerElement := 20
+
+    type *ScopeElement :
+	record
+	    numElems:	0..ScopeEntriesPerElement
+	    next, last:	ScopeElementPtr
+	    entries:	array 1..ScopeEntriesPerElement of ScopeEntry
+	end record
+
+    /* Scope Header Entry */
+    type *ScopeHeaderEntry :
+	record
+	    numElems:	int
+	    first:	ScopeElementPtr
+	    last:	ScopeElementPtr
+	    complete:	boolean
+	    varImport:	boolean
+	end record
+
+    /* Scope Display Entry */
+    type *ScopeDisplayEntry :
+	record
+	    numElems:	int
+	    first:	ScopeElementPtr
+	    last:	ScopeElementPtr
+	    closed:	boolean
+	    saved:	boolean
+	end record
+
+
+    /* Scope Display */
+    /*
+     * The display entry for each list is the (zero) origin of
+     * the corresponding list.  The top list extends from
+     * scopeDisplay(scopeLevel)+1 to scopeTop.
+     */
+    var scopeDisplay: array 1..maxScopeLevel of ScopeDisplayEntry
+
+    var scopeLevel: 0..maxScopeLevel := 0
+    var maxxScopeLevel: 0..maxScopeLevel := 0
+
+    /* Saved Scope Table */
+    var scopeTable: array 1..maxSavedScopes of ScopeHeaderEntry
+    var scopeTableTop: 0..maxSavedScopes := 0
+    var savedScopeIndex: 0..maxSavedScopes
+
+    /* results of Lookup Symbol Operations */
+    var scopeSymbolIdent: IdentifierIndex
+    var scopeSymbolIndex: SymbolIndex
+    var scopeSymbolKind: SymbolKinds
+
+
+    function ConsistentNumElems (s : int) : boolean
+	pre s <= scopeLevel
+	var p := scopeDisplay(s).first
+	var count := 0
+	loop
+	    exit when p = nil(scopes)
+	    count += scopes(p).numElems
+#if DEBUG then
+	    if count > maxSymbols then
+		% we are probably looping.  We can;t have EVERY symbol !!
+		DumpScopes
+		assert false
+	    end if
+#end if
+	    p := scopes(p).next
+	end loop
+	result count >= scopeDisplay(s).numElems
+    end ConsistentNumElems
+
+
+    body procedure PushNewScope
+	if scopeLevel < maxScopeLevel then
+	    scopeLevel += 1
+	    if statistics and maxxScopeLevel < scopeLevel then
+		maxxScopeLevel := scopeLevel
+	    end if
+	    bind var register d to scopeDisplay(scopeLevel)
+	    d.numElems := 0
+	    d.first := nil(scopes)
+	    d.last := nil(scopes)
+	    d.closed := false
+	    d.saved := false
+	else
+	    Error (eScopeDisplayOverflow)
+	end if
+    end PushNewScope
+
+
+    body procedure PushScope % (scope: ScopeIndex)
+	pre scope <= scopeTableTop
+	post ConsistentNumElems(scopeLevel)
+
+	if scopeLevel < maxScopeLevel then
+	    scopeLevel += 1
+	    if statistics and maxxScopeLevel < scopeLevel then
+		maxxScopeLevel := scopeLevel
+	    end if
+	    if scope not= 0 then
+		bind var register d to scopeDisplay(scopeLevel),
+		    register t to scopeTable(scope)
+		d.numElems := t.numElems
+		d.first := t.first
+		d.last := t.last
+		d.closed := false
+		d.saved := true
+	    else
+		bind var register d to scopeDisplay(scopeLevel)
+		d.numElems := 0
+		d.first := nil(scopes)
+		d.last := nil(scopes)
+		d.closed := false
+		d.saved := false
+	    end if
+	else
+	    Error (eScopeDisplayOverflow)
+	end if
+    end PushScope
+
+
+    procedure CopyOneScope (level: int)
+	pre ConsistentNumElems(level)
+	post ConsistentNumElems(scopeLevel)
+
+	if scopeLevel < maxScopeLevel then
+	    scopeLevel += 1
+	    if statistics and maxxScopeLevel < scopeLevel then
+		maxxScopeLevel := scopeLevel
+	    end if
+	    bind var register copy to scopeDisplay(scopeLevel),
+		register old to scopeDisplay(level)
+
+	    /* copy all of the elements from the old scope to the new scope */
+	    var p := old.first
+	    if p not= nil(scopes) then
+		var first := true
+		var t, oldT := nil(scopes)
+		loop
+		    exit when p = nil(scopes)
+		    new scopes, t
+		    if first then
+			copy.first := t
+			first := false
+		    end if
+		    scopes(t) := scopes(p)
+		    scopes(t).last := oldT
+		    if oldT not= nil(scopes) then
+			scopes(oldT).next := t
+		    end if
+		    oldT := t
+		    p := scopes(p).next
+		end loop
+		copy.last := t
+		scopes(t).next := nil(scopes)
+	    else
+		copy.first := nil(scopes)
+		copy.last := nil(scopes)
+	    end if
+	    copy.numElems := old.numElems
+	    copy.saved := false
+	    copy.closed := false
+	else
+	    Error (eScopeDisplayOverflow)
+	end if
+    end CopyOneScope
+
+
+    body procedure PushCopyScope
+	CopyOneScope(scopeLevel)
+    end PushCopyScope
+
+
+    body procedure CloseScope
+	pre scopeLevel > 0
+	scopeDisplay(scopeLevel).closed := true
+    end CloseScope
+
+
+    body function ReturnScopeLevel % : 0..maxScopeLevel
+	result scopeLevel
+    end ReturnScopeLevel
+
+
+    body function EnclosingClosedScope % : int
+	/* find the second closed scope from the top */
+	for decreasing i : scopeLevel..1
+	    if scopeDisplay(i).closed then
+		for decreasing j : i-1 .. 1
+		    if scopeDisplay(j).closed then
+			result j
+		    end if
+		end for
+		exit
+	    end if
+	end for
+	result GlobalScope
+    end EnclosingClosedScope
+
+
+    body procedure SaveScope
+	pre scopeLevel > 0 and ConsistentNumElems(scopeLevel)
+
+	if scopeTableTop < maxSavedScopes then
+	    if scopeDisplay(scopeLevel).numElems = 0 then
+		savedScopeIndex := 0
+	    else
+		scopeTableTop += 1
+		bind var register t to scopeTable(scopeTableTop),
+		    var register d to scopeDisplay(scopeLevel)
+
+		t.numElems := d.numElems
+		t.first := d.first
+		t.last := d.last
+		t.complete := false
+		t.varImport := false
+
+		d.saved := true
+		savedScopeIndex := scopeTableTop
+	    end if
+	else
+	    Error (eScopeTableOverflow)
+	end if
+    end SaveScope
+
+
+    body procedure ScoEnterSymbol
+			   /* (ident: IdentifierIndex,
+			       kind: SymbolKinds,
+			     symbol: SymbolIndex) */
+
+	pre  scopeLevel > 0 and ConsistentNumElems(scopeLevel)
+	post ConsistentNumElems(scopeLevel)
+
+	bind var register d to scopeDisplay(scopeLevel)
+	if d.first = nil(scopes) or
+		scopes(d.last).numElems = ScopeEntriesPerElement then
+	    % must allocate a new scope element
+	    var p : ScopeElementPtr
+	    new scopes, p
+	    if p = nil(scopes) then
+		Error (eScopeSymbolOverflow)
+	    end if
+	    scopes(p).next := nil(scopes)
+	    if d.first = nil(scopes) then
+		d.first := p
+		d.last := p
+		d.numElems := 0
+		scopes(p).last := nil(scopes)
+	    else
+		scopes(d.last).next := p
+		scopes(p).last := d.last
+	    end if
+	    d.last := p
+
+	    % tranfer the information
+	    scopes(d.last).numElems := 1
+	    d.numElems += 1
+
+	    bind var register el to scopes(d.last).entries(1)
+	    el.ident := ident
+	    el.kind := kind
+	    el.symbol := symbol
+	else
+	    d.numElems += 1
+	    bind var register e to scopes(d.last)
+	    e.numElems += 1
+	    bind var register el to e.entries(e.numElems)
+	    el.ident := ident
+	    el.kind := kind
+	    el.symbol := symbol
+	end if
+    end ScoEnterSymbol
+
+
+    body procedure EnterAutoImportSymbol
+				  /*(ident: IdentifierIndex,
+				      kind: SymbolKinds,
+				    symbol: SymbolIndex) */
+	/* enter the symbol in the nearest closed scope */
+	pre  scopeLevel > 0 and ConsistentNumElems(scopeLevel) and
+	     not scopeDisplay(scopeLevel).saved
+	post ConsistentNumElems(scopeLevel)
+
+	/* find the closed scope */
+	var closedScope : int
+
+	for decreasing i : scopeLevel..1
+	    if scopeDisplay(i).closed then
+		closedScope := i
+		exit
+	    end if
+	end for
+
+	begin
+	    bind var register d to scopeDisplay(closedScope)
+	    if d.first = nil(scopes) or
+		    scopes(d.last).numElems = ScopeEntriesPerElement then
+		% must allocate a new scope element
+		var p : ScopeElementPtr
+		new scopes, p
+		if p = nil(scopes) then
+		    Error (eScopeSymbolOverflow)
+		end if
+		scopes(p).next := nil(scopes)
+		if d.first = nil(scopes) then
+		    d.first := p
+		    d.last := p
+		    d.numElems := 0
+		    scopes(p).last := nil(scopes)
+		else
+		    scopes(d.last).next := p
+		    scopes(p).last := d.last
+		end if
+		d.last := p
+
+		% tranfer the information
+		scopes(d.last).numElems := 1
+		d.numElems += 1
+
+		bind var register el to scopes(d.last).entries(1)
+		el.ident := ident
+		el.kind := kind
+		el.symbol := symbol
+	    else
+		d.numElems += 1
+		scopes(d.last).numElems += 1
+		bind var register el to scopes(d.last).entries(scopes(d.last).numElems)
+		el.ident := ident
+		el.kind := kind
+		el.symbol := symbol
+	    end if
+	end
+	assert ConsistentNumElems(closedScope)
+    end EnterAutoImportSymbol
+    
+
+    body procedure ReplaceCountSymbol
+			       /*(entry: int,
+				  ident: IdentifierIndex,
+				   kind: SymbolKinds,
+				 symbol: SymbolIndex) */
+	pre scopeLevel > 0
+	assert entry > 0 and entry <= scopeDisplay(scopeLevel).numElems
+
+	% find the correct scope entry
+	var p := scopeDisplay(scopeLevel).first
+	var i := 0
+	loop
+	    exit when entry-i <= scopes(p).numElems
+	    i += scopes(p).numElems
+	    p := scopes(p).next
+	end loop
+
+	% now select the proper entry
+	bind var register s to scopes(p).entries(entry-i)
+	s.ident := ident
+	s.symbol := symbol
+	s.kind := kind
+    end ReplaceCountSymbol
+
+
+    body procedure PopScope
+	pre scopeLevel > 0 and ConsistentNumElems(scopeLevel)
+
+	if not scopeDisplay(scopeLevel).saved then
+	    % must free the entries
+	    var p := scopeDisplay(scopeLevel).first
+	    loop
+		exit when p = nil(scopes)
+		const q := scopes(p).next
+		free scopes, p
+		p := q
+	    end loop
+	end if
+	scopeLevel -= 1
+    end PopScope
+
+
+    function LastNumber (i : int) : int
+	/* return the number of valid elements in the last element */
+	var c := scopeDisplay(i).numElems
+	var p := scopeDisplay(i).first
+	loop
+	    exit when p = nil(scopes)
+	    if c > scopes(p).numElems then
+		c -= scopes(p).numElems
+	    else
+		exit
+	    end if
+	    p := scopes(p).next
+	end loop
+	result c
+    end LastNumber
+
+
+    body procedure LookupSymbol % (ident: IdentifierIndex, sc: int)
+	/* Looks up the identifier in the scope sc and up */
+	/* we must lookup the symbol from last symbol entered to
+	   the first symbol in a scope. This is necessary for binds */
+
+	scopeSymbolIdent	:= ident
+	scopeSymbolIndex	:= 0
+	scopeSymbolKind		:= sNotFound
+
+	for decreasing j : scopeLevel .. sc
+	    var p := scopeDisplay(j).last
+	    /* find the count in the last element */
+	    var first := true
+	    loop
+		exit when p = nil(scopes)
+
+		bind register s to scopes(p)
+		if first then
+		    for decreasing i : LastNumber(j) .. 1
+			if s.entries(i).ident = ident then
+			    bind register e to s.entries(i)
+			    scopeSymbolIndex := e.symbol
+			    scopeSymbolKind := e.kind
+			    return
+			    exit
+			end if
+		    end for
+		    first := false
+		else
+		    for decreasing i : s.numElems .. 1
+			if s.entries(i).ident = ident then
+			    bind register e to s.entries(i)
+			    scopeSymbolIndex := e.symbol
+			    scopeSymbolKind := e.kind
+			    return
+			    exit
+			end if
+		    end for
+		end if
+		p := s.last
+	    end loop
+	end for
+    end LookupSymbol
+
+
+    body procedure LookupLocalSymbol % (ident: IdentifierIndex)
+	LookupSymbol(ident, scopeLevel)
+    end LookupLocalSymbol
+
+
+    body procedure LookupEnclosingLocalSymbol % (ident: IdentifierIndex)
+	LookupSymbol(ident, scopeLevel-1)
+    end LookupEnclosingLocalSymbol
+
+
+    body procedure LookupEnclosingEnclosingLocalSymbol %(ident: IdentifierIndex)
+	LookupSymbol(ident, scopeLevel-2)
+    end LookupEnclosingEnclosingLocalSymbol
+
+
+    body procedure LookupCountClosedSymbol % (entry: int)
+	pre entry > 0
+
+	/* find the closed scope */
+	var closedScope := GlobalScope
+
+	for decreasing i : scopeLevel..1
+	    if scopeDisplay(i).closed then
+		closedScope := i
+		exit
+	    end if
+	end for
+
+	assert entry <= scopeDisplay(closedScope).numElems
+
+	var p := scopeDisplay(closedScope).first
+	var i := 0
+	loop
+	    exit when entry-i <= scopes(p).numElems
+	    i += scopes(p).numElems
+	    p := scopes(p).next
+	end loop
+
+	% now select the proper entry
+	bind register s to scopes(p).entries(entry-i)
+	scopeSymbolIndex := s.symbol
+	scopeSymbolKind := s.kind
+    end LookupCountClosedSymbol
+
+
+    body procedure LookupCountSymbol % (entry: int)
+	pre scopeLevel > 0 and ConsistentNumElems(scopeLevel)
+
+	if entry <= scopeDisplay(scopeLevel).numElems then
+	    var p := scopeDisplay(scopeLevel).first
+	    var i := 0
+	    loop
+		exit when entry-i <= scopes(p).numElems
+		i += scopes(p).numElems
+		p := scopes(p).next
+	    end loop
+
+	    % now select the proper entry
+	    bind register s to scopes(p).entries(entry-i)
+	    scopeSymbolIdent := s.ident
+	    scopeSymbolIndex := s.symbol
+	    scopeSymbolKind := s.kind
+	else
+	    scopeSymbolIdent := 0
+	    scopeSymbolIndex := 0
+	    scopeSymbolKind := sNotFound
+	end if
+    end LookupCountSymbol
+
+
+    body function ScopeContainsSymbol % (symbol: SymbolIndex) : boolean
+	pre scopeLevel > 0
+
+	var p := scopeDisplay(scopeLevel).first
+	var count := scopeDisplay(scopeLevel).numElems
+	loop
+	    exit when p = nil(scopes)
+
+	    bind register s to scopes(p)
+	    for i : 1 .. min(s.numElems, count)
+		if s.entries(i).symbol = symbol then
+		    result true
+		end if
+	    end for
+	    count -= s.numElems
+	    p := s.next
+	end loop
+	result false
+    end ScopeContainsSymbol
+
+
+    body function ScopeContainsSymbolIdent % (id: IdentifierIndex) : boolean
+	pre scopeLevel > 0
+
+	var p := scopeDisplay(scopeLevel).first
+	var count := scopeDisplay(scopeLevel).numElems
+	loop
+	    exit when p = nil(scopes)
+
+	    bind register s to scopes(p)
+	    for i : 1 .. min(s.numElems, count)
+		if s.entries(i).ident = id then
+		    result true
+		end if
+	    end for
+	    count -= s.numElems
+	    p := s.next
+	end loop
+	result false
+    end ScopeContainsSymbolIdent
+
+
+    procedure ReplaceTopScopeWithCopy
+	% easiest way to do this is to push a copy, then transfer the
+	% information down one level
+	CopyOneScope(scopeLevel)	% bumps scopeLevel
+	scopeDisplay(scopeLevel-1) := scopeDisplay(scopeLevel)
+	scopeLevel -= 1
+    end ReplaceTopScopeWithCopy
+
+
+    procedure ReplaceSecondScopeWithCopy
+	% easiest way to do this is to push a copy, then transfer the
+	% information down two levels
+	CopyOneScope(scopeLevel-1)	% bumps scopeLevel
+	scopeDisplay(scopeLevel-2) := scopeDisplay(scopeLevel)
+	scopeLevel -= 1
+    end ReplaceSecondScopeWithCopy
+
+
+    body procedure MergeScopes
+	pre scopeLevel >= 2
+	post ConsistentNumElems(scopeLevel)
+
+	% merge the top two scopes.  Make sure that each symbol is only in
+	% once.  Also ensure that the maximum readonly kind is kept,
+	% where variable > readonly
+	if scopeDisplay(scopeLevel-1).saved then
+	    % this is the implementation of a separately compiled routine.
+	    % it currently has the module's import list. Replace it with
+	    % a copy.
+	    ReplaceSecondScopeWithCopy
+	end if
+
+	if scopeDisplay(scopeLevel).saved then
+	    % if the top scope is saved, we can't just merge it in,
+	    % because it will mess up in future merges.  Lets copy it.
+	    ReplaceTopScopeWithCopy
+	end if
+
+	const p := scopeDisplay(scopeLevel-1).first
+	var q := scopeDisplay(scopeLevel).first
+
+	% run through q, checking that the symbol is not in p. If it is,
+	% then delete this symbol, else ensure readOnly bit is set properly.
+	if q = nil(scopes) then
+	    % nothing to do
+	elsif p = nil(scopes) then
+	    % tranfer the information, retaining the attributes
+	    var temp := scopeDisplay(scopeLevel-1).closed
+	    scopeDisplay(scopeLevel-1) := scopeDisplay(scopeLevel)
+	    scopeDisplay(scopeLevel-1).closed := temp
+	    scopeDisplay(scopeLevel-1).saved := false
+	else
+	    % hard work to do
+	    % loop through the scope entries, packing the entries
+	    loop
+		exit when q = nil(scopes)
+		var j := 1
+		for i : 1 .. scopes(q).numElems
+		    const sym := scopes(q).entries(i).symbol
+
+		    % search p for sym
+		    var r := p
+		    var found := false
+		    var entry : int
+		    var count := scopeDisplay(scopeLevel-1).numElems
+		    loop
+			exit when r = nil(scopes)
+			bind register s to scopes(r)
+			for k : 1 .. min(s.numElems, count)
+			    if s.entries(k).symbol = sym then
+				found := true
+				entry := k
+				exit
+			    end if
+			end for
+			exit when found
+			count -= s.numElems
+			r := s.next
+		    end loop
+
+		    if found then
+			% scopes(r).entries(entry) is the symbol
+			% get maximal access
+			case scopes(r).entries(entry).kind of
+			    label sReadOnlyVariable, sReadOnlyCollection,
+				  sReadOnlyModule, sReadOnlyMonitor:
+
+				scopes(r).entries(entry).kind :=
+				    scopes(q).entries(i).kind
+			    label :
+			end case
+			j -= 1
+			scopes(q).numElems -= 1
+			scopeDisplay(scopeLevel).numElems -= 1
+		    else
+			if j not= i then
+			    scopes(q).entries(j) := scopes(q).entries(i)
+			    scopes(q).numElems -= 1
+			    scopeDisplay(scopeLevel).numElems -= 1
+			end if
+		    end if
+		    j += 1
+		    if scopes(q).numElems = 0 then
+			/* nothing left in this chunk */
+			if scopeDisplay(scopeLevel).numElems = 0 then
+			    /* nothing left at all! */
+			    scopeDisplay(scopeLevel).first := nil(scopes)
+			    scopeDisplay(scopeLevel).last := nil(scopes)
+			elsif scopes(q).last = nil(scopes) then
+			    /* must fix display.first ! */
+			    if scopes(q).next not= nil(scopes) then
+				scopes(scopes(q).next).last := nil(scopes)
+			    end if
+			    scopeDisplay(scopeLevel).first := scopes(q).next
+			elsif scopes(q).next = nil(scopes) then
+			    /* must fix display.last ! */
+			    if scopes(q).last not= nil(scopes) then
+				scopes(scopes(q).last).next := nil(scopes)
+			    end if
+			    scopeDisplay(scopeLevel).last := scopes(q).last
+			else
+			    scopes(scopes(q).last).next := scopes(q).next
+			    scopes(scopes(q).next).last := scopes(q).last
+			end if
+		    end if
+		end for
+		q := scopes(q).next
+	    end loop
+	    bind var register second to scopeDisplay(scopeLevel-1),
+		register top to scopeDisplay(scopeLevel)
+	    if top.first not= nil(scopes) then
+		second.numElems += top.numElems
+		scopes(second.last).next := top.first
+		scopes(top.first).last := second.last
+		second.last := top.last
+	    end if
+	end if
+
+	% pop the top scope
+	scopeLevel -= 1
+    end MergeScopes
+
+
+    body procedure StripScope
+	pre  scopeLevel > 0
+	post ConsistentNumElems(scopeLevel)
+
+	var register p := scopeDisplay(scopeLevel).first
+
+	% loop through the scope entries, packing the entries
+	loop
+	    exit when p = nil(scopes)
+	    bind var register s to scopes(p)
+	    var j := 1
+	    for i : 1 .. s.numElems
+		case s.entries(i).kind of
+		    label sVariable, sReadOnlyVariable,
+			  sCollection, sReadOnlyCollection,
+			  sModule, sReadOnlyModule,
+			  sMonitor, sReadOnlyMonitor :
+			if j not= i then
+			    s.entries(j) := s.entries(i)
+			end if
+		    label :
+			j -= 1
+			s.numElems -= 1
+			scopeDisplay(scopeLevel).numElems -= 1
+		end case
+		j += 1
+	    end for
+	    p := s.next
+	end loop
+    end StripScope
+
+
+    body function ScopeNumberOfEntries % : int
+	pre scopeLevel > 0
+	result scopeDisplay(scopeLevel).numElems
+    end ScopeNumberOfEntries
+
+
+    body function ClosedScopeNumberOfEntries % : int
+	/* find the closed scope */
+	for decreasing i : scopeLevel..1
+	    if scopeDisplay(i).closed then
+		result scopeDisplay(i).numElems
+	    end if
+	end for
+    end ClosedScopeNumberOfEntries
+
+
+    body function ScoStackEmpty % : boolean
+	result scopeLevel = 0
+    end ScoStackEmpty
+
+
+    body procedure ScopeStats
+	put "Scope\n\tSaved scopes = ", scopeTableTop, "/", maxSavedScopes
+    end ScopeStats
+
+
+    body function ScopeSymbolIndex % : SymbolIndex
+	result scopeSymbolIndex
+    end ScopeSymbolIndex
+
+
+    body function ScopeSymbolKind % : SymbolKinds
+	result scopeSymbolKind
+    end ScopeSymbolKind
+
+
+    body function ScopeSymbolIdent % : IdentifierIndex
+	result scopeSymbolIdent
+    end ScopeSymbolIdent
+
+
+    body function ClosedScope % : int
+	/* find the first closed scope from the top */
+	for decreasing i : scopeLevel..1
+	    if scopeDisplay(i).closed then
+		result i
+	    end if
+	end for
+	result GlobalScope
+    end ClosedScope
+
+
+    body function SavedScopeIndex % : int
+	result savedScopeIndex
+    end SavedScopeIndex
+
+
+    procedure PutSymbolKind (kind : SymbolKinds)
+	if kind >= firstSymbolKind and kind <= lastSymbolKind then
+	    put symbolNames(kind) : 20 ..
+	else
+	    put "??" : 20 , kind ..
+	end if
+    end PutSymbolKind
+
+
+    procedure DumpScopeList (sc : ScopeElementPtr, count : int)
+	var p := sc
+	var c := count
+	loop
+	    exit when p = nil(scopes) or c <= 0
+	    put natstr(#p,1,16), ":\n\t(", natstr(#(scopes(p).last),1,16), ")"
+	    for j : 1 .. min(scopes(p).numElems, c)
+		put "\t" ..
+		PutSymbolKind(scopes(p).entries(j).kind)
+		put "\t", scopes(p).entries(j).ident, "\t",
+		    scopes(p).entries(j).symbol
+	    end for
+	    c -= scopes(p).numElems
+	    p := scopes(p).next
+	end loop
+	put ""
+    end DumpScopeList
+
+
+    body procedure DumpScopes
+	put "Scope Display"
+	for decreasing i : scopeLevel..1
+	    bind register d to scopeDisplay(i)
+	    put i:5, "\t", natstr(#(d.first),1,16), "\t",
+		natstr(#(d.last),1,16), "\t", d.numElems, "\t" ..
+	    if d.closed then
+		put "closed\t" ..
+	    else
+		put "\t" ..
+	    end if
+	    if d.saved then
+		put "saved"
+	    else
+		put ""
+	    end if
+	    % assert ConsistentNumElems(i)
+	    DumpScopeList(d.first, d.numElems)
+	end for
+	put "\nSaved Scopes\n\tnum els\tfirst\tlast"
+	for i : 1..scopeTableTop
+	    put i:5, "\t", scopeTable(i).numElems, "\t",
+		natstr(#(scopeTable(i).first),1,16), "\t",
+		natstr(#(scopeTable(i).last),1,16), "\t" ..
+	    if scopeTable(i).complete then
+		put "complet\t" ..
+	    else
+		put "\t" ..
+	    end if
+	    if scopeTable(i).varImport then
+		put "var import"
+	    else
+		put ""
+	    end if
+	    DumpScopeList(scopeTable(i).first, scopeTable(i).numElems)
+	end for
+	put "\n", repeat("-", 79)
+    end DumpScopes
+end Scope

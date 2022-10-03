@@ -1,0 +1,329 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+% 
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+% 
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+body "actuals.st" module Actuals
+    /*
+     *	File:    Turing Semantic Pass 1 Actuals Mechanism
+     *	Author:  M. Mendell
+     *	Date:	 12 March 1986
+     */
+
+    /*
+     * This mechanism is used to keep a list of reference actual
+     * parameter symbols in a procedure or functions call in order
+     * to facilitate checking of aliasing between actuals.	
+     */
+
+    /* Actual Symbols */
+    var actualsSymbol: array 1..maxActualSymbols of SymbolIndex
+    var actualsSymbolTop: 0..maxActualSymbols := 0
+    var maxActualsSymbolTop: 0..maxActualSymbols := 0
+
+    /* Actuals Stack */
+    /*
+     * Each actual is a list of symbols.  The actuals stack
+     * keeps the start indx and len of the list of symbols
+     * for each individual actual.  The stack entry for each actual
+     * is the (zero) origin and len of the actual's list of symbols.
+     */
+    type *ActualsAttributeSet : set of ActualsAttributes
+    type ActualsStackEntry :
+	record
+	    attr :	ActualsAttributeSet
+	    indx:	0..maxActualSymbols
+	    len:	-maxActualSymbols..maxActualSymbols
+	end record
+
+    var actualsStack: array 1..maxActuals+1 of ActualsStackEntry
+    var actualsTop: 0..maxActuals := 0
+    var maxActualsTop: 0..maxActuals := 0
+
+    /* Actuals List Display */
+    /*
+     * The display entry for each list is the (zero) origin of
+     * the corresponding list in the Actuals Stack.  The top list 
+     * extends from actualsDisplay(actualsLevel)+1 to actualsTop.
+     */
+    var actualsDisplay: array 1..maxActualsLevel of 0..maxActuals
+    var actualsLevel: 0..maxActualsLevel := 0
+    var maxxActualsLevel: 0..maxActualsLevel := 0
+
+    var aliasStack: array 1..maxActualsLevel of
+	record
+	    enclosingAlias, innerAlias:	-(maxActuals+1)..maxActuals+1 
+	end record
+
+    var aliasTop: 0 .. maxActualsLevel := 0
+
+
+    body procedure PushActuals
+	if actualsLevel < maxActualsLevel then
+	    actualsLevel += 1
+	    if statistics and maxxActualsLevel < actualsLevel then
+		maxxActualsLevel := actualsLevel
+	    end if
+	    actualsDisplay(actualsLevel) := actualsTop
+	    actualsStack(actualsTop+1).indx := actualsSymbolTop
+	else
+	    Error (eActualsDisplayOverflow)
+	end if
+    end PushActuals
+
+
+    body procedure BeginActual
+	assert actualsLevel > 0
+
+	if actualsTop < maxActuals then
+	    actualsTop += 1
+	    if statistics and maxActualsTop < actualsTop then
+		maxActualsTop := actualsTop
+	    end if
+	    actualsStack(actualsTop).attr := ActualsAttributeSet()
+	    actualsStack(actualsTop).indx := actualsSymbolTop
+	    actualsStack(actualsTop).len := -1
+	else
+	    Error (eActualsOverflow)
+	end if
+    end BeginActual
+
+
+    body procedure EnterDummy
+	assert actualsLevel > 0
+
+	if actualsTop < maxActuals then
+	    actualsTop += 1
+	    if statistics and maxActualsTop < actualsTop then
+		maxActualsTop := actualsTop
+	    end if
+	    actualsStack(actualsTop).attr := ActualsAttributeSet()
+	    actualsStack(actualsTop).indx := actualsSymbolTop
+	    actualsStack(actualsTop).len := 0
+	else
+	    Error (eActualsOverflow)
+	end if
+    end EnterDummy
+
+
+    body procedure EndActual
+	assert actualsLevel > 0
+	assert actualsStack(actualsTop).len < 0
+	actualsStack(actualsTop).len := -actualsStack(actualsTop).len - 1
+    end EndActual
+
+
+    body procedure RemoveActual
+	assert actualsLevel > 0 and actualsTop > 0
+	actualsSymbolTop := actualsStack(actualsTop).indx
+	actualsStack(actualsTop).len := 0
+    end RemoveActual
+
+
+    body procedure AttrSetAttribute % (attr : ActualsAttributes)
+	actualsStack(actualsTop).attr += ActualsAttributeSet(attr)
+    end AttrSetAttribute
+
+
+    body procedure EnterSymbol % (symbol: SymbolIndex)
+	assert actualsStack(actualsTop).len < 0
+
+	if actualsSymbolTop < maxActualSymbols then
+	    actualsSymbolTop += 1
+	    if statistics and maxActualsSymbolTop < actualsSymbolTop then
+		maxActualsSymbolTop := actualsSymbolTop
+	    end if
+	    actualsSymbol(actualsSymbolTop) := symbol
+	    actualsStack(actualsTop).len -= 1
+	else
+	    Error (eActualsSymbolOverflow)
+	end if
+    end EnterSymbol
+
+
+    body procedure PopActuals
+	assert actualsLevel > 0
+	actualsTop := actualsDisplay(actualsLevel)
+	actualsSymbolTop := actualsStack(actualsTop+1).indx
+	actualsLevel -= 1
+    end PopActuals
+
+
+    body procedure ActualOverlaps % (var res : int)
+	assert actualsLevel > 0
+	var i: 0..maxActuals
+	var status : no..maybe
+
+	res := no
+	if actualsStack(actualsTop).len not = 0 then
+	    /** there are actuals to check **/
+	    i := actualsDisplay(actualsLevel) + 1
+	    loop
+		exit when i = actualsTop
+		status := no
+
+		begin
+		    bind /** most recently added actual **/
+			register actual to actualsStack(actualsTop),
+
+			/** all actuals added before most recent **/
+			register previousActual to actualsStack(i)
+
+		    var j,k: 0..maxActualSymbols+1
+		    var l: 0..maxActualSymbols
+
+		    if previousActual.len not = 0 and
+			  (aaVar in previousActual.attr or
+			   aaVar in actual.attr) then
+			j := previousActual.indx
+			k := actual.indx
+			l := 1
+			loop
+			    exit when actualsSymbol(j+l) not =
+				actualsSymbol(k+l)
+    
+			    if l = previousActual.len or
+				    l = actual.len then
+				if aaSubscript in
+					previousActual.attr and
+					aaSubscript in actual.attr then
+				    status := maybe
+				else
+				    status := yes
+				end if
+				exit
+			    end if
+    
+			    l += 1
+			end loop
+		    end if
+		end
+
+		if status = maybe or status = yes then
+		    aliasTop += 1
+		    if actualsStack(i).len not=
+				actualsStack(actualsTop).len then
+			/** enclosing alias **/
+			if actualsStack(i).len >
+				actualsStack(actualsTop).len then
+			    aliasStack(aliasTop).enclosingAlias := actualsTop
+			    aliasStack(aliasTop).innerAlias := i
+			else
+			    aliasStack(aliasTop).enclosingAlias := i
+			    aliasStack(aliasTop).innerAlias := actualsTop
+			end if
+		    else
+			/** no alias  (same address) **/
+			aliasStack(aliasTop).enclosingAlias := -actualsTop
+			aliasStack(aliasTop).innerAlias := -i
+		    end if
+		end if
+
+		i += 1
+
+		/** transfer the maximal status to res **/
+		if status = yes then
+		    res := yes
+		    exit
+		elsif status = maybe and res = no then
+		    res := maybe
+		end if
+	    end loop
+	end if
+    end ActualOverlaps
+
+
+
+    body procedure ExtractAliases % (var enclosing : int, var inner : int)
+	if aliasTop <= 0 then
+	    inner := 0
+	    enclosing := 0
+	else
+	    enclosing := aliasStack(aliasTop).enclosingAlias
+	    inner := aliasStack(aliasTop).innerAlias
+	    aliasTop -= 1
+	end if
+    end ExtractAliases
+
+
+    body procedure FlushActuals
+	aliasTop := 0
+    end FlushActuals
+
+
+    body function InActual
+	result actualsTop > 0 and
+	    actualsTop > actualsDisplay(actualsLevel) and
+	    actualsStack(actualsTop).len < 0
+    end InActual
+
+
+    body function ActStackEmpty
+	result actualsLevel = 0 and actualsTop = 0 and actualsSymbolTop = 0
+    end ActStackEmpty
+
+
+    body procedure ActStats
+	put "Actuals\n\tDisplay Level = ", maxxActualsLevel, "/",
+	    maxActualsLevel, "\n\tStack Top = ", maxActualsTop, "/",
+	    maxActuals, "\n\tMax Number of Symbols = ", maxActualsSymbolTop,
+	    "/", maxActualSymbols
+    end ActStats
+
+    body procedure DumpActuals
+	var al: 0..maxActualsLevel	:= actualsLevel
+	var act: 0..maxActuals		:= actualsTop
+	var as: 0..maxActualSymbols	:= actualsSymbolTop
+	var maxIndex: int		:= actualsLevel
+
+	if maxIndex < actualsTop then
+	    maxIndex := actualsTop
+	end if
+
+	if maxIndex < actualsSymbolTop then
+	    maxIndex := actualsSymbolTop
+	end if
+
+	assert maxIndex >= 0
+
+	put "\n\tActualsDisplay\t\tActualsStack\t\tActualsSymbol"
+	put  "    ActualsStackEntry\t\tIndex\tLength\t\tSymbol"
+	for decreasing i : maxIndex..1
+	    if al = i then
+		put i, "\t", actualsDisplay(i), "\t\t" ..
+		al -= 1
+	    else
+		put "\t\t\t" ..
+	    end if
+
+	    if act = i then
+		put i, "\t", actualsStack(i).indx, "\t",
+		    actualsStack(act).len, "\t" ..
+		act -= 1
+	    else
+		put "\t\t\t" ..
+	    end if
+
+	    if as = i then
+		put i, "\t", actualsSymbol(i)
+		as -= 1
+	    else
+		put ""
+	    end if
+	end for
+	put "\n", repeat("-", 79)
+    end DumpActuals
+end Actuals

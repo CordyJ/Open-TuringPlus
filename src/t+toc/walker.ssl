@@ -1,0 +1,2611 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+%
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+%
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+% Turing Plus to C Translator
+% S/SL to transform the stream into a tree.
+%
+% From Peter Ashwood-Smith's T+ optimizer
+
+input:
+    FirstToken
+    aIdent = FirstToken
+    aPredefinedId
+    aIntegerLit
+    aStringLit
+    aCharLit
+    aRealLit
+    aDataDescriptor		% used in the allocator and coder passes
+    aRoutineIndex		% used by the allocator and coder passes
+    aIdentText
+    aStabInformation		% used in the allocator and coder passes
+    aEndSubstring		% output from the semantic pass
+
+    aConstInit			% used for something or other
+    aThen
+    aProcessInit
+    aRoot
+    aNoOp			% allows easy "commenting out"
+    aComma			% 'C' comma operator
+    aTempAssign
+
+    				% Other Tokens
+    firstNonCompoundToken = 20
+    aAdd        = firstNonCompoundToken % leave room for more compound tokens
+    aAddressint
+    aAbs                        % output from the semantic pass
+    aAliasCheck                 % output from the semantic pass
+    aAll
+    aAllocate
+    aAnd
+    aAndEqual
+    aArray
+    aAsm
+    aAssert
+    aAssign
+    aAssignInverted             % added by the allocator
+    aAt
+    aBegin
+    aBeginAsm
+    aBind
+    aBits
+    aBody
+    aBoolean
+    aBooleanAndEqual
+    aBooleanOrEqual
+    aByReference                % used by the allocator and coder passes
+    aCall                       % output from the semantic pass
+    aCallVariable
+    aCase
+    aCaseBody
+    aChar
+    aChild
+    aChecked
+    aClose
+    aCollection
+    aColon
+    aCompile                    % compile the following code
+    aConcatenate                % output from the semantic pass
+    aConcatenateAssign          % output from the semantic pass
+    aCondition
+    aConst
+    aDeallocate                 % output from the allocator pass
+    aDecreasing
+    aDeferred
+    aDiv
+    aDivEqual
+    aDivideReal
+    aElse
+    aElsif
+    aEndAsm
+    aEndAliasCheck              % output from the semantic pass
+    aEndArrayIndexList
+    aEndBegin
+    aEndBind
+    aEndCase
+    aEndCaseBody
+    aEndEnum
+    aEndExport
+    aEndExpression
+    aEndExpressionList
+    aEndFor
+    aEndGet
+    aEndGrant
+    aEndIf
+    aEndImport
+    aEndInit
+    aEndLoop
+    aEndModule
+    aEndMonitor
+    aEndOpen
+    aEndPut
+    aEndRead
+    aEndRecord
+    aEndResult
+    aEndSubprogramBody
+    aEndSubs
+    aEndUnion
+    aEndUnionLabelBody
+    aEndWrite
+    aEnum
+    aEqual
+    aExit
+    aExitWhen
+    aExponentiate
+    aExponentiateEqual
+    aExport
+    aExternal
+    aExternalAddress
+    aFalse
+    aField
+    aFor
+    aFork
+    aForkAddress
+    aForkStackSize
+    aForkStatus
+    aForRange
+    aForward
+    aFree
+    aFunction
+    aGet
+    aGrant
+    aGreater
+    aGreaterEqual
+    aHandler
+    aHash
+    aIf
+    aImply
+    aImport
+    aIn
+    aInfixAnd
+    aInfixBooleanCompare        % output from the semantic pass
+    aInfixCompare
+    aInfixImply
+    aInfixOr
+    aInit
+    aInt
+    aInterruptNumber
+    aInvariant
+    aIs
+    aLabel
+    aLess
+    aLessEqual
+    aLogicalAnd
+    aLogicalOr
+    aLogicalXor
+    aLoop
+    aMax                        % output from the semantic pass
+    aMin                        % output from the semantic pass
+    aMinus
+    aMinusEqual
+    aMissingStub
+    aMod
+    aModEqual
+    aModule
+    aMonitor
+    aMonitorPriority
+    aMultiply
+    aNat
+    aNew
+    aNil                        % output from the allocator pass
+    aNoAlias                    % output from the semantic pass
+    aNoEnclosure                % output from the semantic pass
+    aNonManifest                % output from the semantic pass
+    aNonScalar                  % output from the semantic pass
+    aNot
+    aNotEqual
+    aNotIn
+    aOpaque
+    aOpen
+    aOr
+    aOrEqual
+    aOtherwise
+    aPacked
+    aParent
+    aPause
+    aPervasive
+    aPlus
+    aPlusEqual
+    aPointer
+    aPost
+    aPre
+    aPriority
+    aProcedure
+    aProcess
+    aProcessStackSize
+    aPut
+    aPutContinue
+    aQuit
+    aQuitReason
+    aRangeCheck                 % output from the semantic pass
+    aRangeCheck2                % output from the semantic pass
+    aRead
+    aReadWriteSize
+    aReadWriteSizeResult
+    aReadWriteStatus
+    aReal
+    aRealDivEqual
+    aRecord
+    aRecordElementType
+    aRegister
+    aResult
+    aReturn
+    aSeek
+    aSet
+    aSetDifference              % output from the semantic pass
+    aSetDifferenceAssign        % output from the semantic pass
+    aSetGreaterEqual            % output from the semantic pass
+    aSetIntersection            % output from the semantic pass
+    aSetIntersectionAssign      % output from the semantic pass
+    aSetLessEqual               % output from the semantic pass
+    aSetUnion                   % output from the semantic pass
+    aSetUnionAssign             % output from the semantic pass
+    aSetXor
+    aSetXorAssign
+    aShiftLeft
+    aShiftLeftEqual
+    aShiftRight
+    aShiftRightEqual
+    aSignal
+    aSkip
+    aStar
+    aStarEqual
+    aStorageSize
+    aStreamNumber
+    aString
+    aStringSizeBound
+    aStub
+    aSubrange
+    aSubs
+    aSubstring
+    aSubtract
+    aTag
+    aTagCheck                   % output from the semantic pass
+    aTell
+    aTimeout
+    aTrue
+    aType
+    aTypeCheat
+    aTypeCheatSize
+    aUnchecked
+    aUninitialize
+    aUnion
+    aUnionLabelBody
+    aUnqualified
+    aVar
+    aVarInit
+    aVaryingParameter
+    aWait
+    aWaitPriorityOrTimeout
+    aWrite
+    aXor
+    aXorEqual
+
+    % dummy tokens
+    aCheckedStmt
+    aUncheckedStmt
+    % Meta Tokens
+
+    aFileName	= 252	% leave room for more tokens
+    aNewLine
+    aNewFile
+    aEndOfFile
+    LastToken = aEndOfFile;
+
+error:
+    SemanticChoiceFailed          = 50
+    SemanticOperationNotImplemented
+    ChoiceRuleFailed               
+    SslStackOverflow               
+    SslSyntaxError                 
+    SslPrematureEOF             
+    CannotOpenInputFile          
+    CannotOpenTraceFile           
+    BadExpressionEnterLeafCall     
+    EmitWasCalledFromWalker;
+
+type OptimizerAdditionalTreeLabels:
+    opConstInit = aConstInit
+    opThen
+    opProcessInit
+    opRoot		% dummy root of program parse tree.
+    opIf = aIf
+    opElse = aElse
+    ;
+
+type PredefinedRoutines:
+    prAbs       
+    prAddr
+    prArctan
+    prArctand
+    prCeil
+    prChr
+    prCos
+    prCosd
+    prEmpty
+    prEof
+    prErealstr
+    prExp
+    prFloor
+    prFrealstr
+    prGetpriority
+    prIndex
+    prIntreal
+    prIntstr
+    prLength
+    prLn
+    prLower
+    prMax
+    prMin
+    prNatreal
+    prNatstr
+    prNil
+    prOrd
+    prPred
+    prRand
+    prRandInt
+    prRandNext
+    prRandSeed
+    prRandomize
+    prRealstr
+    prRepeat
+    prRound
+    prSetpriority
+    prSign
+    prSin
+    prSind
+    prSize
+    prSqrt
+    prStrint
+    prStrnat
+    prStrdelete
+    prStrmove
+    prStrreal
+    prStrreplace
+    prSucc
+    prUpper
+    ;
+
+type OperatorKind:      % number of nodes that an operator node has
+    tNone
+    tUnary              % ie 1,2,3 or 4
+    tBinary             
+    tTertiary
+    tQuatinary
+    ;
+
+type IntegerLiteralKind:	% not used in walker.ssl but they are picked 
+    iInteger			% up and used in the token module to emit the
+    iIntegerNat			% correct Integer Literal Kind before the 
+    iNat			% literal itself.
+    ;
+
+mechanism ExpressionTree:
+    oExpressionEnterLeaf
+    oExpressionConstructOperator(OperatorKind)
+    oExpressionDumpTop
+    oExpressionEnterMarkedOperator    
+    oExpressionSwapTopTwoExpressions  
+    oExpressionConstructMarkedOperator
+    oExpressionFlushTopExpression
+    oExpressionAssertStackIsEmpty
+    oExpressionEnterZeroAndZeroCount
+    oExpressionIncrementCount
+    oExpressionEnterCountMinusOne
+    oExpressionEnterTree
+    ;
+
+mechanism ParseTree:
+    oTransferExpressionToTreeLeaf
+    oEnterTokenAsTreeLeaf 
+    oEnterExpressionAsTreeLeaf          %  EnterLeaf o Transfer Operations
+    oEnterIdentText			%  Enter the ident text for the
+					%  last token, which was an ident
+    oSwapTopTwoTrees
+    oStartSpecificSubtree(OptimizerAdditionalTreeLabels)
+    oStartNewSubtree
+    oEndSubtree
+    oTreeDumpTop
+    ;
+
+mechanism Types:
+    oAssertTypeStackEmpty
+    oHoldIdentifierAndWaitForItsType		% push an id on type stack
+    oPushTypeDelimiter				% push a 'separator' on type stk
+    oPopTypeDelimiter				% pop a 'separator'from type stk
+    oTypeAllHeldIdentifiers			% pop and type til sep or empty
+    oTypeTheSubprogramHeader			% special case requires some
+    ;						% manipulation to get at id.
+
+mechanism FurtherSelection:
+    oSelectTheExactPredefinedFunction  >> PredefinedRoutines
+    ;
+
+rules 
+
+Goal:
+    oPushTypeDelimiter				
+    oStartSpecificSubtree(opRoot)		% dummy tree root is aRoot
+    aFileName
+    @Program
+    oEndSubtree
+    oPopTypeDelimiter				
+    aEndOfFile					% better be at end of file
+    oAssertTypeStackEmpty			% with no untyped id's and no
+    oExpressionAssertStackIsEmpty		% unplaced expressions and 1
+    ;						% tree (Walker.mod checks this)
+
+Program:
+    [  | aCompile:
+	  oStartNewSubtree
+	  [  | aStub:
+		@CompileStub
+	     | *:
+		@OptionalGrant
+		@DeclarationsAndStatementsInModule
+	  ]
+	  oEndSubtree
+       | aParent:
+	  oStartNewSubtree
+	  @Program
+	  oEndSubtree
+       | aModule:
+	  @ModuleDeclaration
+       | *:					% These will be under aParent
+	  @OptionalGrant 			% root.
+	  @DeclarationsAndStatementsInModule
+    ];
+
+
+OptionalGrant:
+    [ | aGrant:
+	oStartNewSubtree
+	{[ | aEndGrant:
+	     >
+	   | aIdent:
+	     oEnterExpressionAsTreeLeaf   
+	]}
+	oEndSubtree
+      | *:
+    ]
+    ;
+
+OptionalInvariant:
+    [ | aInvariant:
+	oStartNewSubtree
+	@Expression
+	oTransferExpressionToTreeLeaf
+	oEndSubtree
+      | *:
+    ]
+    ;
+
+DeclarationsAndStatementsInFor:
+    @OptionalInvariant
+    @DeclarationsAndStatements
+    ;
+
+DeclarationsAndStatementsInModule:
+    @DeclarationsAndStatements
+    @OptionalInvariant
+    @DeclarationsAndStatements
+    ;
+
+DeclarationsAndStatements:
+{[  | aIdent:
+	@AssignmentOrCallStatement      
+    | aIf:    
+	@IfStatement
+    | aFor:
+	@ForStatement
+    | aLoop:
+	@LoopStatement
+    | aPut:
+	@PutStatement
+    | aGet:
+	@GetStatement
+    | aVar:
+	@VariableDeclaration
+    | aCondition:
+	oStartNewSubtree
+	aVar
+	@VariableDeclaration
+	oEndSubtree
+    | aConst:
+	@ConstantDeclaration
+    | aType:
+	@TypeDeclaration
+    | aBind:
+	@BindDeclaration
+    | aExit:
+	@ExitStatement
+    | aExitWhen:
+	@ExitWhenStatment
+    | aCase:
+	@CaseStatement
+    | aBegin:
+	@BeginStatement
+    | aAssert:
+	@AssertStatement
+    | aProcedure:
+	@ProcedureDeclaration 
+        oTypeTheSubprogramHeader
+    | aFunction:
+	@FunctionDeclaration
+        oTypeTheSubprogramHeader
+    | aModule:
+	@ModuleDeclaration
+    | aMonitor:
+	@MonitorDeclaration
+    | aProcess:
+	@ProcessDeclaration     
+    | aReturn:
+	@ReturnStatement
+    | aResult:
+	@ResultStatement
+    | aTag:
+	@TagStatement
+    | aNew:
+	@NewOrFreeStatement
+    | aFree:
+	@NewOrFreeStatement
+    | aPredefinedId:
+	@PredefinedRoutineCall
+        oTransferExpressionToTreeLeaf
+    | aForward:
+	oStartNewSubtree
+	[ | aProcedure:
+	      @ForwardProcedureHead
+              oTypeTheSubprogramHeader
+	  | aFunction:
+	      @ForwardFunctionHead 
+              oTypeTheSubprogramHeader
+	]
+	oEndSubtree
+    | aBody:
+	oStartNewSubtree
+	[ | aModule:
+	      @ModuleBody
+	  | aMonitor:
+	      @MonitorBody
+	  | *:
+	      @SubprogramBodyDeclaration
+	]
+	oEndSubtree
+    | aChild:
+	@Child
+    | aStub:
+	@Stub
+    | aExternal:
+	oStartNewSubtree
+	[ | aProcedure:
+	     @ExternalProcedureHead
+              oTypeTheSubprogramHeader
+	  | aFunction:
+	     @ExternalFunctionHead
+              oTypeTheSubprogramHeader
+	  | aVar:
+	     @VariableDeclaration    
+	  | aExternalAddress:
+	     oStartNewSubtree    
+	     @Expression
+	     oTransferExpressionToTreeLeaf
+	     oEndSubtree
+	     aVar
+	     @VariableDeclaration    
+	]
+	oEndSubtree 
+    | aInvariant:
+	 @InvariantStatement
+    | aRead, aWrite:
+	 @ReadWriteStatement
+    | aSeek:
+	 @SeekStatement
+    | aTell:
+	 @TellStatement
+    | aOpen:
+	 @OpenStatement
+    | aClose:
+	 @CloseStatement
+    | aQuit:
+	 @QuitStatement
+    | aFork:
+	 @ForkStatement
+    | aAsm:
+	 @AsmStatement
+    | aUnchecked,aChecked :
+         oEnterTokenAsTreeLeaf
+    | aBits:
+	 @BitsStatement
+    | aTypeCheat:
+	 @TypeCheatStatement
+    | aSignal:
+	 @SignalStatement
+    | aWait:
+	 @WaitStatement
+    | aPause: 
+	 @PauseStatement
+    | *:
+      >
+]};
+
+InvariantStatement:
+    oStartNewSubtree
+    @Expression
+    oTransferExpressionToTreeLeaf
+    oEndSubtree
+    ;
+
+ReadWriteStatement:
+    oStartNewSubtree
+    @Expression
+    oTransferExpressionToTreeLeaf
+    [ | aReadWriteStatus :
+	  oStartNewSubtree
+	  @VariableReference
+	  oTransferExpressionToTreeLeaf
+	  oEndSubtree
+      | *:
+    ]     
+    {[| aEndRead, aEndWrite:
+	  >
+      | *:
+	  @VariableReference
+	  oTransferExpressionToTreeLeaf
+	  [ | aReadWriteSize :
+		oStartNewSubtree
+		@Expression
+		oTransferExpressionToTreeLeaf
+		oEndSubtree
+		[ | aReadWriteSizeResult :
+		    oStartNewSubtree
+		    @VariableReference
+		    oTransferExpressionToTreeLeaf
+		    oEndSubtree
+		| *:
+		]
+	    | *:
+	  ]
+    ]} 
+    oEndSubtree;
+
+
+SeekStatement:
+    oStartNewSubtree
+    @Expression
+    oTransferExpressionToTreeLeaf
+    [ | aStar:
+	  oEnterTokenAsTreeLeaf
+      | *:
+	  @Expression
+	  oTransferExpressionToTreeLeaf
+    ]
+    oEndSubtree
+    ;
+
+TellStatement:
+    oStartNewSubtree
+    @Expression
+    oTransferExpressionToTreeLeaf
+    @VariableReference
+    oTransferExpressionToTreeLeaf
+    oEndSubtree
+    ;    
+
+OpenStatement:
+    oStartNewSubtree
+    @VariableReference 
+    oTransferExpressionToTreeLeaf
+    [  | aString, aInt:
+    ]
+    oEnterTokenAsTreeLeaf
+    @Expression
+    oTransferExpressionToTreeLeaf
+    [  | aGet, aPut, aRead, aWrite, aSeek, aMod:  % new open statement ?
+	   oEnterTokenAsTreeLeaf
+	   {[ | aGet,aPut,aRead,aWrite,aSeek,aMod:  % may be several modes
+	           oEnterTokenAsTreeLeaf
+	      | *:
+	           >
+           ]}
+       | *:
+	   @Expression				  % must be old statement
+	   oTransferExpressionToTreeLeaf	  % with string mode ie "r"
+    ]     
+    aEndOpen
+    oEndSubtree
+    ;
+
+CloseStatement:
+    oStartNewSubtree
+    @Expression
+    oTransferExpressionToTreeLeaf
+    oEndSubtree
+    ;
+
+QuitStatement:
+    oStartNewSubtree
+    [ | aGreater, aLess :
+	  oEnterTokenAsTreeLeaf
+      |*:
+    ]
+    [ | aQuitReason:
+	  oStartNewSubtree
+	  @Expression
+	  oTransferExpressionToTreeLeaf
+	  oEndSubtree
+      | *:
+    ]
+    oEndSubtree
+    ;
+
+ForkStatement:
+    oStartNewSubtree    
+    aIdent
+    oExpressionEnterLeaf
+    @Selectors
+    oTransferExpressionToTreeLeaf
+    [ | aForkStatus :
+	 oStartNewSubtree
+	 @VariableReference
+	 oTransferExpressionToTreeLeaf
+	 [ | aForkStackSize:
+		oStartNewSubtree
+		@Expression
+		oTransferExpressionToTreeLeaf
+		[ | aForkAddress:
+		      oStartNewSubtree  
+		      @VariableReference
+		      oTransferExpressionToTreeLeaf
+		      oEndSubtree  
+		  | *:
+		]
+		oEndSubtree
+	   | *:
+	 ]
+	 oEndSubtree
+      | *:
+    ]
+    oEndSubtree 
+    ;
+
+AsmStatement:     
+    oStartNewSubtree
+    @Expression
+    [ | aLabel:					% make parent aLabel kid <exp>
+	  oStartNewSubtree
+          oTransferExpressionToTreeLeaf
+	  oEndSubtree
+          @Expression
+      | *:  
+    ]
+    oTransferExpressionToTreeLeaf
+    [ | aBeginAsm :
+          oStartNewSubtree
+          {[ | aEndAsm:
+	        >
+             | *:
+	        @Expression
+	        oTransferExpressionToTreeLeaf     
+          ]}
+          oEndSubtree
+      | *:
+    ]
+    oEndSubtree        
+    ;
+
+AtStatement:
+    oExpressionEnterMarkedOperator
+    @Expression
+    oExpressionConstructMarkedOperator
+    @NewStatementRightHandSide
+    ;     
+
+BitsStatement:
+    oExpressionEnterMarkedOperator
+    @VariableReference
+    @BitsType
+    oExpressionConstructMarkedOperator
+    @NewStatementRightHandSide
+    ;
+
+TypeCheatStatement:
+    oExpressionEnterMarkedOperator
+    @TypeCheatVariable
+    oExpressionConstructMarkedOperator
+    @Selectors
+    [ *
+	| aAssign, aAssignInverted, aConcatenateAssign, aSetDifferenceAssign,
+		aSetIntersectionAssign, aSetUnionAssign, aSetXorAssign,
+		aAndEqual, aBooleanAndEqual, aBooleanOrEqual, aDivEqual,
+		aExponentiateEqual, aMinusEqual, aModEqual, aOrEqual,
+		aPlusEqual, aRealDivEqual, aShiftLeftEqual, aShiftRightEqual,
+		aStarEqual, aXorEqual :
+	    @NewStatementRightHandSide
+	| *:
+	    oTransferExpressionToTreeLeaf
+    ];
+
+
+PauseStatement:
+    oStartNewSubtree
+    @Expression
+    oTransferExpressionToTreeLeaf
+    oEndSubtree
+    ; 
+
+SignalStatement:
+    oStartNewSubtree
+    @VariableReference
+    oTransferExpressionToTreeLeaf
+    oEndSubtree
+    ;
+
+WaitStatement:          
+    oStartNewSubtree
+    @VariableReference
+    oTransferExpressionToTreeLeaf
+    [ | aWaitPriorityOrTimeout:
+	  oStartNewSubtree
+	  @Expression
+	  oTransferExpressionToTreeLeaf
+	  oEndSubtree      
+      | *:
+    ]
+    oEndSubtree
+    ;
+
+BitsType:
+    aSubrange
+    oExpressionEnterMarkedOperator
+    @ManifestValue
+    @ManifestValue
+    oExpressionConstructMarkedOperator
+    ;
+
+NewStatementRightHandSide:
+    [ | aAssign, aAssignInverted, aConcatenateAssign, aSetDifferenceAssign,
+        aSetIntersectionAssign, aSetUnionAssign, aSetXorAssign, aAndEqual,
+        aBooleanAndEqual, aBooleanOrEqual, aDivEqual, aExponentiateEqual,
+        aMinusEqual, aModEqual, aOrEqual, aPlusEqual, aRealDivEqual,
+        aShiftLeftEqual, aShiftRightEqual, 
+        aStarEqual, aXorEqual :
+	   oStartNewSubtree
+	   oTransferExpressionToTreeLeaf
+	   @Expression
+	   [ | aRangeCheck, aRangeCheck2 :
+	       oExpressionEnterMarkedOperator
+	       oExpressionSwapTopTwoExpressions
+	       @RangeCheck
+	       oExpressionConstructMarkedOperator
+	     | *:  
+	   ]
+	   oTransferExpressionToTreeLeaf
+	   oEndSubtree
+      | *:
+	   @Selectors
+    ];
+
+TypeCheatVariable:
+  @TypeCheatTypeDefinition
+  [
+    | aAt:
+        oExpressionEnterMarkedOperator
+	@AtVariable
+        oExpressionConstructMarkedOperator
+    | *:
+	@Expression
+  ]
+  [ | aTypeCheatSize :				% optional sizeSpec
+	oExpressionEnterMarkedOperator
+	@Expression
+	oExpressionConstructMarkedOperator
+    | *: 
+  ];
+
+AtVariable:
+  @Expression
+  ; 
+
+VariableReference:
+  [ | aIdent:
+	oExpressionEnterLeaf
+	@Selectors
+    | aPredefinedId:
+	@PredefinedRoutineCall
+    | aTypeCheat:
+        oExpressionEnterMarkedOperator
+	@TypeCheatVariable
+        oExpressionConstructMarkedOperator
+	@Selectors
+    | *:
+      @Expression
+  ]
+  ;
+ 
+ProcessDeclaration:
+  oStartNewSubtree
+  aIdent
+  oEnterExpressionAsTreeLeaf
+  aIdentText
+  oEnterIdentText
+  @Parameters
+  [ | aProcessStackSize:
+	 oStartNewSubtree
+	 @Expression
+	 oTransferExpressionToTreeLeaf
+	 oEndSubtree
+    | *:
+  ]
+  @ProcedureBody
+  oEndSubtree
+  ;
+
+MonitorDeclaration:
+  oStartNewSubtree
+  aIdent
+  oEnterExpressionAsTreeLeaf
+  aIdentText
+  oEnterIdentText
+  [ | aMonitorPriority:
+	 oStartNewSubtree
+	 @Expression
+	 oTransferExpressionToTreeLeaf
+	 oEndSubtree
+    | *:
+  ]
+  @OptionalExport
+  @OptionalGrant
+  @OptionalPre
+  @DeclarationsAndStatements
+  @OptionalPost
+  aEndMonitor    
+  oEndSubtree 
+  ;
+
+MonitorBody:
+  oStartNewSubtree
+  aIdent
+  oEnterExpressionAsTreeLeaf
+  aIdentText
+  oEnterIdentText
+  [ | aMonitorPriority:
+	 oStartNewSubtree
+	 @Expression
+	 oTransferExpressionToTreeLeaf
+	 oEndSubtree
+    | *:
+  ]
+  @OptionalGrant
+  @OptionalPre
+  @DeclarationsAndStatements
+  @OptionalPost
+  aEndMonitor    
+  oEndSubtree 
+  ;
+
+MonitorStub:
+  oStartNewSubtree
+  aIdent
+  oEnterExpressionAsTreeLeaf
+  aIdentText
+  oEnterIdentText
+  [ | aMonitorPriority:
+	 oStartNewSubtree
+	 @Expression
+	 oTransferExpressionToTreeLeaf
+	 oEndSubtree
+    | *:
+  ]
+  @OptionalExport
+  @DclsAndStmtsInStub
+  aEndMonitor   
+  oEndSubtree
+  ;
+
+Stub:
+    oStartNewSubtree
+    [ | aModule:
+	  @ModuleStub
+      | aProcedure:
+	  @ProcedureStub
+      | aFunction:
+	  @FunctionStub
+      | aMonitor:
+	  @MonitorStub
+    ]
+    oEndSubtree
+    ;
+
+OptionalExport:
+    [ | aExport:
+	  oStartNewSubtree
+	  {[ | aEndExport:
+		 >
+	     | aOpaque, aUnqualified :
+	   	 oStartNewSubtree
+		 aIdent
+		 oEnterExpressionAsTreeLeaf
+		 oEndSubtree
+	     | aIdent:
+		 oEnterExpressionAsTreeLeaf
+	  ]}
+	  oEndSubtree 
+      | *:
+    ] 
+    ;
+
+DclsAndStmtsInStub:
+ {[ | aConst:
+       @ConstantDeclaration
+    | aType:
+       @TypeDeclaration
+    | aProcedure:
+       @ProcedureStub
+    | aFunction:
+       @FunctionStub
+    | aChild:
+       @Child 
+    | aStub:
+       @Stub
+    | aVar:
+       @VariableDeclaration
+    | aCondition:
+       oStartNewSubtree
+       aVar
+       @VariableDeclaration
+       oEndSubtree
+    | aExternal:
+       oStartNewSubtree
+       [ | aProcedure:
+	    @ExternalProcedureHead
+            oTypeTheSubprogramHeader
+	 | aFunction:
+	    @ExternalFunctionHead
+            oTypeTheSubprogramHeader
+	 | aVar:
+	    @VariableDeclaration    
+	 | aExternalAddress:
+	    oStartNewSubtree    
+	    @Expression
+	    oTransferExpressionToTreeLeaf
+	    oEndSubtree    
+	    aVar
+	    @VariableDeclaration    
+       ]
+       oEndSubtree 
+    | *:
+       > 
+ ]};
+
+Child:
+   oStartNewSubtree
+   [ | aParent:
+	 oStartNewSubtree
+	 [ | aCompile:
+	       oStartNewSubtree 
+	       [ | aStub:
+		     @CompileStub
+		 | aMissingStub:
+		     oStartNewSubtree   
+		     aIdent
+		     oEnterExpressionAsTreeLeaf
+		     @CompileMissingStub
+		     oEndSubtree
+	       ]
+	       oEndSubtree 
+	   | aMissingStub:
+	       @MissingStub 
+	   | aStub:
+	       @Stub 
+	 ]
+	 oEndSubtree
+     | *:
+	 [ | aCompile:
+	       oStartNewSubtree 
+	       [ | aMissingStub:
+		     oStartNewSubtree
+		     aIdent
+		     oEnterExpressionAsTreeLeaf   
+		     oEndSubtree
+		     @CompileMissingStub
+		 | *:
+		     aStub
+		     @CompileStub
+	       ]  
+	       oEndSubtree 
+	   | aMissingStub:
+	       @MissingStub 
+	   | aStub:     
+	       @Stub   
+	 ]  
+   ]
+   oEndSubtree
+   ;
+
+CompileStub:             
+   oStartNewSubtree             
+   [ | aModule:
+	 @ModuleStub
+	 [ | aBody :
+	       oStartNewSubtree
+	       aModule
+	       @ModuleBody
+	       oEndSubtree  
+	   | *:
+	 ]       
+     | aMonitor:
+	 @MonitorStub
+	 [ | aBody :
+	       oStartNewSubtree
+	       aMonitor
+	       @MonitorBody
+	       oEndSubtree  
+	   | *:
+	 ]       
+     | aProcedure:
+	 @ProcedureStub
+	 [ | aIs:
+	       @IsImplementation 
+	   | *:
+	 ]       
+     | aFunction:
+	 @FunctionStub
+	 [ | aIs:
+	       @IsImplementation 
+	   | *:     
+	 ]       
+   ]
+   oEndSubtree
+   ;
+
+IsImplementation:
+   oStartNewSubtree
+   @ProcedureBody
+   oEndSubtree
+   ;
+
+CompileMissingStub:
+    [
+	| aBody:
+	    oStartNewSubtree
+	    [
+		| aModule:
+		    @ModuleBody
+		| aMonitor:
+		    @MonitorBody
+	    ]
+	    oEndSubtree
+	| *:
+	    [
+		| aModule:
+		    @ModuleBody
+		| aMonitor:
+		    @MonitorBody
+	    ]
+    ];
+
+MissingStub:
+   oStartNewSubtree
+   aIdent
+   oEnterExpressionAsTreeLeaf
+   oEndSubtree
+   ;
+
+ExternalProcedureHead:
+   oStartNewSubtree
+   aIdent
+   oEnterExpressionAsTreeLeaf
+   aIdentText
+   oEnterIdentText
+   [ | aExternalAddress:
+	oStartNewSubtree
+	@ManifestValue
+	oTransferExpressionToTreeLeaf
+	oEndSubtree
+     | *:
+   ]
+   @Parameters
+   oEndSubtree
+   ;
+
+ExternalFunctionHead:
+   oStartNewSubtree
+   aIdent
+   oEnterExpressionAsTreeLeaf
+   aIdentText
+   oEnterIdentText
+   [ | aExternalAddress:
+	oStartNewSubtree
+	@ManifestValue
+	oTransferExpressionToTreeLeaf
+	oEndSubtree
+     | *:
+   ]
+   @RestOfFunctionHead
+   oEndSubtree
+   ;
+
+ModuleStub:
+    oStartNewSubtree
+    aIdent
+    oEnterExpressionAsTreeLeaf
+    aIdentText
+    oEnterIdentText
+    @OptionalExport
+    @OptionalGrant
+    @DclsAndStmtsInStub
+    aEndModule
+    oEndSubtree
+    ;
+
+FunctionStub:
+    oStartNewSubtree
+    aIdent
+    oEnterExpressionAsTreeLeaf
+    aIdentText
+    oEnterIdentText
+    @RestOfFunctionHead
+    oEndSubtree
+    ;
+
+ProcedureStub:
+    oStartNewSubtree
+    aIdent
+    oEnterExpressionAsTreeLeaf
+    aIdentText
+    oEnterIdentText
+    @Parameters
+    oEndSubtree
+    ;
+
+ModuleBody:
+    oStartNewSubtree
+    aIdent
+    oEnterExpressionAsTreeLeaf
+    aIdentText
+    oEnterIdentText
+    @OptionalExport
+    @OptionalGrant
+    @OptionalPre
+    @DeclarationsAndStatementsInModule
+    @OptionalPost
+    aEndModule
+    oEndSubtree
+    ; 
+
+SubprogramBodyDeclaration:
+    [ | aProcedure, aFunction :
+	  oStartNewSubtree
+    ]
+    aIdent
+    oEnterExpressionAsTreeLeaf
+    @ProcedureBody
+    oEndSubtree
+    ;
+
+ForwardProcedureHead:
+    oStartNewSubtree
+    aIdent
+    oEnterExpressionAsTreeLeaf
+    aIdentText
+    oEnterIdentText
+    @Parameters
+    oEndSubtree
+    ;
+
+ForwardFunctionHead:
+    oStartNewSubtree
+    aIdent
+    oEnterExpressionAsTreeLeaf
+    aIdentText
+    oEnterIdentText
+    @RestOfFunctionHead
+    oEndSubtree
+    ;
+
+ModuleDeclaration:
+    oStartNewSubtree
+    aIdent
+    oEnterExpressionAsTreeLeaf
+    aIdentText
+    oEnterIdentText
+    @OptionalExport
+    @OptionalGrant 
+    @OptionalPre
+    @DeclarationsAndStatementsInModule
+    @OptionalPost
+    aEndModule
+    oEndSubtree
+    ;
+
+FunctionDeclaration:
+    oStartNewSubtree
+    @FunctionHead
+    @ProcedureBody
+    oEndSubtree
+    ; 
+
+FunctionHead:
+    aIdent
+    oEnterExpressionAsTreeLeaf    
+    aIdentText
+    oEnterIdentText
+    @RestOfFunctionHead
+    ;
+
+ProcedureDeclaration:
+    oStartNewSubtree
+    @ProcedureHead
+    @ProcedureBody
+    oEndSubtree
+    ;
+
+ProcedureHead:
+    aIdent
+    oEnterExpressionAsTreeLeaf    
+    aIdentText
+    oEnterIdentText
+    @Parameters
+    ;
+
+Parameters:
+    [
+	| aSubs:
+	    oStartNewSubtree
+	    {[
+		| aEndSubs:
+		   >       
+		| *:
+		   @ParameterOrSubprogramHeader 
+	    ]}
+	    oEndSubtree
+	| aInterruptNumber:
+	    oStartNewSubtree
+	    @Expression
+	    oTransferExpressionToTreeLeaf
+	    oEndSubtree
+	| *:
+    ];      
+
+
+ParameterOrSubprogramHeader:
+    [ | aProcedure :
+	  @ForwardProcedureHead
+          oTypeTheSubprogramHeader
+      | aFunction :
+	  @ForwardFunctionHead
+          oTypeTheSubprogramHeader
+      | * :
+	  @Parameter
+    ]
+    ;
+
+RestOfFunctionHead:
+    @Parameters
+    aIdent
+    oEnterExpressionAsTreeLeaf
+    aType
+    oStartNewSubtree    
+    @TypeDefinition
+    oEndSubtree
+    ;
+
+Parameter:
+    [ | aVar:
+	oStartNewSubtree
+	[ | aRegister :
+	       oEnterTokenAsTreeLeaf
+	  | *:
+	]
+	@IdentList
+	aType
+	oStartNewSubtree
+	oPushTypeDelimiter		% if it is a record don't want the
+	@ParameterType			% idlist vars to be typed with fields
+	oPopTypeDelimiter
+	oEndSubtree
+	oTypeAllHeldIdentifiers
+	oEndSubtree
+      | *:
+	[ | aRegister :
+	       oEnterTokenAsTreeLeaf
+	  | *:
+	]
+	@IdentList
+	aType
+	oStartNewSubtree
+	oPushTypeDelimiter
+	@ParameterType
+	oPopTypeDelimiter
+	oEndSubtree
+	oTypeAllHeldIdentifiers
+    ]
+    ;
+
+ProcedureBody:
+    @OptionalPre
+    @OptionalInit
+    @OptionalPost
+    @OptionalHandler
+    @DeclarationsAndStatements
+    aEndSubprogramBody		  % keep this to distinguish between proc types
+    oEnterTokenAsTreeLeaf	  % and a real proc declaration tree.
+    ;
+
+OptionalHandler:
+    [ | aHandler:
+	  oStartNewSubtree
+	  aIdent
+	  oEnterExpressionAsTreeLeaf
+	  @DeclarationsAndStatements
+	  aEndSubprogramBody
+	  oEndSubtree
+      | *:
+    ];
+
+OptionalPre:
+    [ | aPre:
+	 oStartNewSubtree
+	 @Expression
+	 oTransferExpressionToTreeLeaf
+	 oEndSubtree
+      | *:
+    ]    
+    ;
+
+OptionalPost:
+    [ | aPost:
+	 oStartNewSubtree
+	 @Expression
+	 oTransferExpressionToTreeLeaf
+	 oEndSubtree
+      | *:
+    ]    
+    ;
+
+OptionalInit:						% init {id := <expn>}+
+    [ | aInit:
+	 oStartSpecificSubtree(opProcessInit)		% avoid ambiguity
+	 @InitList					% with init(...)
+	 oEndSubtree
+      | *:
+    ]  
+    ;
+
+ParameterType:
+    [ | aType :			% type cheat paramete kind
+	  oStartNewSubtree
+	  @ParameterType
+	  oEndSubtree
+      | aArray :
+	  oStartNewSubtree
+	  @ParameterArrayType
+	  oEndSubtree
+      | aPacked :
+	  oStartNewSubtree
+	  @ParameterType
+	  oEndSubtree
+      | aString:
+	  oStartNewSubtree
+	  [ | aStringSizeBound:
+		oStartNewSubtree
+		[ | aStar:
+		     oEnterExpressionAsTreeLeaf   
+		  | aNonManifest:
+		     oStartNewSubtree
+		     @Expression
+		     oTransferExpressionToTreeLeaf
+		     oEndSubtree
+		  | *:
+		     @ManifestValue
+		     oTransferExpressionToTreeLeaf   
+		]
+		oEndSubtree
+	    | *:
+	  ]
+	  oEndSubtree
+      | aVaryingParameter:
+	  oEnterTokenAsTreeLeaf
+      | *:
+	  @TypeDefinition
+    ];
+
+
+ParameterArrayType:
+    @ParameterArrayIndexList
+    @ParameterType;
+
+
+ParameterArrayIndexList:
+    {[ | aEndArrayIndexList:
+	   >      
+       | aSubrange:
+	   oStartNewSubtree
+	   @ManifestValue
+	   oTransferExpressionToTreeLeaf
+	   [ | aStar:
+	       oEnterExpressionAsTreeLeaf 
+	     | *:
+		 @ManifestValue   
+		 oTransferExpressionToTreeLeaf
+	   ]
+	   @OptionalStorageSize
+	   oEndSubtree
+       | aEnum :
+	   @Enum
+       | aIdent:
+	   oEnterExpressionAsTreeLeaf
+	   @NamedType
+    ]} 
+    ;
+
+Enum:
+   oStartNewSubtree
+   oExpressionEnterZeroAndZeroCount
+   oTransferExpressionToTreeLeaf
+   {[
+	| aEndEnum:
+	    >
+	| aIdent:
+	   oExpressionIncrementCount
+   ]}
+   oExpressionEnterCountMinusOne
+   oTransferExpressionToTreeLeaf
+   @OptionalStorageSize
+   oEndSubtree;
+
+
+InitList:
+   {[ | aEndInit:
+	 >
+      | aIdent:
+	 oEnterExpressionAsTreeLeaf
+	 aType
+	 oStartNewSubtree
+	 [ | aNonScalar:
+	      oEnterTokenAsTreeLeaf
+	      oEndSubtree
+	      aIdent
+	      oExpressionEnterLeaf
+	      @Selectors
+	      oTransferExpressionToTreeLeaf
+	   | *:
+	      @TypeDefinition    
+	      oEndSubtree
+	      @Expression
+	      oTransferExpressionToTreeLeaf
+	 ]
+    ]} 
+    ;
+
+InitValueList:
+   {[ | aInit:					% sub init of array, record
+	  oStartNewSubtree			% or union.
+	  @InitValueList
+	  oEndSubtree
+      | aEndInit:
+	>
+      | aInt, aNat, aReal, aBoolean :		% simple base type
+	  oStartNewSubtree              
+	  @ManifestValue			% and its actual init value
+          oTransferExpressionToTreeLeaf
+	  oEndSubtree
+      | aString, aChar:				% string constant
+	  oStartNewSubtree                
+	  @ManifestValue			% actual literal string
+          oTransferExpressionToTreeLeaf
+	  oEndSubtree
+      | aIdent:					% union label ident
+          oEnterExpressionAsTreeLeaf
+      | aNil:
+	  oExpressionEnterMarkedOperator    
+	  aIdent
+	  oExpressionEnterLeaf
+	  oExpressionConstructMarkedOperator
+          oTransferExpressionToTreeLeaf
+   ]};       
+
+ConstantDeclaration:                                       
+    oStartNewSubtree    
+    [ | aPervasive:
+          oEnterTokenAsTreeLeaf
+      | *:
+    ]
+    [ | aRegister:
+          oEnterTokenAsTreeLeaf
+      | *:
+    ]
+    aIdent
+    oEnterExpressionAsTreeLeaf
+    oHoldIdentifierAndWaitForItsType	
+    aIdentText   
+    oEnterIdentText
+    aType 
+    oStartNewSubtree
+    [ | aNonScalar:
+	  oEnterTokenAsTreeLeaf
+	  oEndSubtree
+	  oStartSpecificSubtree(opConstInit)
+	  @Expression
+	  oTransferExpressionToTreeLeaf
+	  oEndSubtree  
+	  oTypeAllHeldIdentifiers
+      | *:
+	  oPushTypeDelimiter
+	  @TypeDefinition
+	  oPopTypeDelimiter
+	  [ | aInit:
+	       oEndSubtree
+	       oTypeAllHeldIdentifiers
+	       oStartNewSubtree
+	       @InitValueList
+	       oEndSubtree
+	    | *:
+	       oEndSubtree
+	       oTypeAllHeldIdentifiers
+	       oStartSpecificSubtree(opConstInit)	% disambiguate tree
+	       @Expression				% for output.mod
+	       oTransferExpressionToTreeLeaf    
+	       oEndSubtree
+	  ]    
+    ]
+    oEndSubtree;
+
+
+VariableDeclaration:                                       
+    oStartNewSubtree    
+    [ | aRegister:
+          oEnterTokenAsTreeLeaf
+      | *:
+    ]
+    @IdentList    
+    [ | aType:
+	oStartNewSubtree
+	[ | aNonScalar:
+	      oPushTypeDelimiter
+	      oEnterTokenAsTreeLeaf
+	      oPopTypeDelimiter
+	      oEndSubtree
+	      aVarInit
+	      oStartNewSubtree
+	      [ | aIdent:
+		   oExpressionEnterLeaf
+		   @Variable			% absorb call/selectors etc.
+		| aPredefinedId:
+		   @PredefinedRoutineCall
+		| aNil:
+		  oExpressionEnterMarkedOperator    
+		  aIdent
+		  oExpressionEnterLeaf
+		  oExpressionConstructMarkedOperator
+	      ]
+	      oTransferExpressionToTreeLeaf
+	      aEndExpression
+	      oEndSubtree  
+	      oTypeAllHeldIdentifiers
+	  | *:
+	      oPushTypeDelimiter
+	      @TypeDefinition
+	      oPopTypeDelimiter
+	      [ | aVarInit:
+		  oEndSubtree
+		  oTypeAllHeldIdentifiers
+		  oStartNewSubtree
+		  @Expression
+		  oTransferExpressionToTreeLeaf
+		| aInit:
+		  oEndSubtree
+		  oTypeAllHeldIdentifiers
+		  oStartNewSubtree
+		  @InitValueList
+		| *:
+		  oTypeAllHeldIdentifiers
+	      ]    
+	      oEndSubtree
+	]
+        oEndSubtree
+      | aCollection:
+	oStartNewSubtree
+	[
+	    | aUnchecked:
+		% Ignore this for now
+	    | *:
+	]
+	[ | aForward:
+	     oStartNewSubtree   
+	     aIdent
+	     oEnterExpressionAsTreeLeaf   
+	     oEndSubtree
+	  | *:
+	     oPushTypeDelimiter
+	     @TypeDefinition
+	     oPopTypeDelimiter
+	]
+	oEndSubtree
+        oTypeAllHeldIdentifiers
+	oEndSubtree
+    ];
+
+PredefinedRoutineCall:
+    oExpressionEnterLeaf
+    [ | aCall :
+          oExpressionEnterMarkedOperator
+          oExpressionSwapTopTwoExpressions
+          @HandleParameters
+          oExpressionConstructMarkedOperator
+          @Selectors 
+      | *:				
+    ]
+    ;
+
+Expression:
+{[  | aEndExpression:
+      [  | aRangeCheck, aRangeCheck2 :
+	   oExpressionEnterMarkedOperator     
+	   oExpressionSwapTopTwoExpressions
+	   @RangeCheck
+	   oExpressionConstructMarkedOperator
+	 | * :
+      ]
+      >
+    | aIdent :
+	 oExpressionEnterLeaf
+	 @Variable
+    | aIntegerLit, aRealLit, aTrue, aFalse :
+	 oExpressionEnterLeaf
+    | aPredefinedId :
+	 @PredefinedRoutineCall
+    | aTypeCheat:
+	 oExpressionEnterMarkedOperator
+	 @TypeCheatVariable
+	 oExpressionConstructMarkedOperator
+	 @Selectors
+    | aBits:
+	 oExpressionEnterMarkedOperator
+	 @Expression
+	 @BitsType
+	 oExpressionConstructMarkedOperator
+    | aStringLit, aCharLit:
+	 oExpressionEnterLeaf
+	 [ | aSubstring:
+      	      oExpressionEnterMarkedOperator
+              oExpressionSwapTopTwoExpressions
+              @SubstringExpression
+              [ | aEndSubstring:
+	           oExpressionEnterLeaf
+	        | *:
+	           @SubstringExpression
+	           aEndSubstring
+	           oExpressionEnterLeaf	
+              ]
+              oExpressionConstructMarkedOperator
+	   | * :
+	 ]
+    | aNil:
+	  oExpressionEnterMarkedOperator    
+	  aIdent
+	  oExpressionEnterLeaf
+	  oExpressionConstructMarkedOperator
+    | * :
+	 @Operator
+]};
+
+SubstringExpression:
+  [ | aStar:
+       oExpressionEnterLeaf
+       [ | aMinus:
+	     oExpressionEnterMarkedOperator
+	     oExpressionSwapTopTwoExpressions
+	     @Expression
+	     oExpressionConstructMarkedOperator
+         | *:
+       ]
+    | *:
+       @Expression
+  ]
+  ;
+
+Operator:
+[   | aAdd, aSubtract, aMultiply, aDiv, aConcatenate,
+      aExponentiate, aDivideReal, aMod, 
+      aXor, aShiftLeft, aShiftRight, aLogicalAnd,
+      aLogicalOr, aLogicalXor, aSetUnion, aSetXor,
+      aSetIntersection, aSetDifference :
+	 oExpressionConstructOperator(tBinary)
+%
+    | aPlus,aMinus,aNot,aHash:
+	 oExpressionConstructOperator(tUnary)
+%
+    | aInfixBooleanCompare, aInfixCompare,
+      aInfixAnd, aInfixOr, aInfixImply:
+	 oExpressionEnterMarkedOperator
+	 oExpressionSwapTopTwoExpressions
+%
+    | aEqual,aNotEqual,aLess,aLessEqual,aGreater,aGreaterEqual,
+      aSetLessEqual, aSetGreaterEqual :
+	 oExpressionConstructOperator(tBinary)
+	 oExpressionConstructMarkedOperator
+%
+    | aAnd, aOr, aImply :		     % Don't put aAnd and aOr in the
+         oExpressionConstructMarkedOperator  % tree. Let aInfixAnd,aInfixOr
+					     % be the root.
+%
+    | aAbs :
+	 oExpressionEnterMarkedOperator
+	 @Expression
+	 oExpressionConstructMarkedOperator
+%
+    | aMax, aMin :
+	 oExpressionEnterMarkedOperator
+	 @Expression
+	 @Expression
+	 oExpressionConstructMarkedOperator
+%
+    | aIn, aNotIn :                             
+	 oExpressionEnterMarkedOperator
+	 @ManifestValue
+	 @ManifestValue
+	 oExpressionConstructMarkedOperator 
+	 oExpressionConstructMarkedOperator
+];
+
+ManifestValue:
+[   | aIntegerLit, aStringLit, aRealLit, aTrue, aFalse, aCharLit, aStar :
+	 oExpressionEnterLeaf
+];
+
+RangeCheck:
+[   | aString:
+	oExpressionEnterLeaf
+	[  | aStar :
+		oExpressionEnterLeaf
+	   | *     : 
+		@ManifestValue
+	]
+    | * :
+	@ManifestValue
+	@ManifestValue
+];
+
+Variable:
+   @Selectors
+   ;
+
+Selectors:
+{[ | aSubs :
+      oExpressionEnterMarkedOperator    
+      oExpressionSwapTopTwoExpressions  
+      @Subscripts                       
+      oExpressionConstructMarkedOperator
+   | aCall :
+      oExpressionEnterMarkedOperator
+      oExpressionSwapTopTwoExpressions  
+      @HandleParameters
+      oExpressionConstructMarkedOperator
+   | aSet  :
+      oExpressionEnterMarkedOperator
+      oExpressionSwapTopTwoExpressions
+      aSubs 
+      oExpressionEnterMarkedOperator
+      [ | aAll :
+	   oExpressionEnterLeaf 
+	   aEndSubs
+	| *:
+	   @Subscripts
+      ]
+      oExpressionConstructMarkedOperator
+      oExpressionConstructMarkedOperator
+   | aSubstring :
+      oExpressionEnterMarkedOperator
+      oExpressionSwapTopTwoExpressions
+      @SubstringExpression
+      [ | aEndSubstring:
+	   oExpressionEnterLeaf		% we put substring kind into the tree
+	| *:
+	   @SubstringExpression
+	   aEndSubstring
+	   oExpressionEnterLeaf		% here too.
+      ]
+      oExpressionConstructMarkedOperator
+   | aCollection :
+      oExpressionEnterMarkedOperator
+      oExpressionSwapTopTwoExpressions
+      aSubs
+      oExpressionEnterMarkedOperator  
+      @Subscripts
+      oExpressionConstructMarkedOperator
+      oExpressionConstructMarkedOperator
+   | aField :
+      oExpressionEnterMarkedOperator
+      oExpressionSwapTopTwoExpressions
+      @Fielding
+      oExpressionConstructMarkedOperator  
+   | aHash:
+      oExpressionConstructOperator(tUnary)
+   | *:  
+      >
+]};
+
+HandleParameters:
+   [ | aSubs:
+	 oExpressionEnterMarkedOperator
+	 @Actuals
+     | *:
+   ]
+   @OptionalAliasCheck
+   ;
+
+Actuals:
+   {[| aEndSubs:
+        oExpressionConstructMarkedOperator
+        >
+     | aString, aChar:	  	       % type may come before string/char
+        oExpressionEnterLeaf	       % to Predefined Functions.
+     | *:
+        @Expression
+   ]}      
+   ;
+
+% ignore these
+OptionalAliasCheck:
+  [  | aAliasCheck:
+       {[ | aNoAlias, aNoEnclosure:
+	    aIntegerLit
+	    aIntegerLit
+          | aEndAliasCheck:
+            >
+       ]}   
+     | *:
+  ];
+
+
+Subscripts:
+{[ | aEndSubs:
+     >
+   | *:
+     @Expression
+]};
+
+Fielding:
+   [  | aTagCheck :
+	oExpressionEnterMarkedOperator
+	aIdent                  % tag identifier
+	oExpressionEnterLeaf
+	aIdent                  % map identifier
+	oExpressionEnterLeaf
+	@ManifestValue
+	oExpressionConstructMarkedOperator
+      | *:
+   ]
+   aIdent
+   oExpressionEnterLeaf
+   ;
+
+
+Elsif:
+    % convert these to else if expn, necessary for translation
+    oStartSpecificSubtree(opElse)
+    oStartSpecificSubtree(opIf)
+    @Expression
+    oTransferExpressionToTreeLeaf     
+    oStartSpecificSubtree(opThen)
+    @DeclarationsAndStatements
+    oEndSubtree
+    [
+	| aElsif:
+	    @Elsif
+	| aElse:
+	    oStartNewSubtree
+	    @DeclarationsAndStatements   
+	    oEndSubtree
+	| *:
+    ]
+    oEndSubtree
+    oEndSubtree;
+
+
+IfStatement:
+   oStartNewSubtree
+   @Expression
+   oTransferExpressionToTreeLeaf
+   oStartSpecificSubtree(opThen)	% make then and else etc. subtrees
+   @DeclarationsAndStatements
+   oEndSubtree
+   [
+       | aElsif:
+	  @Elsif
+       | *:
+	   [   | aElse:
+		   oStartNewSubtree
+		   @DeclarationsAndStatements   
+		   oEndSubtree
+	       | *:
+	   ]
+   ]
+   oEndSubtree
+   aEndIf;     
+
+
+ForStatement:
+   oStartNewSubtree
+    [
+	| aChar:
+	    % we handle this already
+	| *:
+    ]
+   [  | aDecreasing:
+	oEnterTokenAsTreeLeaf
+      | *:
+   ]
+   aIdent
+   oEnterExpressionAsTreeLeaf
+
+   oPushTypeDelimiter                      % is type Subrange ...
+   oHoldIdentifierAndWaitForItsType
+   aForRange
+   oStartNewSubtree
+   @Expression
+   oTransferExpressionToTreeLeaf
+   @Expression
+   oTransferExpressionToTreeLeaf
+   oEndSubtree
+   oTypeAllHeldIdentifiers
+   oPopTypeDelimiter
+
+   @DeclarationsAndStatementsInFor
+   oEndSubtree
+   aEndFor
+   ;
+
+LoopStatement:
+   oStartNewSubtree
+   @OptionalInvariant     
+   @DeclarationsAndStatements
+   aEndLoop
+   oEndSubtree
+   ;
+
+PutStatement:
+   oStartNewSubtree
+   [ | aStreamNumber:
+       oStartNewSubtree
+       @Expression
+       oTransferExpressionToTreeLeaf
+       oEndSubtree  
+     | *:
+   ]
+   @PutList
+   oEndSubtree
+   ;
+
+GetStatement:
+   oStartNewSubtree
+   [ | aStreamNumber:
+       oStartNewSubtree
+       @Expression
+       oTransferExpressionToTreeLeaf
+       oEndSubtree  
+     | *:
+   ]
+   @GetList
+   oEndSubtree
+   ;
+
+PutList:
+{[ | aSkip:
+      oEnterTokenAsTreeLeaf
+   | aEndPut:
+     >
+   | aPutContinue:
+      oEnterTokenAsTreeLeaf
+      aEndPut 
+      >
+   | *:
+     [ | aReal, aInt, aString, aChar, aNat:
+	 oEnterTokenAsTreeLeaf
+     ]
+     @Expression
+     oTransferExpressionToTreeLeaf   
+     aColon
+     oStartNewSubtree
+     @Expression
+     oTransferExpressionToTreeLeaf   
+     [ | aColon :
+	  oStartNewSubtree
+	  @Expression
+	  oTransferExpressionToTreeLeaf   
+	  [  | aColon:
+		oStartNewSubtree
+		@Expression
+		oTransferExpressionToTreeLeaf   
+		oEndSubtree
+	     | *:
+	  ]
+	  oEndSubtree
+       | *:
+     ] 
+     oEndSubtree
+]};
+
+GetList:
+{[  | aSkip :
+	oEnterTokenAsTreeLeaf
+    | aEndGet:
+      >
+    | *:  
+      [  | aReal, aInt, aNat:
+	     oStartNewSubtree
+	     @VariableReference
+	     oTransferExpressionToTreeLeaf
+	     oEndSubtree
+	 | aString, aChar:
+	     oStartNewSubtree
+	     @VariableReference
+	     oTransferExpressionToTreeLeaf
+	     [  | aColon:
+	           oStartNewSubtree
+		   [  | aStar:
+		        oEnterTokenAsTreeLeaf
+		      | *:
+		        @Expression
+		        oTransferExpressionToTreeLeaf  
+		   ]
+		   oEndSubtree
+		| *:
+	     ]       
+	     oEndSubtree 
+	 | aSubrange:
+	     oStartNewSubtree
+	     [
+		| aChar:
+		    oEnterTokenAsTreeLeaf 
+		| *:
+	     ]
+	     @VariableReference
+	     oTransferExpressionToTreeLeaf   
+	     [
+		| aIntegerLit, aCharLit:
+	     ]
+	     oEnterExpressionAsTreeLeaf
+	     [
+		| aIntegerLit, aCharLit:
+	     ]
+	     oEnterExpressionAsTreeLeaf  
+	     oEndSubtree      
+         | *:
+	     @VariableReference     
+	     oTransferExpressionToTreeLeaf
+	     [ | aColon :
+		   oStartNewSubtree
+	           @Expression
+		   oTransferExpressionToTreeLeaf
+		   oEndSubtree
+	       | *:
+	     ]
+      ]
+]};
+
+ExitStatement:
+   oEnterTokenAsTreeLeaf
+   ;
+
+ExitWhenStatment:
+   oStartNewSubtree
+   @Expression
+   oTransferExpressionToTreeLeaf
+   oEndSubtree
+   ;
+
+CaseStatement:
+   oStartNewSubtree
+   @Expression
+   oTransferExpressionToTreeLeaf
+   @CaseAlternative
+   {[   | aEndCase:
+	    >
+	| aOtherwise:
+	    oStartNewSubtree    
+	    @DeclarationsAndStatements  
+	    oEndSubtree    
+	    aEndCase
+	    >
+	| *:
+	    @CaseAlternative
+   ]}
+   oEndSubtree
+   ;
+
+CaseAlternative:
+   {[   | aCaseBody:
+	   >
+	| *:
+	   @ManifestValue
+	   oTransferExpressionToTreeLeaf     
+   ]}
+   oStartNewSubtree			% root is aCaseBody
+   @DeclarationsAndStatements
+   oEndSubtree
+   aEndCaseBody
+   ;
+
+BeginStatement:
+   oStartNewSubtree
+   @DeclarationsAndStatements
+   aEndBegin
+   oEndSubtree
+   ;
+
+AssertStatement:
+   oStartNewSubtree
+   @Expression
+   oTransferExpressionToTreeLeaf       
+   oEndSubtree
+   ;
+
+ReturnStatement:
+   oEnterTokenAsTreeLeaf
+   ;
+
+ResultStatement:
+   oStartNewSubtree
+   @Expression
+   oTransferExpressionToTreeLeaf
+   oEndSubtree
+   ;
+
+TagStatement:
+   oStartNewSubtree
+   aIdent
+   oExpressionEnterLeaf
+   @Selectors
+   oTransferExpressionToTreeLeaf
+   @Expression
+   oTransferExpressionToTreeLeaf
+   oEndSubtree
+   ;
+
+NewOrFreeStatement:
+   oStartNewSubtree
+   aIdent
+   oExpressionEnterLeaf
+   [  | aField:                 % collection 
+	 oExpressionEnterMarkedOperator
+	 oExpressionSwapTopTwoExpressions
+	 aIdent
+	 oExpressionEnterLeaf
+	 oExpressionConstructMarkedOperator
+      | *:
+   ]
+   oTransferExpressionToTreeLeaf
+   aIdent
+   oExpressionEnterLeaf
+   @Selectors
+   oTransferExpressionToTreeLeaf
+   oEndSubtree
+   ;
+
+BindDeclaration:
+   oStartNewSubtree
+   {   [  | aEndBind:
+	       >
+	  | *:
+	      @RenameVariable  
+       ]  
+   }     
+   oEndSubtree
+   ;     
+    
+RenameVariable:
+   {[  | aVar, aRegister:
+           oEnterTokenAsTreeLeaf
+       | *:
+           >
+   ]}
+   aIdent
+   oEnterExpressionAsTreeLeaf
+   @VariableReference
+   @OptionalAliasCheck
+   oTransferExpressionToTreeLeaf
+   ;
+
+TypeDeclaration:
+   oStartNewSubtree
+   aIdent
+   oEnterExpressionAsTreeLeaf
+   oHoldIdentifierAndWaitForItsType
+   oPushTypeDelimiter
+   @TypeDefinition
+   oPopTypeDelimiter
+   oTypeAllHeldIdentifiers   
+   oEndSubtree
+   ; 
+
+TypeCheatTypeDefinition:
+   @TypeDefinition
+   oExpressionEnterTree
+   ;
+
+TypeDefinition:
+   [  | aBoolean, aAddressInt :
+	  oEnterTokenAsTreeLeaf
+      | aInt, aNat, aReal :
+	  oStartNewSubtree
+	  @OptionalStorageSize
+	  oEndSubtree
+      | aString, aChar :
+	  oStartNewSubtree
+	  [  | aStringSizeBound:
+		oStartNewSubtree
+	        [ | aNonManifest:
+		     oStartNewSubtree
+		     @Expression
+		     oTransferExpressionToTreeLeaf
+		     oEndSubtree
+	          | *:
+		     @ManifestValue
+		     oTransferExpressionToTreeLeaf
+		]
+		oEndSubtree
+	     | *:
+	  ]   
+	  oEndSubtree
+      | aArray:
+	  oStartNewSubtree
+	  @ArrayType
+	  oEndSubtree
+      | aRecord:
+	  @RecordType
+      | aUnion:
+	  @UnionType
+      | aSet:
+	  oStartNewSubtree
+	  @IndexType
+	  oEndSubtree      
+      | aPointer:
+	  oStartNewSubtree
+	  aIdent
+	  oEnterExpressionAsTreeLeaf
+	  oEndSubtree      
+      | aSubrange:
+	  oStartNewSubtree
+	  @ManifestValue
+	  oTransferExpressionToTreeLeaf
+	  @ManifestValue
+	  oTransferExpressionToTreeLeaf      
+	  @OptionalStorageSize
+	  oEndSubtree
+      | aEnum:
+	  @Enum
+      | aIdent:   
+	  oEnterExpressionAsTreeLeaf            % to keep the compound
+	  @NamedType
+      | aPacked:
+	  oStartNewSubtree
+	  @TypeDefinition
+	  oEndSubtree
+      | aProcedure:
+	  @ProcedureType
+      | aFunction:
+	  @FunctionType
+      | aCondition:
+	  @ConditionType
+   ]
+   ;
+
+OptionalStorageSize:
+   [  | aStorageSize :
+	  oStartNewSubtree
+	  @Expression
+	  oTransferExpressionToTreeLeaf
+	  oEndSubtree
+       | *:
+   ];
+
+ProcedureType:
+   oStartNewSubtree
+   aIdent
+   oEnterExpressionAsTreeLeaf          
+   aIdentText
+   oEnterIdentText
+   @Parameters
+   oEndSubtree 
+   ;
+
+FunctionType:
+   oStartNewSubtree
+   aIdent
+   oEnterExpressionAsTreeLeaf          
+   aIdentText
+   oEnterIdentText
+   @Parameters
+   aIdent
+   oEnterExpressionAsTreeLeaf
+   aType
+   oStartNewSubtree
+   @TypeDefinition
+   oEndSubtree
+   oEndSubtree 
+   ;
+
+ConditionType:
+   oStartNewSubtree
+   [ | aPriority, aDeferred :
+	 oEnterTokenAsTreeLeaf
+     | aTimeout:
+	 oStartNewSubtree
+	 oEndSubtree
+     | *:
+   ]     
+   oEndSubtree
+   ;
+
+ArrayType:
+   @ArrayIndexList
+   @TypeDefinition      
+   ;
+
+RecordType: 
+   oStartNewSubtree
+   { [ | aEndRecord:
+	   >
+       | *:
+	  @IdentList
+	  aRecordElementType
+	  oStartNewSubtree
+	  oPushTypeDelimiter
+	  @TypeDefinition
+	  oPopTypeDelimiter
+	  oEndSubtree
+	  oTypeAllHeldIdentifiers
+     ]
+   }    
+   oEndSubtree
+   ;
+
+IdentList:
+   {[ | aIdent:
+	oEnterExpressionAsTreeLeaf              % to keep compound token
+	oHoldIdentifierAndWaitForItsType	% will pop and type later
+	[  | aIdentText:
+	     oEnterIdentText
+	   | *:
+	]
+      | *:
+	>
+    ]
+   };  
+
+UnionType:
+   oStartNewSubtree
+   aIdent
+   oEnterExpressionAsTreeLeaf
+   aType
+   oStartNewSubtree
+   @IndexType				
+   oEndSubtree
+   aIdent				% map identifier
+   oEnterExpressionAsTreeLeaf 
+   { [ | aEndUnion:
+	   >
+       | aLabel:
+	   oStartNewSubtree
+	   [  | aOtherWise:
+		 oEnterTokenAsTreeLeaf
+	      | *:
+		  {[ | aIntegerLit:
+			 oEnterExpressionAsTreeLeaf
+		     | *: 
+			 >
+		  ]} 
+	   ]
+	   oEndSubtree
+	   [  | aUnionLabelBody:
+		  oStartNewSubtree
+		  {[ | aEndUnionLabelBody:
+			 >
+		     | *:
+			@IdentList
+			aRecordElementType
+			oStartNewSubtree
+		        oPushTypeDelimiter
+			@TypeDefinition
+			oPopTypeDelimiter
+			oEndSubtree
+			oTypeAllHeldIdentifiers
+		  ]}
+		  oEndSubtree
+	      | *:
+	   ]
+     ]
+   }
+   oEndSubtree
+   ;
+
+NamedType:
+   [  | aField:				% moduleId '.' ExportedType
+	 oStartNewSubtree
+	 aIdent
+	 oEnterExpressionAsTreeLeaf
+	 oEndSubtree
+      | *:
+   ];
+
+IndexType:
+   [  | aSubrange:
+	 oStartNewSubtree
+	 @ManifestValue
+	 oTransferExpressionToTreeLeaf
+	 @ManifestValue
+	 oTransferExpressionToTreeLeaf
+	 @OptionalStorageSize
+	 oEndSubtree
+      | aEnum:
+	 @Enum
+      | aIdent:
+	 oEnterExpressionAsTreeLeaf
+	 @NamedType  
+   ]
+   ;
+
+ArrayIndexList:
+   {  [  | aEndArrayIndexList:
+	      >
+	 | aSubrange:
+	      oStartNewSubtree
+	      @ManifestValue
+	      oTransferExpressionToTreeLeaf
+	      [  | aNonManifest:
+		     oStartNewSubtree
+		     @Expression
+		     oTransferExpressionToTreeLeaf
+		     oEndSubtree
+		 | *:
+		     @ManifestValue
+		     oTransferExpressionToTreeLeaf 
+	      ]
+	      oEndSubtree
+	 | aEnum:
+	      @Enum
+	 |  aIdent:
+	      oEnterExpressionAsTreeLeaf  
+	      @NamedType
+      ] 
+   };      
+
+AssignmentOrCallStatement:
+   oExpressionEnterLeaf                   % hold onto 'ident' for a bit
+   [ | aCall :                            % make 'aCall' the root with
+	 oExpressionEnterMarkedOperator   % left kid 'ident' expression leaf.
+	 oExpressionSwapTopTwoExpressions   
+	 @HandleParameters
+	 oExpressionConstructMarkedOperator
+	 @Selectors
+	 oTransferExpressionToTreeLeaf
+     | *:                                 % it is an assign statement!
+	 @Selectors                       % absorbs 'ident' if any selectors
+	 [  | aHash :
+		oExpressionConstructOperator(tUnary)
+	    | *:
+	 ]
+	 oTransferExpressionToTreeLeaf
+         [ | aAssign, aAssignInverted, aConcatenateAssign, aSetDifferenceAssign,
+             aSetIntersectionAssign, aSetUnionAssign, aSetXorAssign, aAndEqual,
+             aBooleanAndEqual, aBooleanOrEqual, aDivEqual, aExponentiateEqual,
+             aMinusEqual, aModEqual, aOrEqual, aPlusEqual, aRealDivEqual,
+             aShiftLeftEqual, aShiftRightEqual, 
+             aStarEqual, aXorEqual :
+		oStartNewSubtree
+		oSwapTopTwoTrees
+		@Expression
+		[  | aRangeCheck, aRangeCheck2:
+		     oExpressionEnterMarkedOperator
+		     oExpressionSwapTopTwoExpressions   
+		     @RangeCheck
+		     oExpressionConstructMarkedOperator
+		   | *:
+		]
+		oTransferExpressionToTreeLeaf
+		oEndSubtree
+	   | *:
+	 ]       
+   ]
+   ;
+
+end
+
+

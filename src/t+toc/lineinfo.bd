@@ -1,0 +1,112 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+% 
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+% 
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+body "lineinfo.st" module LineInfo
+
+    var lineType : unchecked collection of
+	record
+	    name : string
+	    next : pointer to lineType
+	end record
+
+
+    var root := nil(lineType)
+
+
+    body procedure SetFileNumber % (fileName : char(*), fileNameLen : int)
+	var nm := fileName(1..fileNameLen)
+	var register lastX, x := root
+	var register count := 0
+	loop
+	    exit when x = nil(lineType) or nm = lineType(x).name
+	    lastX := x
+	    x := lineType(x).next
+	    count += 1
+	end loop
+	count += 1
+	if x = nil(lineType) then
+	    if root = nil(lineType) then
+		new lineType, root
+		lineType(root).name := nm
+		lineType(root).next := nil(lineType)
+	    else
+		new lineType, lineType(lastX).next
+		x := lineType(lastX).next
+		lineType(x).name := nm
+		lineType(x).next := nil(lineType)
+	    end if
+	end if
+	currentFileNumber := count
+    end SetFileNumber
+
+
+    body function FileName % (i : int) : string
+	var register x := root
+
+	if i = 0 then
+	    result "(internal)"
+	end if
+	for : 1 .. i-1
+	    x := lineType(x).next
+	end for
+	result lineType(x).name
+    end FileName
+
+
+    body procedure WriteFileTable % (stream : int)
+	var register x := root
+	var register count := 0
+	var nfiles := 0
+
+	/* find out total size of strings */
+	loop
+	    exit when x = nil(lineType)
+	    count += length(lineType(x).name) + 1
+	    nfiles += 1
+	    x := lineType(x).next
+	end loop
+
+	put :stream, "static struct {\n    ", macdepType(mInt4),
+	    "\tdummy;\n    char\tdummy2[", count, "];\n} TLFTAB =\n    { ",
+	    nfiles, ",\n    {" ..
+
+	x := root
+	loop
+	    exit when x = nil(lineType)
+	    for i : 1 .. length(lineType(x).name)
+		const ch : char := lineType(x).name(i)
+		case ch of
+		    label '\\':
+			put : stream, "'\\', " ..
+		    label '\'':
+			put : stream, "'\'', " ..
+		    label :
+			put : stream, "'", ch, "', " ..
+		end case
+	    end for
+	    x := lineType(x).next
+	    if x not= nil(lineType) then
+		put :stream, "'\\0',\n    " ..
+	    else
+		put :stream, "'\\0'"
+	    end if
+	end loop
+	put :stream, "    }};"
+    end WriteFileTable
+
+end LineInfo

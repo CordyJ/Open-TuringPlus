@@ -1,0 +1,77 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+%
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+%
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+const *indirect := false
+const *direct := true
+
+/* Identifiers */
+type  *IdentifierIndex : 0..maxIdents : 2
+
+/* Scope Indices */
+type *ScopeIndex : 0..maxSavedScopes : 2
+type *SymbolKinds : firstSymbolKind..lastSymbolKind : 1
+
+/* Symbol Attributes */
+type *SymbolAttributes : firstSymbolAttribute..lastSymbolAttribute : 1
+type *SymbolAttributeSet : set of SymbolAttributes
+const *attrchars := "ORFTU"
+
+const *symbolNames : array firstSymbolKind .. lastSymbolKind of string(20) :=
+    init ( "Variable", "RunTimeConstant", "CompileTimeConstant", "Type",
+	   "Collection", "Procedure", "Function",
+	   "Module", "Monitor", "Process", "EnumeratedElement",
+	   "Call", "Export", "NotFound")
+
+
+/* Symbol Table Indices */
+type *SymbolIndex : -(2 * (lastTypeKind + 1) + (lastPredefinedId + 1) +
+			maxDummySymbols) .. maxSymbols : 2
+
+/* Type Kinds */
+type *TypeKinds : firstTypeKind..lastTypeKind : 1
+
+/* Type Attributes */
+type *TypeAttributes : firstTypeAttribute..lastTypeAttribute : 1
+
+/* Type Table Indices */
+type *TypeIndex : -maxDummyTypes .. maxTypes : 2
+
+/* predefined Indices */
+type *PredefinedIdIndex : firstPredefinedId..lastPredefinedId : 2
+
+/* Value representing a null union body */
+const *nullBody := 0
+
+/* Comparison Results */
+const *crLess := 0
+const *crEqual := 1
+const *crGreater := 2
+type *CompareResult : crLess..crGreater : 1
+
+/* Value Kinds */
+type *ValueKinds : firstValueKind..lastValueKind : 1
+
+/* Value Descriptors */
+const *negative := true
+const *positive := false
+
+/* Value Table Indices */
+type *ValueIndex : 0..maxSavedValues : 2
+
+/* SubString definitions */
+type *SubstringExpnKind : substringStar .. substringNone : 1

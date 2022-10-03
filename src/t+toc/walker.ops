@@ -1,0 +1,187 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+%
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+%
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+%    Turing Plus To C translator
+%    By      : Mark Mendell
+%    Date    : 28 Oct 1986
+
+label oExpressionEnterLeaf :
+      case inputToken.tokenKind of
+	 label aIntegerLit : 
+	      Expression.EnterInteger(inputToken.intValue, inputToken.intKind)
+
+	 label aStringLit :
+	      Expression.EnterString(inputToken.stringText,inputToken.stringLen)
+
+	 label aCharLit :
+	      Expression.EnterChar(inputToken.stringText, inputToken.stringLen)
+
+	 label aStar, aAll, aTrue, aFalse, aBoolean, aInt, aNat,
+	   aString, aChar, aAddressint, aReal :
+	      Expression.EnterSimpleLeaf(inputToken.tokenKind)
+
+	 label aRealLit :
+	      Expression.EnterReal(inputToken.stringText, inputToken.stringLen)
+
+	 label aIdent :
+	      Expression.EnterIdentifier(inputToken.ident)
+
+	 label aEndSubstring :
+	      Expression.EnterSubstringKind(inputToken.intValue)
+
+	 label aPredefinedId :
+	      Expression.EnterPredefinedId (inputToken.ident,
+		  inputToken.predefinedIdent)
+
+	 label : 
+	      Error(BadExpressionEnterLeafCall, nil(tNode), fatalError)
+      end case
+
+label oExpressionConstructOperator  :
+      Expression.EndOp(inputToken.tokenKind,parameterValue)
+
+label oExpressionFlushTopExpression :
+      var junk : ExpressionPointer
+      Expression.End(junk)			% just throw it away 
+
+label oExpressionEnterMarkedOperator :
+      Expression.EnterMarkedOperator(inputToken.tokenKind)
+
+label oExpressionConstructMarkedOperator :
+      Expression.ConstructMarkedOperator
+
+label oExpressionSwapTopTwoExpressions :
+      Expression.SwapTopTwoExpressions
+
+label oExpressionDumpTop :
+      Expression.DumpTop(debugFile)
+
+label oExpressionAssertStackIsEmpty :
+      Expression.AssertStackIsEmpty
+
+label oExpressionEnterZeroAndZeroCount:
+      Expression.EnterInteger(0, iInteger)
+      expressionCount := 0
+
+label oExpressionIncrementCount:
+      expressionCount += 1
+
+label oExpressionEnterCountMinusOne:
+      Expression.EnterInteger(expressionCount-1, iInteger)
+
+label oExpressionEnterTree:
+      var tp : TreePointer
+      Tree.End(tp)
+      Expression.EnterTree(tp)
+
+label oTreeDumpTop :
+      Tree.DumpTop(debugFile)
+
+label oStartNewSubtree :
+      Tree.StartNewSubtree(inputToken.tokenKind)
+
+label oStartSpecificSubtree :
+      Tree.StartNewSubtree(parameterValue)
+
+label oEndSubtree :
+      Tree.EndSubtree
+
+label oTransferExpressionToTreeLeaf:
+      var e: ExpressionPointer
+      Expression.End(e)				% may do nothing if
+      Tree.EnterExpression(e)			% expr stack empty.
+
+label oEnterTokenAsTreeLeaf:
+      Tree.EnterSimpleLeaf(inputToken.tokenKind)
+
+label oSwapTopTwoTrees:
+      Tree.SwapTopTwoTrees
+
+label oEnterExpressionAsTreeLeaf:
+      var e: ExpressionPointer
+
+      case inputToken.tokenKind of
+	 label aIntegerLit : 
+	      Expression.EnterInteger(inputToken.intValue, inputToken.intKind)
+
+	 label aStringLit :
+	      Expression.EnterString(inputToken.stringText,inputToken.stringLen)
+
+	 label aCharLit :
+	      Expression.EnterChar(inputToken.stringText, inputToken.stringLen)
+
+	 label aStar, aAll, aTrue, aFalse, aBoolean, aInt, aNat,
+		  aString, aChar, aAddressint, aReal :
+	      Expression.EnterSimpleLeaf(inputToken.tokenKind)
+
+	 label aRealLit :
+	      Expression.EnterReal(inputToken.stringText, inputToken.stringLen)
+
+	 label aIdent :
+	      Expression.EnterIdentifier(inputToken.ident)
+
+	 label aEndSubstring :
+	      Expression.EnterSubstringKind(inputToken.intValue)
+
+	 label aPredefinedId :
+	      Expression.EnterPredefinedId (inputToken.ident,
+		  inputToken.predefinedIdent)
+
+	 label : 
+	      Error(BadExpressionEnterLeafCall, nil(tNode), fatalError)
+      end case
+      Expression.End(e)
+      Tree.EnterExpression(e)
+
+label oEnterIdentText:
+    Identifier.SetIdentText(inputToken.ident, inputToken.stringText,
+			      inputToken.stringLen)
+
+label oSelectTheExactPredefinedFunction:
+      resultValue := inputToken.predefinedIdent
+
+label oHoldIdentifierAndWaitForItsType: 
+      var e:ExpressionPointer
+
+      Expression.EnterIdentifier(inputToken.ident)
+      Expression.End(e)
+      Types.HoldIdentifier(e)
+
+label oTypeAllHeldIdentifiers:
+      var tr : TreePointer
+
+      Tree.End(tr)      		% take type off stack
+      Tree.EnterCopy(tr)		% put back a copy of type tree
+      Types.MakeType(tr)		% make all held id's this type
+
+label oPushTypeDelimiter:
+      Types.PushDelimiter  
+
+label oPopTypeDelimiter:
+      Types.PopDelimiter
+
+label oAssertTypeStackEmpty:
+      Types.AssertTypeStackEmpty
+
+label oTypeTheSubprogramHeader:		% take a subprogram header,
+					% extract its id and type the
+      var tr: TreePointer		% id to the header of procedure
+
+      Tree.End(tr)
+      Tree.EnterCopy(tr)
+      Types.SetType(tNode(tNode(tr).operand).leaf,tr)

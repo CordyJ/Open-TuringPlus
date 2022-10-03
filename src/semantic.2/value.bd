@@ -1,0 +1,1375 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+% 
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+% 
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+body "value.st" module Value
+    /*
+     *  Module:	Semantic Pass 2 Value Mechanism V1.00
+     * 	Author:	M. Mendell & Stephen Perelgut
+     * 	Date:	13 Feb 1984
+     */
+
+    /* This mechanism is used to evaluate and fold manifest expressions */
+
+
+    type *ValueStackEntry :
+	record
+	    value: ValueDescriptor
+	    vindex: ValueIndex
+	end record
+
+    /* Value Stack */
+    var valueStack:	array 1..maxValues of ValueStackEntry
+    var valueTop:	0..maxValues := 0
+    var maxValueTop:	0..maxValues := 0
+    
+    /* Value Table */
+    var valueTable: array 1..maxSavedValues of ValueDescriptor
+    var valueTableTop: 0..maxSavedValues := 0
+
+
+    body procedure PushValue % (kind: ValueKinds, neg: boolean, val: nat4)
+	if valueTop < maxValues then
+	    valueTop += 1
+	    if statistics and maxValueTop < valueTop then
+		maxValueTop := valueTop
+	    end if
+
+	    bind var register v to valueStack(valueTop)
+	    tag v.value, kind
+	    case kind of
+		label vInteger:
+		    v.value.intval := val
+		    v.value.negative := neg
+		label :
+	    end case
+	    v.vindex := 0
+	else
+	    Error (eValueOverflow)
+	end if
+    end PushValue
+
+
+    body procedure PushSet % (small: boolean, val: SetType)
+	if valueTop < maxValues then
+	    valueTop += 1
+	    if statistics and maxValueTop < valueTop then
+		maxValueTop := valueTop
+	    end if
+
+	    bind var register v to valueStack(valueTop)
+	    tag v.value, vSet
+	    v.value.smallset := small
+	    v.value.setval := val
+	    v.vindex := 0
+	else
+	    Error (eValueOverflow)
+	end if
+    end PushSet
+
+
+    body procedure PushString % (kind: ValueKinds, slen : int,
+			      %  stringVal: char(*))
+	if valueTop < maxValues then
+	    valueTop += 1
+	    if statistics and maxValueTop < valueTop then
+		maxValueTop := valueTop
+	    end if
+	    bind var register v to valueStack(valueTop)
+	    tag v.value, kind
+	    case kind of
+		label vString, vChar, vReal:
+		    new strings, v.value.stringval
+		    if v.value.stringval = nil(strings) then
+			Error(eNoMoreStringSpace)
+		    end if
+		    v.value.stringlen := slen
+		    strings(v.value.stringval) := stringVal
+	    end case
+	    v.vindex := 0
+	else
+	    Error (eValueOverflow)
+	end if
+    end PushString
+
+
+    body procedure ReplaceValue % (kind: ValueKinds, neg: boolean, val: nat4)
+	pre valueTop > 0
+	bind var register v to valueStack(valueTop)
+	tag v.value, kind
+	v.vindex := 0
+	case kind of
+	    label vInteger:
+		v.value.intval := val
+		v.value.negative := neg
+	    label vSet:
+		v.value.smallset := true
+		v.value.setval := SetType()
+	    label vNil:
+		v.value.collSym := val
+	    label :
+	end case
+    end ReplaceValue
+
+
+
+    body procedure PushValueDescriptor % (value: ValueDescriptor)
+	if valueTop < maxValues then
+	    valueTop += 1
+	    if statistics and maxValueTop < valueTop then
+		maxValueTop := valueTop
+	    end if
+	    valueStack(valueTop).vindex := 0
+	    bind var register v to valueStack(valueTop).value
+
+	    tag v, value.kind
+	    case value.kind of
+		label vInteger:
+		    v.intval := value.intval
+		    v.negative := value.negative
+
+		label vString, vChar, vReal:
+		    new strings, v.stringval
+		    if v.stringval = nil(strings) then
+			Error(eNoMoreStringSpace)
+		    end if
+		    v.stringlen := value.stringlen
+		    strings(v.stringval) := strings(value.stringval)
+
+		label vSet:
+		    v.smallset := value.smallset
+		    v.setval := value.setval
+
+		label vNil:
+		    v.collSym := value.collSym
+
+		label :
+	    end case
+	else
+	    Error (eValueOverflow)
+	end if
+    end PushValueDescriptor
+
+
+    body procedure PushValueIndex % (vindex: ValueIndex)
+	pre vindex not= 0
+
+	PushValueDescriptor(valueTable(vindex))
+	valueStack(valueTop).vindex := vindex
+    end PushValueIndex
+
+
+    body procedure PopValue
+	pre valueTop > 0
+	case valueStack(valueTop).value.kind of
+	    label vString, vReal, vChar :
+		free strings, valueStack(valueTop).value.stringval
+
+	    label :
+	end case
+
+	valueTop -= 1
+    end PopValue
+
+
+    body procedure SwapValues
+	pre valueTop >= 2
+	var v := valueStack(valueTop)
+
+	valueStack(valueTop) := valueStack(valueTop-1)
+	valueStack(valueTop-1) := v
+    end SwapValues
+
+
+    body procedure NegateValue
+	valueStack(valueTop).vindex := 0
+	bind var register v to valueStack(valueTop).value
+
+	case v.kind of
+	    label vInteger:
+		if v.intval not= 0 then
+		    v.negative := not v.negative
+		end if
+	    label vReal:
+		bind var register s to strings(v.stringval)
+		if s(1) = '-' then
+		    for i : 1..v.stringlen
+			s(i) := s(i+1)
+		    end for
+		    v.stringlen -= 1
+		else
+		    for decreasing i : v.stringlen..1
+			s(i+1) := s(i)
+		    end for
+		    s(1) := '-'
+		    v.stringlen += 1
+		end if
+	    label :
+		tag v, vRunTime
+	end case
+    end NegateValue
+
+
+
+    body procedure AddValues
+	bind var register v1 to valueStack(valueTop-1),
+		register v2 to valueStack(valueTop)
+
+	if v1.value.kind = vInteger and v2.value.kind = vInteger then
+	    if v1.value.negative = v2.value.negative then
+		% both positive, or both negative
+		if maxnat - v1.value.intval < v2.value.intval then
+		    Error(eCompileTimeAdditionOverflow)
+		    v1.value.intval := 1
+		else
+		    v1.value.intval += v2.value.intval
+		end if
+	    else
+		% different signs
+		if v1.value.negative then
+		    % negative, positive
+		    if v1.value.intval <= v2.value.intval then
+			% result is positive (or zero)
+			v1.value.negative := false
+			v1.value.intval := v2.value.intval - v1.value.intval
+		    else
+			v1.value.intval -= v2.value.intval
+		    end if
+		else
+		    % positive, negative
+		    if v1.value.intval < v2.value.intval then
+			% result is negative
+			v1.value.negative := true
+			v1.value.intval := v2.value.intval - v1.value.intval
+		    else
+			v1.value.intval -= v2.value.intval
+		    end if
+		end if
+	    end if
+	    if v1.value.negative and v1.value.intval > maxint then
+		Error(eCompileTimeAdditionOverflow)
+		v1.value.intval := 1
+	    end if
+	else
+	    /* Can't fold it */
+	    tag v1.value, vRunTime
+	end if
+
+	v1.vindex := 0
+	valueTop -= 1
+    end AddValues
+
+
+    body procedure SubtractValues
+	NegateValue
+	AddValues
+    end SubtractValues
+
+
+    body procedure MultiplyValues
+	bind var register v1 to valueStack(valueTop-1),
+		register v2 to valueStack(valueTop)
+
+	if v1.value.kind = vInteger and v2.value.kind = vInteger then
+	    /* We can fold it */
+	    if v1.value.negative = v2.value.negative then
+		v1.value.negative := false
+	    else
+		v1.value.negative := true
+	    end if
+	    if v1.value.intval = 0 or v2.value.intval = 0 then
+		v1.value.intval := 0
+#if CMS then
+	    elsif v1.value.intval = 1 then
+		v1.value.intval := v2.value.intval
+#end if
+	    elsif maxnat div v1.value.intval < v2.value.intval then
+		Error(eCompileTimeMultiplyOverflow)
+		v1.value.intval := 1
+	    else
+		v1.value.intval *= v2.value.intval
+	    end if
+	    if v1.value.negative and v1.value.intval > maxint then
+		Error(eCompileTimeMultiplyOverflow)
+		v1.value.intval := 1
+	    end if
+	else
+	    /* Can't fold it */
+	    tag v1.value, vRunTime
+	end if
+
+	v1.vindex := 0
+	valueTop -= 1
+    end MultiplyValues
+
+
+    body procedure DivValues
+	bind var register v1 to valueStack(valueTop-1),
+		register v2 to valueStack(valueTop)
+
+	if v1.value.kind = vInteger and v2.value.kind = vInteger then
+	    /* We can fold it */
+	    if v2.value.intval = 0 then
+		Error(eCompileTimeDivByZero)
+		v1.value.intval := 1
+	    else
+		if v1.value.negative = v2.value.negative then
+		    v1.value.negative := false
+		else
+		    v1.value.negative := true
+		end if
+		#if CMS then
+		    if v2.value.intval not= 1 then
+			v1.value.intval div= v2.value.intval
+		    end if
+		#else
+		    v1.value.intval div= v2.value.intval
+		#end if
+		if v1.value.intval = 0 then
+		    v1.value.negative := false
+		elsif v1.value.negative and v1.value.intval > maxint then
+		    Error(eCompileTimeAdditionOverflow)
+		    v1.value.intval := 1
+		end if
+	    end if
+	else
+	    /* Can't fold it */
+	    tag v1.value, vRunTime
+	end if
+
+	v1.vindex := 0
+	valueTop -= 1
+    end DivValues
+
+
+    body procedure ModValues
+	bind var register v1 to valueStack(valueTop-1),
+		register v2 to valueStack(valueTop)
+
+	if v1.value.kind = vInteger and v2.value.kind = vInteger then
+	    if v2.value.intval = 0 then
+		Error(eCompileTimeModByZero)
+		v1.value.negative := false
+		v1.value.intval := 1
+	    else
+		/** the sign of v1 mod v2 == sign of v1 **/
+		#if CMS then
+		    if v2.value.intval = 1 then
+			v1.value.intval := 0
+		    else
+			v1.value.intval mod= v2.value.intval
+		    end if
+		#else
+		    v1.value.intval mod= v2.value.intval
+		#end if
+	    end if
+	    if v1.value.intval = 0 then
+		v1.value.negative := false
+	    elsif v1.value.negative and v1.value.intval > maxint then
+		Error(eCompileTimeAdditionOverflow)
+		v1.value.intval := 1
+	    end if
+	else
+	    /* Can't fold it */
+	    tag v1.value, vRunTime
+	end if
+
+	v1.vindex := 0
+	valueTop -= 1
+    end ModValues
+
+
+    body procedure ChrValue
+	bind var register v to valueStack(valueTop)
+
+	if v.value.kind = vInteger and not v.value.negative and
+		v.value.intval <= maxChar then
+	    var temp := v.value.intval
+
+	    tag v.value, vChar
+	    new strings, v.value.stringval
+	    if v.value.stringval = nil(strings) then
+		Error(eNoMoreStringSpace)
+	    end if
+	    strings(v.value.stringval)(1) := chr(temp)
+	    v.value.stringlen := 1
+	else
+	    /* Can't fold it */
+	    tag v.value, vRunTime
+	end if
+	v.vindex := 0
+    end ChrValue
+
+
+    body procedure OrdValue
+	bind var register v to valueStack(valueTop)
+
+	case v.value.kind of
+	    label vString, vChar:
+		var temp : char
+		if v.value.stringlen not= 1 then
+		    Error(eOrdOnlyAppliesToSingleCharacterStrings)
+		    temp := '?'
+		else
+		    temp := strings(v.value.stringval)(1)
+		end if
+		free strings, v.value.stringval
+		tag v.value, vInteger
+		v.value.negative := false
+		v.value.intval := ord(temp)
+
+	    label vInteger:
+
+	    label :
+		/* Can't fold it */
+		tag v.value, vRunTime
+	end case
+	v.vindex := 0
+    end OrdValue
+
+
+    body procedure StringConcatenate
+	bind var register v1 to valueStack(valueTop - 1),
+		var register v2 to valueStack(valueTop)
+
+	if (v1.value.kind = vString or v1.value.kind = vChar) and
+		(v2.value.kind = vString or v2.value.kind = vChar) then
+	    if v1.value.stringlen + v2.value.stringlen <= maxStringSize then
+		begin
+		    bind var register s1 to strings(v1.value.stringval),
+			 register s2 to strings(v2.value.stringval)
+		    for i : 1..v2.value.stringlen
+			s1(i+v1.value.stringlen) := s2(i)
+		    end for
+		    v1.value.stringlen += v2.value.stringlen
+		end
+		free strings, v2.value.stringval
+	    else
+		Error(eStringConcatenateOverflow)
+	    end if
+	else
+	    /* Can't fold it */
+	    tag v1.value, vRunTime
+	end if
+
+	v1.vindex := 0
+	valueTop -= 1
+    end StringConcatenate
+
+
+    body procedure ConvertIntToReal
+	pre valueStack(valueTop).value.kind = vInteger
+
+	bind var register v to valueStack(valueTop)
+
+	var temp := v.value.intval
+
+	if v.value.negative then
+	    temp := -temp
+	end if
+
+	tag v.value, vReal
+	new strings, v.value.stringval
+	const tstring := intstr(temp, 1) + ".0"
+
+	v.value.stringlen := length(tstring)
+	for i : 1..v.value.stringlen
+	    strings(v.value.stringval)(i) := tstring(i)
+	end for
+	v.vindex := 0
+    end ConvertIntToReal
+
+
+    body procedure ConvertCharToString
+	pre valueStack(valueTop).value.kind = vChar
+
+	bind var register v to valueStack(valueTop)
+
+	const svalue := v.value.stringval
+	const slen := v.value.stringlen
+
+	tag v.value, vString
+	v.value.stringval := svalue
+	v.value.stringlen := slen
+    end ConvertCharToString
+
+
+    body procedure ConvertIntToNat
+	pre valueStack(valueTop).value.kind = vInteger
+
+	bind var register v to valueStack(valueTop)
+	assert v.value.negative
+
+	v.value.intval := maxnat - v.value.intval + 1
+	v.value.negative := false
+    end ConvertIntToNat
+
+
+    function IntValue (v : ValueDescriptor) : int4
+	case v.kind of
+	    label vInteger:
+		var register i : int4 := v.intval
+		if v.negative then
+		    result -i
+		else
+		    result i
+		end if
+
+	    label vChar:
+		if v.stringlen = 1 then
+		    result ord(strings(v.stringval)(1))
+		else
+		    result 0
+		end if
+
+	    label :
+		result 0
+	end case
+    end IntValue
+
+
+    body procedure SetAll % (value1, value2 : ValueIndex)
+	bind register v1 to valueTable(value1),
+		register v2 to valueTable(value2)
+	const val1 := IntValue(v1)	% XXX
+	const val2 := IntValue(v2)	% XXX
+	
+	assert val2 >= val1
+	if val2 - val1 > maxSetElement then
+	    PushValue (vRunTime, positive, 0)
+	else
+	    var register t := SetType()
+	    for i : val1 .. val2
+		t += SetType(i-val1)
+	    end for
+	    PushSet (true, t)
+	end if
+    end SetAll
+
+
+    body procedure BuildSet % (value1, value2 : ValueIndex, count : int)
+	bind register v1 to valueTable(value1), 
+		register v2 to valueTable(value2)
+
+	var compileTime := true
+	const val1 := IntValue(v1)	% XXX
+	const val2 := IntValue(v2)	% XXX
+	var register t := SetType()
+	
+	assert val2 >= val1
+	if val2 - val1 > maxSetElement then
+	    compileTime := false
+	end if
+	assert valueTop >= count
+
+	for : 1 .. count
+	    if compileTime then
+		if valueStack(valueTop).value.kind = vInteger then
+		    const temp := IntValue(valueStack(valueTop).value) % XXX
+		    if temp >= val1 and temp <= val2 then
+			t += SetType(temp-val1)
+		    else
+			compileTime := false
+		    end if
+		else
+		    compileTime := false
+		end if
+	    end if
+	    PopValue
+	end for
+
+	if compileTime then
+	    PushSet(true, t)
+	else
+	    PushValue(vRunTime, positive, 0)
+	end if
+    end BuildSet
+
+
+    function CompareAbsoluteValues (value1, value2: ValueDescriptor)
+			: CompareResult
+	if value1.intval = value2.intval then
+	    result crEqual
+	elsif value1.intval > value2.intval then
+	    result crGreater
+	else
+	    result crLess
+	end if
+    end CompareAbsoluteValues
+
+
+    function CompareValues (value1, value2: ValueDescriptor) : CompareResult
+	case value1.kind of
+	    label vInteger:
+		if not value1.negative then
+		    if not value2.negative then
+			result CompareAbsoluteValues (value1, value2)
+		    else
+			result crGreater
+		    end if
+		else
+		    if not value2.negative then
+			result crLess
+		    else
+			result CompareAbsoluteValues (value2, value1)
+		    end if
+		end if
+	    label vChar:
+		if strings(value1.stringval)(1) >
+			strings(value2.stringval)(1) then
+		    result crGreater
+		elsif strings(value1.stringval)(1) =
+			strings(value2.stringval)(1) then
+		    result crEqual
+		else
+		    result crLess
+		end if
+	end case
+    end CompareValues
+
+
+    body procedure GreaterValues
+	bind var register v1 to valueStack(valueTop-1),
+		register v2 to valueStack(valueTop)
+
+	if v1.value.kind = vInteger and v2.value.kind = vInteger then
+	    /* We can fold it */
+	    if CompareValues (v1.value, v2.value) = crGreater then
+		tag v1.value, vTrue
+	    else
+		tag v1.value, vFalse
+	    end if
+	else
+	    /* Can't fold it */
+	    tag v1.value, vRunTime
+	end if
+
+	v1.vindex := 0
+	valueTop -= 1
+    end GreaterValues
+
+
+    body procedure LessValues
+	SwapValues
+	GreaterValues
+    end LessValues
+
+
+    body procedure EqualValues
+	bind var register v1 to valueStack(valueTop-1),
+		register v2 to valueStack(valueTop)
+
+	if (v1.value.kind = vTrue or v1.value.kind = vFalse) and
+		(v2.value.kind = vTrue or v2.value.kind = vFalse) then
+	    if v1.value.kind = v2.value.kind then
+		tag v1.value, vTrue
+	    else
+		tag v1.value, vFalse
+	    end if
+	elsif v1.value.kind = vInteger and v2.value.kind = vInteger then
+	    /* We can fold it */
+	    if CompareValues (v1.value, v2.value) = crEqual then
+		tag v1.value, vTrue
+	    else
+		tag v1.value, vFalse
+	    end if
+	else
+	    /* Can't fold it */
+	    tag v1.value, vRunTime
+	end if
+
+	v1.vindex := 0
+	valueTop -= 1
+    end EqualValues
+
+
+    body procedure NotValue
+	bind var register v to valueStack(valueTop)
+
+	if v.value.kind = vTrue then
+	    tag v.value, vFalse
+	elsif v.value.kind = vFalse then
+	    tag v.value, vTrue
+	else
+	    tag v.value, vRunTime
+	end if
+
+	v.vindex := 0
+    end NotValue
+
+
+    body procedure LogicalAndValues
+	bind var register v1 to valueStack(valueTop-1),
+		register v2 to valueStack(valueTop)
+	if v1.value.kind = vInteger and v2.value.kind = vInteger then
+	    v1.value.intval and= v2.value.intval
+	    v1.value.negative := false
+	else
+	    /* Can't fold it */
+	    tag v1.value, vRunTime
+	end if
+
+	v1.vindex := 0
+	valueTop -= 1
+    end LogicalAndValues
+
+
+    body procedure LogicalOrValues
+	bind var register v1 to valueStack(valueTop-1),
+		register v2 to valueStack(valueTop)
+	if v1.value.kind = vInteger and v2.value.kind = vInteger then
+	    v1.value.intval or= v2.value.intval
+	    v1.value.negative := false
+	else
+	    /* Can't fold it */
+	    tag v1.value, vRunTime
+	end if
+
+	v1.vindex := 0
+	valueTop -= 1
+    end LogicalOrValues
+
+
+    body procedure LogicalXorValues
+	bind var register v1 to valueStack(valueTop-1),
+		register v2 to valueStack(valueTop)
+	if v1.value.kind = vInteger and v2.value.kind = vInteger then
+	    v1.value.intval xor= v2.value.intval
+	    v1.value.negative := false
+	else
+	    /* Can't fold it */
+	    tag v1.value, vRunTime
+	end if
+
+	v1.vindex := 0
+	valueTop -= 1
+    end LogicalXorValues
+
+
+    body procedure LogicalShiftRightValues
+	bind var register v1 to valueStack(valueTop-1),
+		register v2 to valueStack(valueTop)
+	if v1.value.kind = vInteger and v2.value.kind = vInteger then
+	    if v2.value.negative then
+		Error(eCompileTimeShiftByNegativeValue)
+	    end if
+	    v1.value.intval shr= v2.value.intval
+	    v1.value.negative := false
+	else
+	    /* Can't fold it */
+	    tag v1.value, vRunTime
+	end if
+
+	v1.vindex := 0
+	valueTop -= 1
+    end LogicalShiftRightValues
+
+
+    body procedure LogicalShiftLeftValues
+	bind var register v1 to valueStack(valueTop-1),
+		register v2 to valueStack(valueTop)
+	if v1.value.kind = vInteger and v2.value.kind = vInteger then
+	    if v2.value.negative then
+		Error(eCompileTimeShiftByNegativeValue)
+	    end if
+	    v1.value.intval shl= v2.value.intval
+	    v1.value.negative := false
+	else
+	    /* Can't fold it */
+	    tag v1.value, vRunTime
+	end if
+
+	v1.vindex := 0
+	valueTop -= 1
+    end LogicalShiftLeftValues
+
+
+    body procedure SetDifference
+	bind var register v1 to valueStack(valueTop-1),
+		register v2 to valueStack(valueTop)
+	if v1.value.kind = vSet and v1.value.smallset and
+		v2.value.kind = vSet and v2.value.smallset then
+	    v1.value.setval -= v2.value.setval
+	else
+	    /* Can't fold it */
+	    tag v1.value, vRunTime
+	end if
+
+	v1.vindex := 0
+	valueTop -= 1
+    end SetDifference
+
+
+    body procedure SetIntersection
+	bind var register v1 to valueStack(valueTop-1),
+		register v2 to valueStack(valueTop)
+	if v1.value.kind = vSet and v1.value.smallset and
+		v2.value.kind = vSet and v2.value.smallset then
+	    v1.value.setval *= v2.value.setval
+	else
+	    /* Can't fold it */
+	    tag v1.value, vRunTime
+	end if
+
+	v1.vindex := 0
+	valueTop -= 1
+    end SetIntersection
+
+
+    body procedure SetUnion
+	bind var register v1 to valueStack(valueTop-1),
+		register v2 to valueStack(valueTop)
+	if v1.value.kind = vSet and v1.value.smallset and
+		v2.value.kind = vSet and v2.value.smallset then
+	    v1.value.setval += v2.value.setval
+	else
+	    /* Can't fold it */
+	    tag v1.value, vRunTime
+	end if
+
+	v1.vindex := 0
+	valueTop -= 1
+    end SetUnion
+
+
+    body procedure SetXor
+	bind var register v1 to valueStack(valueTop-1),
+		register v2 to valueStack(valueTop)
+	if v1.value.kind = vSet and v1.value.smallset and
+		v2.value.kind = vSet and v2.value.smallset then
+	    v1.value.setval xor= v2.value.setval
+	else
+	    /* Can't fold it */
+	    tag v1.value, vRunTime
+	end if
+
+	v1.vindex := 0
+	valueTop -= 1
+    end SetXor
+
+
+    body function ValStackEmpty % : boolean
+	result valueTop = 0
+    end ValStackEmpty
+
+
+    body function TopValue % : int4
+	pre valueTop > 0
+
+	const tmp : int4 := valueStack(valueTop).value.intval
+	if valueStack(valueTop).value.negative then
+	    result -tmp
+	end if
+	result tmp
+    end TopValue
+
+
+    body function TopValueLength % : int
+	pre valueTop > 0 and
+	    (valueStack(valueTop).value.kind = vString or
+	     valueStack(valueTop).value.kind = vChar)
+
+	result valueStack(valueTop).value.stringlen
+    end TopValueLength
+
+
+    body function LeftValueLower % : boolean
+	pre valueTop >= 2
+	result CompareValues (valueStack(valueTop-1).value,
+			      valueStack(valueTop).value) not= crGreater
+    end LeftValueLower
+
+
+    body function IllegalIntNatRange % : boolean
+	pre valueTop >= 2
+	bind register left to valueStack(valueTop-1).value,
+	     register right to valueStack(valueTop).value
+
+	if left.kind not= vInteger or right.kind not= vInteger or
+		CompareValues(left, right) = crGreater then
+	    result false
+	end if
+
+	result left.negative and (not right.negative and right.intval > maxint)
+    end IllegalIntNatRange
+
+
+    body function NonNegative % : boolean
+	bind register v to valueStack(valueTop)
+	result v.value.intval = 0 or not v.value.negative
+    end NonNegative
+
+
+    body function InRange % (lowerIndex, upperIndex: ValueIndex) : boolean
+	pre valueTop > 0
+
+	assert lowerIndex not= 0 and upperIndex not= 0
+	bind register low to valueTable(lowerIndex),
+		register up to valueTable(upperIndex)
+
+	if CompareValues (low, valueStack(valueTop).value) not= crGreater then
+	    if up.kind = vParameter then
+		result true
+	    else
+		result CompareValues (valueStack(valueTop).value,
+				      up) not= crGreater
+	    end if
+	else
+	    result false
+	end if
+    end InRange
+
+
+    body function InFlexRange % (lowerIndex: ValueIndex) : boolean
+	pre valueTop > 0 and lowerIndex not= 0
+
+	result CompareValues(valueTable(lowerIndex),
+			      valueStack(valueTop).value) not= crGreater
+    end InFlexRange
+
+
+    body function ValueIndexKind % (v : ValueIndex) : ValueKinds
+	result valueTable(v).kind
+    end ValueIndexKind
+
+
+    body function ValueKind % : ValueKinds
+	pre valueTop > 0
+	result valueStack(valueTop).value.kind
+    end ValueKind
+
+
+    body function LegalSetRange % : boolean
+	bind register v1 to valueStack(valueTop-1).value,
+	     register v2 to valueStack(valueTop).value
+
+	case v1.kind of
+	    label vInteger:
+		var val1 : int4 := v1.intval
+		var val2 : int4 := v2.intval
+		
+		if v1.negative then val1 := -val1 end if
+		if v2.negative then val2 := -val2 end if
+		
+		result val2 >= val1
+
+	    label vChar:
+		if v1.stringlen not= 1 or v2.stringlen not= 1 then
+		    result false
+		end if
+		result #strings(v2.stringval)(1) >= #strings(v1.stringval)(1)
+
+	    label :
+		result false
+	end case
+    end LegalSetRange
+
+
+    body function LegalSubstringValue % : boolean
+	bind register v0 to valueStack(valueTop-2).value, /*string length*/
+	     register v2 to valueStack(valueTop).value	 /*upper bound*/
+
+	if v2.kind not= vInteger then
+	    result true
+	end if
+
+	var register val2 : int4 := v2.intval
+	
+	assert v0.kind = vRunTime or not v0.negative
+	if v2.negative then val2 := -val2 end if
+
+	if v0.kind = vRunTime then
+	    /* parameter with type : string(*) */
+	    result val2 >= 1
+	end if
+	result val2 >= 1 and val2 <= v0.intval
+    end LegalSubstringValue
+
+
+    body function LegalSubstringValues % : boolean
+	bind register v0 to valueStack(valueTop-2).value, /*string length*/
+	     register v1 to valueStack(valueTop-1).value, /*lower bound*/
+	     register v2 to valueStack(valueTop).value	 /*upper bound*/
+	var val1 : int4 := v1.intval
+	var val2 : int4 := v2.intval
+	
+	assert v0.kind = vRunTime or not v0.negative
+	if v1.negative then val1 := -val1 end if
+	if v2.negative then val2 := -val2 end if
+
+	if v0.kind = vRunTime then
+	    /* parameter with type : string(*) */
+	    result val1 >= 1
+	end if
+	result val1 >= 1 and val2 <= v0.intval and (val2-val1+1) >= 0
+    end LegalSubstringValues
+
+
+    body function LeftValueKind % : ValueKinds
+	pre valueTop >= 2
+	result valueStack(valueTop-1).value.kind
+    end LeftValueKind
+
+
+    body function SameValues % : boolean
+	pre valueTop >= 2
+	result CompareValues (valueStack(valueTop-1).value,
+			      valueStack(valueTop).value) = crEqual
+    end SameValues
+
+
+    body procedure ValueValue % (var v : ValueDescriptor)
+	pre valueTop > 0
+	v := valueStack(valueTop).value
+    end ValueValue
+
+
+    function StringEqual(register s1, s2 : char(*), slen : int) : boolean
+	for i : 1..slen
+	    if s1(i) not= s2(i) then
+		result false
+	    end if
+	end for
+	result true
+    end StringEqual
+
+
+    procedure SaveValue (var value: ValueStackEntry)
+	var newIndex := 0
+
+	for i : 1..valueTableTop
+	    bind register v to valueTable(i)
+	    if v.kind = value.value.kind then
+		case v.kind of
+		    label vInteger:
+			if v.intval = value.value.intval and
+			    v.negative = value.value.negative then
+			    newIndex := i
+			    exit
+			end if
+
+		    label vString, vReal, vChar:
+			if v.stringlen = value.value.stringlen and
+				StringEqual(strings(v.stringval),
+				    strings(value.value.stringval),
+				    v.stringlen) then
+			    newIndex := i
+			    exit
+			end if
+
+		    label vSet:
+			if v.smallset = value.value.smallset and
+				v.setval = value.value.setval then
+			    newIndex := i
+			    exit
+			end if
+
+		    label vNil:
+			if v.collSym = value.value.collSym then
+			    newIndex := i
+			    exit
+			end if
+
+		    label :
+			newIndex := i
+			exit
+		end case
+	    end if
+	end for
+
+	if newIndex = 0 then
+	    % must add a new value to the table
+	    if valueTableTop < maxSavedValues then
+		valueTableTop += 1
+		newIndex := valueTableTop
+		bind register v to value.value,
+			var register newv to valueTable(newIndex)
+		tag newv, v.kind
+		case v.kind of
+		    label vInteger:
+			newv.intval := v.intval
+			newv.negative := v.negative
+
+		    label vSet:
+			newv.smallset := v.smallset
+			newv.setval := v.setval
+
+		    label vString, vReal, vChar:
+			new strings, newv.stringval
+			if newv.stringval = nil(strings) then
+			    Error(eNoMoreStringSpace)
+			end if
+			strings(newv.stringval) := strings(v.stringval)
+			newv.stringlen := v.stringlen
+
+		    label vNil:
+			newv.collSym := v.collSym
+
+		    label :
+		end case
+	    else
+		Error (eValueTableOverflow)
+		newIndex := 1
+	    end if
+	end if
+
+	value.vindex := newIndex
+    end SaveValue
+
+
+    body procedure ValueIndexx % (var vindex: ValueIndex)
+	pre valueTop > 0
+	bind var register v to valueStack(valueTop)
+
+	if v.vindex = 0 then
+	    SaveValue (v)
+	end if
+
+	vindex := v.vindex
+    end ValueIndexx
+
+
+    body procedure LeftValueIndex % (var vindex: ValueIndex)
+	pre valueTop >= 2
+	bind var register v to valueStack(valueTop-1)
+
+	if v.vindex = 0 then
+	    SaveValue (v)
+	end if
+
+	vindex := v.vindex
+    end LeftValueIndex
+
+
+    body function NumberOfElements % (lowerIndex, upperIndex: ValueIndex) : int
+	pre lowerIndex not= 0 and upperIndex not= 0
+
+	bind register low to valueTable(lowerIndex),
+		register up to valueTable(upperIndex)
+
+	const lval := IntValue(low)	% XXX
+	const uval := IntValue(up)	% XXX
+
+	assert uval >= lval
+
+	result uval - lval + 1
+    end NumberOfElements
+
+
+    body function CompileTimeValue % (v : ValueIndex) : boolean
+	result valueTable(v).kind not= vRunTime
+    end CompileTimeValue
+
+
+    body function ValGetString % (s : StringPtr) : char(maxstr+1)
+	result strings(s)
+    end ValGetString
+
+
+    body procedure ValStats
+	put "Value\n\tStack = ", maxValueTop, "/", maxValues,
+	    "\n\tTable = ", valueTableTop, "/", maxSavedValues
+	end ValStats
+
+
+    procedure PutString (tlen : int, t : char(*))
+	var tt := ""
+	const printSize := 30
+	for i : 1 .. min (tlen, printSize)
+		case t(i) of
+		    label '"' : 
+			tt += "\\\""
+		    label '\t' :
+			tt += "\\t"
+		    label '\\' :
+			tt += "\\\\"
+		    label '\f' :
+			tt += "\\f"
+		    label '\n' :
+			tt += "\\n"
+		    label '\d' :
+			tt += "\\d"
+        	    label '\0' :
+        	        tt += "\\EOF"
+		    label :
+#if not EBCDIC then
+			if ord(t(i)) < 32 then
+%#if tplus then
+			    tt += "\^" + chr(ord(t(i)) + 64)
+%#else
+%			    tt += "^" + chr(ord(t(i)) + 64)
+%#end if
+			else
+#end if
+			    tt += t(i)
+#if not EBCDIC then
+			end if
+#end if
+		end case
+	end for
+	if length(tt) > printSize then
+	    put tt(1..printSize-2), "..\t" ..
+	else
+	    put tt, "\t" ..
+	end if
+    end PutString
+
+
+    body procedure DumpValues
+	const kindstrings : array firstValueKind .. lastValueKind of string(8)
+	    := init ("no value", "runtime", "real", "true", "false",
+		     "integer", "string", "char", "set", "paramter", "nil")
+	
+	var vs := valueTop
+	var vt := valueTableTop
+
+	var maxIndex : int		:= valueTop
+
+	if maxIndex < valueTableTop then
+	    maxIndex := valueTableTop
+	end if
+
+	assert maxIndex >= 0
+
+	put "\n\t\tValueStack\t\tValueTable\n\tKind\tVal\tIndex\t\tKind\tValue"
+
+	for decreasing i : maxIndex .. 1
+	    if vs = i then
+		put i : 7, "\t" ..
+		put kindstrings(valueStack(i).value.kind), "\t" ..
+		case valueStack(i).value.kind of
+		    label vInteger:
+			if not valueTable(i).negative then
+			    put "+", valueTable(i).intval, "\t" ..
+			else
+			    put "-", valueTable(i).intval, "\t" ..
+			end if
+
+		    label vString, vChar, vReal:
+			PutString(valueStack(i).value.stringlen,
+				  strings(valueStack(i).value.stringval))
+		    label :
+			put "\t" ..
+		end case
+		put valueStack(i).vindex, "\t" ..
+		vs -= 1
+	    else
+		put "\t\t\t\t" ..
+	    end if
+	    if vt = i then
+		put i : 7, "\t" ..
+		put kindstrings(valueTable(i).kind), "\t" ..
+		case valueTable(i).kind of
+		    label vInteger:
+			if not valueTable(i).negative then
+			    put "+", valueTable(i).intval, "\t"
+			else
+			    put "-", valueTable(i).intval, "\t"
+			end if
+
+		    label vString, vChar, vReal:
+			PutString(valueTable(i).stringlen,
+				  strings(valueTable(i).stringval))
+			put ""
+
+		    label :
+			put "\t"
+		end case
+		vt -= 1
+	    else
+		put ""
+	    end if
+	    maxIndex := maxIndex - 1
+	end for
+	put "\n", repeat("-", 79)
+    end DumpValues
+
+    var value: ValueStackEntry
+
+    /* Initialize the Value Table */
+    tag value.value, vInteger
+    value.value.negative := false
+    value.value.intval := 0
+    SaveValue (value)
+    assert value.vindex = viZero
+
+    value.value.intval := 1
+    SaveValue (value)
+    assert value.vindex = viOne
+
+    value.value.intval := 4
+    SaveValue (value)
+    assert value.vindex = viFour
+
+    value.value.intval := 8
+    SaveValue (value)
+    assert value.vindex = viEight
+
+    value.value.intval := 10
+    SaveValue (value)
+    assert value.vindex = viTen
+
+    value.value.intval := maxSetElement
+    SaveValue (value)
+    assert value.vindex = viMaxSetElement
+
+    /* MinLongInt = -MaxLongInt - 1 */
+    value.value.negative := true
+    value.value.intval := maxint + 1
+    SaveValue (value)
+    assert value.vindex = viMinLongInt
+
+    value.value.negative := false
+    value.value.intval := maxint
+    SaveValue (value)
+    assert value.vindex = viMaxLongInt
+
+    value.value.negative := false
+    value.value.intval   := maxnat
+    SaveValue (value)
+    assert value.vindex = viMaxNat
+
+    value.value.intval := defaultStringSize
+    SaveValue (value)
+    assert value.vindex = viDefaultStringSize
+
+    value.value.intval := maxCharValue
+    SaveValue (value)
+    assert value.vindex = viMaxChar
+
+    value.value.intval := defaultExponentRange
+    SaveValue (value)
+    assert value.vindex = viDefaultExponentRange
+
+    tag value.value, vRunTime
+    SaveValue (value)
+    assert value.vindex = viNonManifest
+
+    tag value.value, vTrue
+    SaveValue (value)
+    assert value.vindex = viTrue
+
+    tag value.value, vFalse
+    SaveValue (value)
+    assert value.vindex = viFalse
+
+    tag value.value, vSet
+    value.value.smallset := true
+    value.value.setval := SetType()
+    SaveValue(value)
+    assert value.vindex = viEmptySet
+end Value

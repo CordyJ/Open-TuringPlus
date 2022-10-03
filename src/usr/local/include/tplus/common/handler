@@ -1,0 +1,37 @@
+#if not TL_HANDLER then
+#define TL_HANDLER
+
+type *TL_ExceptionInfo :
+    record
+	quitCode	: int4
+	libraryQuitCode	: int4
+	errorMsg	: string
+    end record
+
+
+%
+% Changes to the following records will also require changes 
+% to the cinterface files AND perhaps the machine dependent TLE??.? files 
+% that are found in tlib/<machine_type> directories.
+%
+
+var TL_Handler		: unchecked collection of forward TL_HandlerArea
+type *TL_HApointer	: pointer to TL_Handler
+type *TL_HandlerArea :
+    record
+	quitCode	: int4
+	lineAndFile	: nat4
+	fileTable	: addressint
+	nextHandler	: TL_HApointer
+	savedState	: array 0..0 of nat1	/* really longer */
+	   /* NOTE: 'savedState' is really a larger array.
+	    *       It is effectively the 'jmpbuf' in setjmp(3) C library
+	    *       
+	    * Luckily only compiler allocates space for this
+	    * and it knows how big 'jmp_buf' is!
+	    * (See the '/local/lib/tplus/allocXXX.mdp'
+	    *  and '/local/include/tplus/XXX/cinterface' files )
+	    */
+    end record
+
+#end if

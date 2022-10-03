@@ -1,0 +1,280 @@
+%	Computer Systems Research Group
+%   	University of Toronto
+  
+%	Turing Plus SUN/Unix Curses Library Interface  V1.00
+%   	Author:	Mark Mendell (based on version by J.R. Cordy & M. Mendell)
+%   	Date:	November 1986
+
+% Copyright (C) 1986  The University of Toronto
+
+% This module provides an interface to the Berkeley
+% SUN/Unix "curses" terminal interface library.
+% This module should be included in the user's program
+% using the include statement:
+
+%	include "%curses"
+
+% and compiled with the curses and termcap libraries,
+% using the tpcurses command, thus:
+
+%    	tpcurses prog.t
+
+% Only the standard window is provided, with the following
+% entries:
+
+%    	initialize, move, addch, addstr, printw, 
+%	clear, clrtoeol, clrtobot, refresh, redraw,
+%	deleteln, insertln, deletech, insertch, scrollup, scrolldown,
+%	getch, getchNoRedraw, hasch, nl, nonl, echo, noecho, 
+%	crmode, nocrmode, raw, noraw, 
+%	standout, standend, endwin, lines, columns, getyx
+
+% Entries are invoked from the Turing Plus program using calls of
+% the form "curses.entry (parameters)".
+% For detailed information on the use of the curses package,
+% refer to "man tpcurses" and "man 3 curses".
+
+% Notes:
+
+% 	(1) Programs using this interface should 
+% 	    use only this module for terminal I/O and
+%	    should not access the terminal directly using
+%	    put and get.
+
+%	(2) The curses library never updates the actual
+%	    terminal screen image except when directed to by a
+%	    call to curses.refresh or curses.redraw.
+
+%	(3) Programs using curses.hasch should call
+%	    curses.crmode before the first use.
+
+%	(4) ALL programs using curses MUST call
+%	    curses.endwin before program exit.
+
+module curses
+    export (initialize, move, addch, addstr, printw, 
+	clear, clrtoeol, clrtobot, refresh, redraw,
+	deleteln, insertln, deletech, insertch, scrollup, scrolldown,
+	getch, getchNoRedraw, hasch, nl, nonl, echo, noecho, 
+	crmode, nocrmode, raw, noraw, 
+	standout, standend, endwin, lines, columns, getyx)
+
+    var sp : int
+    var csp: int 
+
+    external procedure wrefresh (s : int) 
+    procedure refresh 
+	% update the physical screen 
+	wrefresh (sp)
+    end refresh
+
+    external procedure wclear (s : int)
+    procedure clear 
+	% clear the screen 
+	wclear (sp)
+    end clear
+
+    external procedure wclrtobot (s : int)
+    procedure clrtobot
+	% clear from cursor to bottom of screen
+	wclrtobot (sp)
+    end clrtobot
+
+    external procedure wclrtoeol (s : int)
+    procedure clrtoeol
+	% clear from cursor to end of line
+	wclrtoeol (sp)
+    end clrtoeol
+
+    external procedure delwin (s: int) 
+    external procedure touchwin (s: int) 
+    procedure redraw 
+	touchwin (csp)
+	wrefresh (csp)
+	touchwin (sp)
+	wrefresh (sp)
+    end redraw
+
+    external procedure wdeleteln (s: int)
+    procedure deleteln
+	% delete the current line
+	wdeleteln (sp)
+    end deleteln
+
+    external procedure winsertln (s: int)
+    procedure insertln
+	% insert a line preceding the current line
+	winsertln (sp)
+    end insertln
+
+    external procedure wdelch (s: int, c: int)
+    procedure deletech
+	% delete the current character
+	var c : int := 0
+	wdelch (sp, c)
+    end deletech
+
+    external procedure winsch (s : int, c : int)  
+    procedure insertch (c : char) 
+	% insert the character c preceding the current cursor position 
+	if #c not = 0 then
+	    winsch (sp, #c)
+	end if
+    end insertch
+
+    external procedure waddch (s : int, c : int)  
+    procedure addch (c : char) 
+	% put the character c at the current cursor position 
+	if #c not = 0 then
+	    waddch (sp, #c)
+	end if
+    end addch
+
+    external procedure waddstr (s: int, ss : string) 
+    procedure addstr (s : string) 
+	% put the string s at the current cursor position 
+	waddstr (sp, s)
+    end addstr
+
+    external procedure wprintw (s : int, ss : string, i : int) 
+    procedure printw (s : string, i : int) 
+	% printf the integer i using format string s 
+	% at the current cursor position 
+	wprintw (sp, s, i)
+    end printw
+
+    external procedure wmove (s : int, y : int, x : int) 
+    procedure move (y : int, x : int) 
+	% move the current cursor position to column x, row y 
+	wmove (sp, y, x)
+    end move
+
+    external procedure wstandout (s : int) 
+    procedure standout
+	% place the standard window into standout mode
+	wstandout (sp)
+    end standout
+
+    external procedure wstandend (s : int) 
+    procedure standend
+	% remove the standard window from standout mode
+	wstandend (sp)
+    end standend
+
+    external function tgetch : char
+    const *ctrlR := chr(18)
+    const *ctrlL := chr(12)
+
+    procedure getch (var c : char) 
+	% get an input character from the terminal
+	wrefresh (sp)
+	loop
+	    c := tgetch
+	    exit when c not = ctrlR
+	    redraw
+	end loop
+    end getch
+
+    procedure getchNoRedraw (var c : char) 
+	% get an input character from the terminal
+	wrefresh (sp)
+	c := tgetch
+    end getchNoRedraw
+
+    external function thasch : boolean
+    function hasch : boolean
+	result (thasch)
+    end hasch
+
+    external procedure techo 
+    procedure echo
+	techo
+    end echo
+
+    external procedure tnoecho 
+    procedure noecho
+	tnoecho
+    end noecho
+
+    external procedure tcrmode 
+    procedure crmode
+	tcrmode
+    end crmode
+
+    external procedure tnocrmode 
+    procedure nocrmode
+	tnocrmode
+    end nocrmode
+
+    external procedure traw 
+    procedure raw
+	traw
+    end raw
+
+    external procedure tnoraw 
+    procedure noraw
+	tnoraw
+    end noraw
+
+    external procedure tnl 
+    procedure nl
+	tnl
+    end nl
+
+    external procedure tnonl 
+    procedure nonl
+	tnonl
+    end nonl
+
+    external procedure tlines (var l : int)
+    function lines : int
+	var l : int
+	tlines (l)
+	result l
+    end lines
+
+    external procedure tcolumns (var c : int)
+    function columns : int
+	var c : int
+	tcolumns (c)
+	result c
+    end columns
+
+    external procedure tgetyx (var y, x : int)
+    procedure getyx (var y, x : int)
+	tgetyx(y, x)
+    end getyx
+
+    procedure scrollup (firstLine, secondLine, number : int)
+	for i : 1 .. number
+	    move (firstLine, 0)
+	    deleteln
+	    move (secondLine, 0)
+	    insertln
+	end for
+    end scrollup
+
+    procedure scrolldown (firstLine, secondLine, number : int )
+	for i : 1 .. number
+	    move (secondLine, 0)
+	    deleteln
+	    move (firstLine, 0)
+	    insertln
+	end for
+    end scrolldown
+
+    external procedure endwin
+
+    external function initscr : int 
+
+    external function newwin (c: int, l: int, y: int, x: int) : int 
+
+
+    procedure initialize
+	sp := initscr
+	csp:= newwin (24, 80, 0, 0)
+	wclear (csp)
+    end initialize
+
+    initialize
+end curses

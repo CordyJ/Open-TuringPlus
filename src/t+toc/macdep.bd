@@ -1,0 +1,99 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+% 
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+% 
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+/*
+ *    Turing Plus to C Translator
+ *    Module: Machine Dependencies module
+ *    By:    Mark Mendell
+ *    Date:  April 22, 1987
+ */
+
+body "macdep.st" module MachineDependent
+
+    procedure CheckSection (section : string)
+	var ts : string
+
+	get :macdepFile, skip, ts: *
+	if ts not= section then
+	    put : 0, "Invalid machine dependencies file, expected: \"", 
+		section, "\""
+	    sysexit(1)
+	end if
+    end CheckSection
+
+
+    /*
+     * Read in the machine dependencies file, and set macdepType and
+     * macdepAddressSize, and predefNames
+     */
+    
+    var infile : int
+
+    open :infile, macdepFile, get
+
+    if infile = 0 then
+	put : 0, "Cannot open machine dependencies file (", macdepFile, ")"
+	sysexit(1)
+    end if
+    assert infile = macdepFile
+
+    CheckSection("# Include File")
+    get :macdepFile, includeFile
+
+    CheckSection("# Machine Types")
+    for i : mFirstType .. mLastType
+	get :macdepFile, macdepType(i)
+    end for
+
+    CheckSection("# Address Size")
+    get :macdepFile, macdepAddressSize
+
+    CheckSection("# Condition Size")
+    get :macdepFile, macdepConditionSize
+
+    CheckSection("# Predefined Routines")
+    for i : firstPredefinedRoutine..lastPredefinedRoutine
+	get :macdepFile, predefNames(i)
+    end for
+
+    CheckSection("# Prefix Identifiers")
+    var dummy : int
+    get : macdepFile, dummy
+    prefixIdentifiers := dummy not= 0
+
+    CheckSection("# Underflow checking")
+    get : macdepFile, disableUnderflowCheckingString
+
+    CheckSection("# Process Stack Size")
+    get : macdepFile, macdepStackSize
+
+    CheckSection("# Prefix Record/Union")
+    get : macdepFile, dummy
+    prefixRecordUnion := dummy not= 0
+
+    CheckSection("# Ord(Delete)")
+    get : macdepFile, macdepDeleteOrd
+
+    CheckSection("# Ord(Escape)")
+    get : macdepFile, macdepEscapeOrd
+
+    CheckSection("# Unsigned Literal Terminator")
+    get : macdepFile, unsignedLiteralTerminator
+
+    CheckSection("# End")
+end MachineDependent

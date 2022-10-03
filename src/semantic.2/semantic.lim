@@ -1,0 +1,171 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+%
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+%
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+%   Computer Systems Research Group
+%   University of Toronto
+%   File:    Turing Plus Semantic Pass 1 Limits V1.00
+%   Author:  M. Mendell
+%   Date:    12 March 1986
+
+const *defaultExponentRange := 35
+
+#if BIG then
+    /* Identifiers */
+    const *maxIdents := 4099
+
+    /* Count Stack */
+    const *maxCountValue := 2147483640
+    const *maxCounts := 200		/* max scope nesting */
+    const *maxUnionBodyCounts := 20    	/* max union nesting */
+    const *maxUnionBodyCountValue := 250
+
+    /* Loop Stack */
+    const *maxLoops := 14		/* max loop nesting */
+
+    /* Scope Stack and Table */
+    const *maxScopeLevel := maxCounts	/* max scope nesting */
+    const *maxSavedScopes := 1200	/* max saved scope lists */
+
+    /* Symbol Stack and Table */
+    const *maxSymbols := 8000		/* max total declared symbols */
+    const *maxSymbolDepth := 200	/* max nested symbol references */
+    const *maxDummySymbols := 20	/* max nested dummy symbols */
+
+    /* Type Stack and Table */
+    const *maxTypes := 3000		/* max total declared types */
+    const *maxDummyTypes := 20		/* max nested dummy types */
+    const *maxTypeDepth := 200		/* max nested type references */
+    const *maxTypeRanges := 1500	/* max total range bounds */
+    const *maxArrayIndices := 1500	/* max total array indices */
+    const *maxUnionMapValues := 1500	/* max total union labels */
+
+    /* Value Stack and Table */
+    const *maxChar := 255		/* maximum character Ord value */
+    const *maxValues := 100		/* max expression nesting */
+    const *maxSetElement := 31		/* max set element value */
+    const *maxSavedValues := 1499	/* max unique manifest consts */
+    const *maxStringSize := 4095	/* max string size */
+    const *defaultStringSize := maxStringSize
+    const *maxCharValue := maxStringSize
+
+    /* Emit Mechanism */
+    const *maxEmitBuffers := 40		/* max expression nesting */
+    const *maxEmitBufferChars := 1000  	/* max total stream length */
+
+    /* Substring Mechanism */
+    const *maxSubstrings := 14		/* max nested substrings */
+
+    /* Ident Chars */
+    const *maxIdentChars :=  45000      /* max identifier chars - from scanner*/
+#elsif PC then
+    /* Identifiers */
+    const *maxIdents := 1201
+
+    /* Count Stack */
+    const *maxCountValue := 2147483640
+    const *maxCounts := 10		/* max scope nesting */
+    const *maxUnionBodyCounts := 5    	/* max union nesting */
+    const *maxUnionBodyCountValue := 250
+
+    /* Loop Stack */
+    const *maxLoops := 7		/* max loop nesting */
+
+    /* Scope Stack and Table */
+    const *maxScopeLevel := maxCounts	/* max scope nesting */
+    const *maxSavedScopes := 250	/* max saved scope lists */
+
+    /* Symbol Stack and Table */
+    const *maxSymbols := 750		/* max total declared symbols */
+    const *maxSymbolDepth := 20		/* max nested symbol references */
+    const *maxDummySymbols := 5		/* max nested dummy symbols */
+
+    /* Type Stack and Table */
+    const *maxTypes := 500		/* max total declared types */
+    const *maxDummyTypes := 20		/* max nested dummy types */
+    const *maxTypeDepth := 21		/* max nested type references */
+    const *maxTypeRanges := 75		/* max total range bounds */
+    const *maxArrayIndices := 75	/* max total array indices */
+    const *maxUnionMapValues := 50	/* max total union labels */
+
+    /* Value Stack and Table */
+    const *maxChar := 255		/* maximum character Ord value */
+    const *maxValues := 30		/* max expression nesting */
+    const *maxSetElement := 31		/* max set element value */
+    const *maxSavedValues := 150	/* max unique manifest consts */
+    const *maxStringSize := 4095	/* max string size */
+    const *defaultStringSize := maxStringSize
+    const *maxCharValue := maxStringSize
+
+    /* Emit Mechanism */
+    const *maxEmitBuffers := 20		/* max expression nesting */
+    const *maxEmitBufferChars := 500  	/* max total stream length */
+
+    /* Substring Mechanism */
+    const *maxSubstrings := 7		/* max nested substrings */
+
+    /* Ident Chars */
+    const *maxIdentChars :=  15000      /* max identifier chars - from scanner*/
+#else
+    /* Identifiers */
+    const *maxIdents := 1201
+
+    /* Count Stack */
+    const *maxCountValue := 2147483640
+    const *maxCounts := 20		/* max scope nesting */
+    const *maxUnionBodyCounts := 5    	/* max union nesting */
+    const *maxUnionBodyCountValue := 250
+
+    /* Loop Stack */
+    const *maxLoops := 7		/* max loop nesting */
+
+    /* Scope Stack and Table */
+    const *maxScopeLevel := maxCounts	/* max scope nesting */
+    const *maxSavedScopes := 900	/* max saved scope lists */
+
+    /* Symbol Stack and Table */
+    const *maxSymbols := 2000		/* max total declared symbols */
+    const *maxSymbolDepth := 40		/* max nested symbol references */
+    const *maxDummySymbols := 10	/* max nested dummy symbols */
+
+    /* Type Stack and Table */
+    const *maxTypes := 1000		/* max total declared types */
+    const *maxDummyTypes := 40		/* max nested dummy types */
+    const *maxTypeDepth := 40		/* max nested type references */
+    const *maxTypeRanges := 200		/* max total range bounds */
+    const *maxArrayIndices := 300	/* max total array indices */
+    const *maxUnionMapValues := 300	/* max total union labels */
+
+    /* Value Stack and Table */
+    const *maxChar := 255		/* maximum character Ord value */
+    const *maxValues := 50		/* max expression nesting */
+    const *maxSetElement := 31		/* max set element value */
+    const *maxSavedValues := 200	/* max unique manifest consts */
+    const *maxStringSize := 4095	/* max string size */
+    const *defaultStringSize := maxStringSize
+    const *maxCharValue := maxStringSize
+
+    /* Emit Mechanism */
+    const *maxEmitBuffers := 20		/* max expression nesting */
+    const *maxEmitBufferChars := 500  	/* max total stream length */
+
+    /* Substring Mechanism */
+    const *maxSubstrings := 7		/* max nested substrings */
+
+    /* Ident Chars */
+    const *maxIdentChars :=  15000      /* max identifier chars - from scanner*/
+#end if

@@ -1,0 +1,121 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+% 
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+% 
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+body "context.st" module Context
+
+    /*
+     *   File:	Turing Plus Semantic Pass 1 Context Mechanism V1.00
+     *   Author:	M. Mendell
+     *   Date:	13 March 1986
+     */
+
+    /*
+     * This mechanism is used to keep track of a set of flags, for use in
+     * the S/SL
+     */
+
+    var contextArray : array firstContext .. lastNonStackContext of boolean
+
+    var contextArrayStack :
+	array firstStackContext .. lastContext, 1..maxCounts of boolean
+    var contextArrayTop : array firstStackContext .. lastContext of 1..maxCounts
+
+
+    body function ContextChoose % (i : firstContext .. lastContext) : boolean
+	if i < firstStackContext then
+	    result contextArray(i)
+	else
+	    result contextArrayStack(i, contextArrayTop(i))
+	end if
+    end ContextChoose
+
+
+    body procedure ContextPush % (i : firstStackContext..lastContext)
+	contextArrayTop(i) += 1
+	contextArrayStack(i, contextArrayTop(i)) :=
+	    contextArrayStack(i, contextArrayTop(i)-1)
+    end ContextPush
+
+
+    body procedure ContextPop % (i : firstStackContext..lastContext)
+	contextArrayTop(i) -= 1
+    end ContextPop
+
+
+    body procedure ContextSet % (i : firstContext .. lastContext)
+	if i < firstStackContext then
+	    contextArray(i) := true
+	else
+	    contextArrayStack(i, contextArrayTop(i)) := true
+	end if
+    end ContextSet
+
+
+    body procedure ContextClear % (i : firstContext .. lastContext)
+	if i < firstStackContext then
+	    contextArray(i) := false
+	else
+	    contextArrayStack(i, contextArrayTop(i)) := false
+	end if
+    end ContextClear
+
+
+    body function ConFinally % : boolean
+	for i : firstStackContext..lastContext
+	    if contextArrayTop(i) not= 1 then
+		result false
+	    end if
+	end for
+	result true
+    end ConFinally
+
+
+    body procedure DumpContext
+	const contextNames : array firstContext .. lastContext of string(22)
+	    := init ("Pervasive", "AliasChecked", "Post", "Assert",
+		     "Function", "AutoImport", "Compile", 
+		     "ForwardFound", "ProcessingParameters",
+		     "ProcessingPredefines", "ProcedureImports",
+		     "SubprogramStubBody", "Child", "Printed Error msg",
+		     "Dont enter import", "DeviceMonitor", "Process_Imports",
+		     "Body_Seen", "ModuleInvariantOK", "Pred : string")
+	put "Contexts:\t"
+	for i : firstContext .. lastNonStackContext
+	    if contextArray(i) then
+		put contextNames(i), " " ..
+	    end if
+	end for
+	for i : firstStackContext .. lastContext
+	    if contextArrayStack(i, 1) then
+		put contextNames(i), " " ..
+	    end if
+	end for
+	put "\n\n", repeat("-", 79)
+    end DumpContext
+
+    /* initialize all the contexts to false */
+    for i : firstContext .. lastNonStackContext
+	contextArray(i) := false
+    end for
+
+    for i : firstStackContext .. lastContext
+	contextArrayStack(i, 1) := false
+	contextArrayTop(i) := 1
+    end for
+
+end Context

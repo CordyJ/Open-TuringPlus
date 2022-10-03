@@ -1,0 +1,1744 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+% 
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+% 
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+/*
+ * Turing Plus to C Translator
+ *    Module:Output Parse Tree as C program
+ *    By:    Mark Mendell
+ *    Date:  29 Oct 1986
+ *    From:
+ *
+ *	Turing Source Level Global Optimizer
+ *	Module:Output Parse Tree
+ *	By:    Peter Ashwood-Smith
+ *	Date:  July 1986.
+ */
+
+body "output.st" module Output
+    grant outFile, var Token, var eNode, tNode, TokenToName, 
+	  var Tree, var Types, predefNames, OutputIndent, var CTypes,
+	  asNode, ImplicitReference, inRoutine, VariableId, VariableType,
+	  intCast, realCast, natCast, macdepType,
+	  var currentRangecheck, strings,
+	  currentMonitorVariable, lineNumbering, var needSetFileTable,
+	  ParameterSize, var OutputExpn, var needSaveLineFile, 
+	  OutputLineNumber, var needLoopTimeSlice, var needStackCheck,
+
+	  /* from OutputExpression */
+	  OutputExpression, OutputExpressionList, OutputFunctionId,
+	  OutputReference, OutputCastedExpression, OutputParameters,
+	  OutputCastedExpressionList, OutputAddressExpression
+
+    var outFile : int
+
+    /* loop termination information */
+    var lastLoopIsLoop := false
+    var loopExitLabel := nil(eNode)
+
+    /* routine information */
+    var inRoutine := false
+    var postStatement := nil(tNode)
+    var routineHasHandler := false
+
+    /* Current invariant kind */
+    const *loopInvariant := 8
+    const *forInvariant := 9
+    const *moduleInvariant := 10
+    var currentInvariant : loopInvariant..moduleInvariant := moduleInvariant
+
+    /* Current rangecheck kind */
+    const *tagRangecheck := 4
+    const *assignmentRangecheck := 5
+    const *valueParameterRangecheck := 12
+    const *stringParameterRangecheck := 13
+    const *resultRangecheck := 14
+    const *setElementRangecheck := 15
+    var currentRangecheck : tagRangecheck..setElementRangecheck :=
+	assignmentRangecheck
+
+    /* I/O modes */
+    const *ioSeek := 0
+    const *ioGet := 1
+    const *ioPut := 2
+    const *ioRead := 3
+    const *ioWrite := 4
+    const *ioMod := 5
+
+    const *noParen := false
+    const *paren := true
+
+    const intCast : string(41) := "(" + macdepType(mInt4) + ") "
+    const natCast : string(41) := "(" + macdepType(mNat4) + ") "
+    const realCast: string(41) := "(" + macdepType(mReal8) + ") "
+
+
+    /* current monitor information */
+    var currentMonitorVariable, currentMonitorPriority := nil(eNode)
+    var doMonitorEntryExit : boolean
+
+    /* is the main module/monitor an orphan? -- used to ensure single inits */
+    var mainModuleIsOrphan := false
+
+
+    /* function result kind */
+    var fcnKind : TypeKinds
+
+    /* a set file table directive is needed */
+    var needSetFileTable := false
+    var needSaveLineFile := false
+
+    var needLoopTimeSlice := false
+    var needStackCheck := false
+
+    child "outpututil.st"		/* Miscellaneous */
+    child "outputexpn.st"		/* Expressions */
+    child "outpututil2.st"		/* Miscellaneous, need above */
+    child "outputio.st"			/* I/O */
+
+
+    forward procedure OutputDeclarations (t : TreePointer, indent : int,
+				var nonDecl : TreePointer)
+	import forward OutputProgram, tNode, outFile, var unChecked,
+	       originalUnChecked
+
+
+    forward procedure OutputProgram (t:TreePointer, indent : int)
+	import tNode, eNode, var Tree, OutputIndent,
+	       var OutputIo, var lastLoopIsLoop, var loopExitLabel,
+	       var Expression, forward OutputScope, outFile, OutputProgram,
+	       TokenToName, forward OutputProcedure, forward OutputFunction,
+	       forward OutputCase, forward OutputProcess, forward OutputFor,
+	       forward OutputModule, forward OutputMonitor,
+	       OutputDeclarations, var Types, var CTypes,
+	       predefNames, inRoutine, forward OutputBody, OutputQuit,
+	       OutputVarConst, OutputType, postStatement, routineHasHandler,
+	       OutputFork, var unChecked, var currentInvariant, timeSlice,
+	       var currentRangecheck, doMonitorEntryExit, OutputLineNumber,
+	       currentMonitorVariable, currentMonitorPriority, ExpnType,
+	       SimpleExpression, macdepType, fcnKind, lineNumbering,
+	       ForceLineNumberAssignment, OutputExpression,
+	       OutputExpressionList, OutputCastedExpressionList,
+	       OutputCastedExpression, OutputReference, var needSaveLineFile,
+	       var needLoopTimeSlice, intCast, strings,
+	       OutputPossibleAddressintExpression, forward OutputChild,
+	       originalUnChecked
+
+
+    forward procedure OutputProcedure (t : TreePointer, indent : int)
+	import tNode, outFile, OutputIndent, OutputProcedureHeader,
+	       var Types, forward OutputHandlerScope, var inRoutine,
+	       unChecked
+
+
+    forward procedure OutputFunction(t : TreePointer, indent : int)
+	import tNode, outFile, OutputIndent, OutputFunctionHeader,
+	       var Types, forward OutputHandlerScope, var inRoutine,
+	       unChecked, var fcnKind, predefNames
+
+
+    forward procedure OutputScope ( t : TreePointer, indent : int)
+	import tNode, OutputProgram, outFile, OutputProcedure, OutputFunction,
+	       var unChecked, originalUnChecked
+
+
+    forward procedure OutputHandlerScope (fcnName : ExpressionPointer,
+					  t : TreePointer, indent : int)
+	import OutputProgram, outFile, tNode, var Expression, predefNames,
+	       OutputScope, OutputIndent, var Identifier, eNode,
+	       var postStatement, var routineHasHandler, var Types,
+	       var CTypes, macdepType, var unChecked, var doMonitorEntryExit,
+	       currentMonitorVariable, currentMonitorPriority,
+	       lineNumbering, var needSetFileTable, OutputExpression,
+	       var needSaveLineFile, var needStackCheck,
+	       ForceLineNumberAssignment, OutputProcedure, OutputFunction,
+	       originalUnChecked, OutputDeclarations
+
+
+    forward procedure OutputChild (t : TreePointer, indent : int)
+	import tNode, forward OutputStub, outFile, var Types, OutputChild,
+	       OutputType, OutputVarConst, OutputProcedure, OutputFunction,
+	       OutputProgram
+
+    forward procedure OutputStub (t : TreePointer, indent : int)
+	import tNode, OutputType, outFile, OutputDeclarations,
+	       OutputProgram, var inRoutine, var Types, OutputIndent,
+	       OutputProcedureHeader, OutputFunctionHeader,
+	       OutputHandlerScope, unChecked, predefNames
+
+
+    function IsForDifficult (tp : TreePointer, decrease : boolean) : boolean
+	assert tNode(tp).nodeKind = NodeKinds.ExpressionLeaf
+
+	if eNode(tNode(tp).leaf).u.operatorNumber not= aIntegerLit then
+	    result true
+	else
+	    const endValue := eNode(tNode(tp).leaf).u.integerValue
+	    if decrease then
+		result endValue = -2147483648
+	    else
+		result endValue = 2147483647
+	    end if
+	end if
+    end IsForDifficult
+
+
+    forward procedure OutputFor (t : TreePointer, indent : int)
+	import IsForDifficult, var lastLoopIsLoop, var loopExitLabel,
+	       OutputIndent, tNode, outFile, OutputScope, eNode, unChecked,
+	       var currentInvariant, timeSlice, predefNames, OutputExpression,
+	       var needLoopTimeSlice
+
+
+    procedure OutputCase(t : TreePointer, indent : int)
+	var register tp := tNode(t).operand
+	var seenOtherwise := false
+	const oldLastLoopIsLoop := lastLoopIsLoop
+
+	lastLoopIsLoop := false
+
+	OutputIndent(indent)
+	put :outFile, "switch (" ..
+	OutputExpression(tNode(tp).leaf, noParen)
+	put :outFile, ") {"
+
+	tp := tNode(tp).sibling
+	loop
+	    exit when tp = nil(tNode)
+	    if tNode(tp).operatorNumber = aCaseBody then
+		ForceLineNumberAssignment
+		/* better put in a scope, in case of declarations */
+		if tNode(tp).operand not= nil(tNode) then
+		    OutputIndent(indent+8)
+		    put : outFile, "{"
+		    OutputScope(tNode(tp).operand, indent+12)
+		    OutputIndent(indent+8)
+		    put : outFile, "}"
+		end if
+		OutputIndent(indent+8)
+		put : outFile, "break;"
+	    elsif tNode(tp).operatorNumber = aOtherwise then
+		ForceLineNumberAssignment
+		seenOtherwise := true
+		OutputIndent(indent+4)
+		put :outFile, "default :"
+		if tNode(tp).operand not= nil(tNode) then
+		    OutputIndent(indent+8)
+		    put : outFile, "{"
+		    OutputScope(tNode(tp).operand, indent+12)
+		    OutputIndent(indent+8)
+		    put : outFile, "}"
+		end if
+		OutputIndent(indent+8)
+		put : outFile, "break;"
+	    else
+		OutputIndent(indent+4)
+		put :outFile, "case " ..
+		OutputExpression(tNode(tp).leaf, noParen)
+		put :outFile, ":"
+	    end if
+	    tp := tNode(tp).sibling
+	end loop
+
+	/* abort if no otherwise and out of range */
+	if not unChecked and not seenOtherwise then
+	    OutputIndent(indent+4)
+	    put :outFile, "default:"
+	    OutputIndent(indent+8)
+	    put :outFile, predefNames (pCaseAbort), ";"
+	end if
+
+	OutputIndent(indent)
+	put :outFile, "}" ..
+
+	lastLoopIsLoop := oldLastLoopIsLoop
+    end OutputCase
+
+
+    body procedure OutputProcedure % (t : TreePointer, indent : int)
+	var register tp := tNode(t).operand
+	const fcnId := tNode(tp).leaf
+
+	var oldInRoutine := inRoutine
+	inRoutine := true
+
+	put :outFile, ""
+	OutputProcedureHeader(tp, indent, false)
+	tp := tNode(tp).sibling
+	if Types.HasAttribute(fcnId, aaForward) then
+	    Types.ClearAttribute(fcnId, aaForward)
+	    put :outFile, ";" ..
+	elsif not Types.HasAttribute(fcnId, aaExternal) then
+	    if tp not= nil(tNode) and tNode(tp).operatorNumber = aSubs then
+		OutputHandlerScope(fcnId, tNode(tp).sibling, indent+4)
+	    else
+		OutputHandlerScope(fcnId, tp, indent+4)
+	    end if
+	    OutputIndent(indent)
+	    put :outFile, "}" ..
+	else
+	    put :outFile, ";" ..
+	end if
+
+	inRoutine := oldInRoutine
+    end OutputProcedure
+
+
+    procedure OutputBody (t : TreePointer, indent : int)
+	var register tp := t
+	var oldInRoutine := inRoutine
+	const isProc := tNode(tp).operatorNumber = aProcedure
+
+	inRoutine := true
+	/* fetch the subprogram header */
+	tp := Types.GetType(tNode(tNode(tp).operand).leaf)
+	tp := tNode(tp).operand
+
+	put :outFile, ""
+	const fcnName := tNode(tNode(t).operand).leaf
+
+	if isProc then
+	    OutputProcedureHeader(tp, indent, true)
+	else
+	    var register x := tNode(tp).sibling
+
+	    if tNode(x).operatorNumber = aSubs then
+		x := tNode(x).sibling
+	    end if
+	    fcnKind := Types.GetKind(tNode(x).leaf)
+	    if not Types.HasAttribute(fcnName, aaNonScalar) then
+		/*
+		 * we must set the indirection again, because it has
+		 * been reset when we printed the forward/stub declaration
+		 */
+		x := tNode(x).sibling
+		Types.SetIndirection(fcnName, 0, inSubprogram)
+		Transform.SetIndirection(fcnName, CTypes.TypeKind(x), x)
+	    end if
+	    OutputFunctionHeader(tp, indent, true)
+	end if
+	OutputHandlerScope(fcnName, tNode(tNode(t).operand).sibling, indent+4)
+	OutputIndent(indent)
+	if not isProc then
+	    OutputIndent(indent+4)
+	    put :outFile, "/* NOTREACHED */"
+	    if not unChecked then
+		OutputIndent(indent+4)
+		put :outFile, predefNames(pFunctionResultAbort), ";"
+	    end if
+	end if
+	put :outFile, "}" ..
+	inRoutine := oldInRoutine
+    end OutputBody
+
+
+    procedure OutputProcess(t : TreePointer, indent : int)
+	var register tp := tNode(t).operand
+
+	var oldInRoutine := inRoutine
+	inRoutine := true
+
+	put :outFile, ""
+	OutputIndent(indent)
+	if not Types.HasAttribute(tNode(tp).leaf, aaGrant) then
+	    put :outFile, "static " ..
+	end if
+	put : outFile, macdepType(mVoid), " " ..
+	OutputExpression(tNode(tp).leaf, noParen)
+	const fcnName := tNode(tp).leaf
+	tp := tNode(tp).sibling
+	if tp not= nil(tNode) and tNode(tp).operatorNumber = aSubs then
+	    var firstTime := true
+	    put :outFile, " (" ..
+	    OutputParameters(tNode(tp).operand, firstTime)
+	    put :outFile, ")"
+	    OutputParameterDeclarations(tNode(tp).operand, indent)
+	    OutputIndent(indent)
+	    put :outFile, "{"
+	    tp := tNode(tp).sibling
+	else
+	    put :outFile, " () {"
+	end if
+	if tp not= nil(tNode) and
+		tNode(tp).operatorNumber = aProcessStackSize then
+	    tp := tNode(tp).sibling
+	end if
+	OutputHandlerScope(fcnName, tp, indent+4)
+	OutputIndent(indent)
+	put :outFile, "}" ..
+
+	inRoutine := oldInRoutine
+    end OutputProcess
+
+
+    body procedure OutputFunction % (t : TreePointer, indent : int)
+	var tp := tNode(t).operand
+	var oldInRoutine := inRoutine
+	const fcnId := tNode(tp).leaf
+	inRoutine := true
+
+	put :outFile, ""
+	OutputFunctionHeader(tp, indent, false)
+	if Types.HasAttribute(fcnId, aaForward) then
+	    Types.ClearAttribute(fcnId, aaForward)
+	    put :outFile, ";" ..
+	elsif not Types.HasAttribute(fcnId, aaExternal) then
+	    tp := tNode(tp).sibling	/* aSubs or function result */
+	    if tNode(tp).operatorNumber = aSubs then
+		tp := tNode(tp).sibling		/* function result */
+	    end if
+	    fcnKind := Types.GetKind(tNode(tp).leaf)
+	    tp := tNode(tp).sibling	/* function type */
+	    OutputHandlerScope(fcnId, tNode(tp).sibling, indent+4)
+	    OutputIndent(indent+4)
+	    put :outFile, "/* NOTREACHED */"
+	    if not unChecked then
+		OutputIndent(indent+4)
+		put :outFile, predefNames(pFunctionResultAbort), ";"
+	    end if
+	    OutputIndent(indent)
+	    put :outFile, "}" ..
+	else
+	    put :outFile, ";" ..
+	end if
+
+	inRoutine := oldInRoutine
+    end OutputFunction
+
+
+    procedure OutputModule (t : TreePointer, indent : int)
+	var register tp := tNode(t).operand
+	const moduleId := tNode(tp).leaf
+	var statements : TreePointer
+
+	const mainOrphan := mainModuleIsOrphan
+	mainModuleIsOrphan := false
+
+	var oldInRoutine := inRoutine
+	inRoutine := false
+
+	tp := tNode(tp).sibling
+	if tp not= nil(tNode) and
+		tNode(tp).operatorNumber = aImport then
+	    tp := tNode(tp).sibling
+	end if
+	if tp not= nil(tNode) and
+		tNode(tp).operatorNumber = aExport then
+	    tp := tNode(tp).sibling
+	end if
+	if tp not= nil(tNode) and
+		tNode(tp).operatorNumber = aGrant then
+	    tp := tNode(tp).sibling
+	end if
+	OutputDeclarations(tp, indent, statements)
+	put :outFile, ""
+
+	var initVar : ExpressionPointer
+
+	if mainOrphan then
+	    Expression.CreateUniqueIdentifier(initVar)
+	    OutputIndent(indent)
+	    put :outFile, "static ", macdepType(mBoolean), " " ..
+	    OutputExpression(initVar, noParen)
+	    put :outFile, ";"
+	end if
+
+	OutputIndent(indent)
+	if not Types.HasAttribute(moduleId, aaGrant) then
+	    put :outFile, "static " ..
+	end if
+	put : outFile, macdepType(mVoid), " " ..
+	OutputExpression(moduleId, noParen)
+	put :outFile, " () {"
+	if lineNumbering then
+	    OutputIndent(indent+4)
+	    put :outFile, predefNames(pSaveLineAndFile), "();"
+	    OutputIndent(indent+4)
+	    put :outFile, predefNames(pSetFileTable), "();"
+	end if
+	if mainOrphan then
+	    OutputIndent(indent+4)
+	    put :outFile, "if (" ..
+	    OutputExpression(initVar, noParen)
+	    put :outFile, " == 0) {"
+	    OutputIndent(indent+8)
+	    OutputExpression(initVar, noParen)
+	    put :outFile, " = 1;"
+	    OutputScope(statements, indent+8)
+	    OutputIndent(indent+4)
+	    put :outFile, "}"
+	else
+	    OutputScope(statements, indent+4)
+	end if
+	if lineNumbering then
+	    OutputIndent(indent+4)
+	    put :outFile, predefNames(pRestoreLineAndFile), "();"
+	end if
+	OutputIndent(indent)
+	put :outFile, "}" ..
+
+	inRoutine := oldInRoutine
+    end OutputModule
+
+
+    procedure OutputMonitor (t : TreePointer, indent : int)
+	var register tp := tNode(t).operand
+	const monitorId := tNode(tp).leaf
+	var statements : TreePointer
+
+	const mainOrphan := mainModuleIsOrphan
+	mainModuleIsOrphan := false
+
+	var oldInRoutine := inRoutine
+	inRoutine := false
+
+	tp := tNode(tp).sibling
+	currentMonitorVariable := tNode(t).leaf
+	if tp not= nil(tNode) and
+		tNode(tp).operatorNumber = aMonitorPriority then
+	    currentMonitorPriority := tNode(tNode(tp).operand).leaf
+	    tp := tNode(tp).sibling
+	end if
+	if tp not= nil(tNode) and
+		tNode(tp).operatorNumber = aImport then
+	    tp := tNode(tp).sibling
+	end if
+	if tp not= nil(tNode) and
+		tNode(tp).operatorNumber = aExport then
+	    tp := tNode(tp).sibling
+	end if
+	if tp not= nil(tNode) and
+		tNode(tp).operatorNumber = aGrant then
+	    tp := tNode(tp).sibling
+	end if
+	OutputDeclarations(tp, indent, statements)
+	put :outFile, ""
+
+	var initVar : ExpressionPointer
+
+	if mainOrphan then
+	    Expression.CreateUniqueIdentifier(initVar)
+	    OutputIndent(indent)
+	    put :outFile, "static ", macdepType(mBoolean), " " ..
+	    OutputExpression(initVar, noParen)
+	    put :outFile, ";"
+	end if
+
+	OutputIndent(indent)
+	if not Types.HasAttribute(monitorId, aaGrant) then
+	    put :outFile, "static " ..
+	end if
+	put : outFile, macdepType(mVoid), " " ..
+	OutputExpression(monitorId, noParen)
+	put :outFile, " () {"
+	if lineNumbering then
+	    OutputIndent(indent+4)
+	    put :outFile, predefNames(pSaveLineAndFile), "();"
+	    OutputIndent(indent+4)
+	    put :outFile, predefNames(pSetFileTable), "();"
+	end if
+	if mainOrphan then
+	    OutputIndent(indent+4)
+	    put :outFile, "if (" ..
+	    OutputExpression(initVar, noParen)
+	    put :outFile, " == 0) {"
+	    OutputIndent(indent+8)
+	    OutputExpression(initVar, noParen)
+	    put :outFile, " = 1;"
+	    OutputScope(statements, indent+8)
+	    OutputIndent(indent+4)
+	    put :outFile, "}"
+	else
+	    OutputScope(statements, indent+4)
+	end if
+	if lineNumbering then
+	    OutputIndent(indent+4)
+	    put :outFile, predefNames(pRestoreLineAndFile), "();"
+	end if
+	OutputIndent(indent)
+	put :outFile, "}" ..
+
+	inRoutine := oldInRoutine
+	currentMonitorPriority := nil(eNode)
+	currentMonitorVariable := nil(eNode)
+    end OutputMonitor
+
+
+    body procedure OutputHandlerScope % (fcnName : ExpressionPointer,
+				      %  t : TreePointer, indent : int)
+	var register next := t
+	const oldUnChecked := unChecked
+
+	if next = nil(tNode) then
+	    return
+	end if
+
+	doMonitorEntryExit := Types.HasAttribute(fcnName, aaMonitorEntry)
+
+	if Types.HasAttribute(fcnName, aaFcnResultNecessary) then
+	    /* must declare the alternate function result */
+	    var register x := Types.GetType(fcnName)
+
+	    assert tNode(x).operatorNumber = aFunction
+	    x := tNode(tNode(x).operand).sibling
+	    if tNode(x).operatorNumber = aSubs then
+		x := tNode(x).sibling
+	    end if
+	    OutputIndent(indent)
+	    CTypes.Output(tNode(tNode(x).sibling).operand, x, outFile, 0)
+	    put : outFile, ";"
+	end if
+
+	if lineNumbering then
+	    if unChecked then
+		OutputIndent(indent+4)
+		put :outFile, predefNames(pSaveLineAndFile), "();"
+	    else
+		needSaveLineFile := true
+		needSetFileTable := true
+	    end if
+	end if
+	if not unChecked then
+	    needStackCheck := true
+	end if
+
+	loop
+	    exit when next = nil(tNode) or tNode(next).operatorNumber not= aNoOp
+	    next := tNode(next).sibling
+	end loop
+
+	var preStatement := nil(tNode)
+	if next not= nil(tNode) and tNode(next).operatorNumber = aPre then
+	    preStatement := next
+	    next := tNode(next).sibling
+	end if
+
+	if next = nil(tNode) then
+	    if preStatement not= nil(tNode) then
+		OutputProgram(preStatement, indent)
+		put : outFile, ";"
+	    end if
+	    if doMonitorEntryExit then
+		doMonitorEntryExit := false
+		OutputIndent(indent)
+		if currentMonitorPriority = nil(eNode) then
+		    /* regular monitor */
+		    put :outFile, predefNames(pExitMonitor), "(" ..
+		else
+		    /* device monitor */
+		    put :outFile, predefNames(pExitDeviceMonitor), "(" ..
+		end if
+		OutputExpression (currentMonitorVariable, noParen)
+		put :outFile, ");"
+	    end if
+	    if lineNumbering and not needSaveLineFile then
+		OutputIndent(indent)
+		put :outFile, predefNames(pRestoreLineAndFile), "();"
+	    end if
+	    if Types.HasAttribute(fcnName, aaInterruptProcedure) then
+		OutputIndent(indent)
+		put :outFile, predefNames(pInterruptProcedureExit), "(" ..
+		OutputExpression (currentMonitorVariable, noParen)
+		put :outFile, ");"
+	    end if
+	    needSaveLineFile := false
+	    unChecked := oldUnChecked
+	    return
+	end if
+
+	loop
+	    exit when next = nil(tNode)
+	    case tNode(next).operatorNumber of
+		label aHandler, aPost:
+		    exit
+
+		label aEndSubprogramBody:
+		    next := tNode(next).sibling
+		    loop
+			exit when next = nil(tNode)
+			assert tNode(next).nodeKind = NodeKinds.ExpressionLeaf
+			OutputProgram(next, indent)
+			put : outFile, ";"
+			next := tNode(next).sibling
+		    end loop
+		    exit
+
+		label aConst, aType, aVar, aBind:
+		    OutputProgram(next, indent)
+		    put : outFile, ";"
+
+		label aProcedure:
+		    /* must be an external procedure def */
+		    OutputProcedure(next, indent)
+		    put : outFile, ""
+
+		label aFunction:
+		    /* must be an external function def */
+		    OutputFunction(next, indent)
+		    put : outFile, ""
+
+		label aNoOp:
+
+		label aUnchecked, aUncheckedStmt:
+		    unChecked := true
+
+		label aChecked, aCheckedStmt:
+		    if not originalUnChecked then
+			unChecked := false
+		    end if
+
+		label :
+		    if preStatement not= nil(tNode) then
+			OutputProgram(preStatement, indent)
+			put : outFile, ";"
+			preStatement := nil(tNode)
+		    end if
+		    OutputProgram(next, indent)
+		    put : outFile, ";"
+	    end case
+	    next := tNode(next).sibling
+	end loop
+
+	if next not= nil(tNode) then
+	    /* there must be a post and/or handler */
+	    if tNode(next).operatorNumber = aPost then
+		postStatement := next
+		next := tNode(next).sibling
+	    else
+		postStatement := nil(tNode)
+	    end if
+
+	    if next not= nil(tNode) and
+		    tNode(next).operatorNumber = aHandler then
+		const register hid := tNode(tNode(next).operand).leaf
+
+		%% Can't set this inside the handler itself - JRC 4.7.18
+	        %% routineHasHandler := true
+
+		OutputIndent(indent)
+		put :outFile, macdepType(mHandlerArea), "\t" ..
+		Expression.Output(hid, outFile)
+		put :outFile, ";"
+		
+		/* stack checking */
+		needStackCheck := false
+		if not unChecked then
+		    OutputIndent(indent)
+		    if needSaveLineFile then
+			put :outFile, predefNames(pStackCheckAndSaveLineFile),
+			    "(", tNode(next).fileNumber * 100000 +
+				tNode(next).lineNumber, ");"
+		    else
+			put :outFile, predefNames(pStackCheck), "();"
+		    end if
+		end if
+
+		if preStatement not= nil(tNode) then 
+		    OutputProgram(preStatement, indent)
+		    put : outFile, ";"
+		    preStatement := nil(tNode) 
+		end if
+
+		OutputIndent(indent)
+		put :outFile, "if (", predefNames (pEnterCHandler),
+		    "(" ..
+		Expression.Output(hid, outFile)
+		put :outFile, ")) {"
+		needSetFileTable := true
+		Identifier.AppendText(eNode(hid).u.referenceValue, '.quitCode')
+		OutputScope(tNode(tNode(next).operand).sibling, indent+4)
+		OutputIndent(indent)
+		put :outFile, "} else {"
+
+		%% OK, now we're in the main body, not in the handler itself - JRC 4.7.18
+		routineHasHandler := true 
+		%%
+
+		needSetFileTable := true
+		next := tNode(next).sibling
+		loop
+		    exit when next = nil(tNode)
+
+		    case tNode(next).operatorNumber of
+			label aEndSubprogramBody:
+			    exit
+
+			label aNoOp:
+
+			label aProcedure:
+			    /* must be an external procedure def */
+			    OutputProcedure(next, indent+4)
+			    put : outFile, ""
+
+			label aFunction:
+			    /* must be an external function def */
+			    OutputFunction(next, indent+4)
+			    put : outFile, ""
+
+			label aUnchecked, aUncheckedStmt:
+			    unChecked := true
+
+			label aChecked, aCheckedStmt:
+			    if not originalUnChecked then
+				unChecked := false
+			    end if
+
+			label :
+			    OutputProgram (next, indent+4)
+			    put : outFile, ";"
+		    end case
+		    next := tNode(next).sibling
+		end loop
+		OutputIndent(indent+4)
+		put :outFile, predefNames(pExitHandler), "();"
+		OutputIndent(indent)
+		put :outFile, "}"
+		routineHasHandler := false
+	    elsif next not= nil(tNode) then
+		/* there is further code, but no handler */
+		var dummyT  := nil(tNode)
+
+		OutputDeclarations(next, indent, dummyT)
+		if preStatement not= nil(tNode) then
+		    OutputProgram(preStatement, indent)
+		    put : outFile, ";"
+		    preStatement := nil(tNode)
+		end if
+		next := dummyT
+		if next not= nil(tNode) then
+		    OutputScope (next, indent)
+		end if
+	    else
+		/* there was no code or handler */
+		assert next = nil(tNode)
+		if preStatement not= nil(tNode) then 
+		    OutputProgram(preStatement, indent)
+		    put : outFile, ";"
+		    preStatement := nil(tNode)
+		end if
+	    end if
+	    if postStatement not= nil(tNode) and
+		    Types.GetKind(fcnName) not= tFunction then
+		OutputProgram (postStatement, indent)
+		put : outFile, ";"
+	    end if
+	elsif preStatement not= nil(tNode) then 
+	    OutputProgram(preStatement, indent)
+	    put : outFile, ";"
+	end if
+
+	/* reset variables */
+	preStatement := nil(tNode) 
+	needStackCheck := false
+	postStatement := nil(tNode)
+
+	if doMonitorEntryExit then
+	    doMonitorEntryExit := false
+	    OutputIndent(indent)
+	    if currentMonitorPriority = nil(eNode) then
+		/* regular monitor */
+		put :outFile, predefNames(pExitMonitor), "(" ..
+	    else
+		/* device monitor */
+		put :outFile, predefNames(pExitDeviceMonitor), "(" ..
+	    end if
+	    OutputExpression (currentMonitorVariable, noParen)
+	    put :outFile, ");"
+	end if
+	if lineNumbering and not needSaveLineFile then
+	    OutputIndent(indent)
+	    put :outFile, predefNames(pRestoreLineAndFile), "();"
+	end if
+	if Types.HasAttribute(fcnName, aaInterruptProcedure) then
+	    OutputIndent(indent)
+	    put :outFile, predefNames(pInterruptProcedureExit), "(" ..
+	    OutputExpression (currentMonitorVariable, noParen)
+	    put :outFile, ");"
+	end if
+	needSaveLineFile := false
+	unChecked := oldUnChecked
+    end OutputHandlerScope
+
+
+    body procedure OutputScope % ( t : TreePointer, indent : int)
+	const oldUnChecked := unChecked
+	var register next := t
+
+	loop
+	    exit when next = nil(tNode) or
+		tNode(next).operatorNumber = aEndSubprogramBody
+	    case tNode(next).operatorNumber of
+		label aNoOp:
+
+		label aUnchecked, aUncheckedStmt:
+		    unChecked := true
+
+		label aChecked, aCheckedStmt:
+		    if not originalUnChecked then
+			unChecked := false
+		    end if
+
+		label aProcedure:
+		    OutputProcedure(next, indent)
+		    put : outFile, ""
+
+		label aFunction:
+		    OutputFunction(next, indent)
+		    put : outFile, ""
+
+		label :
+		    OutputProgram (next, indent)
+		    put : outFile, ";"
+	    end case
+	    next := tNode(next).sibling
+	end loop
+	unChecked := oldUnChecked
+    end OutputScope
+
+
+    body procedure OutputDeclarations % (t : TreePointer, indent : int,
+				      % var nonDecl : TreePointer)
+	const oldUnChecked := unChecked
+	var register tp := t
+
+	nonDecl := nil(tNode)
+	loop
+	    exit when tp = nil(tNode)
+	    case tNode(tp).operatorNumber of
+		label aConst, aType, aVar, aExternal, aBind:
+		    OutputProgram(tp, indent)
+		    put : outFile, ";"
+
+		label aBody, aFunction, aModule, aMonitor, aProcedure, aProcess:
+		    OutputProgram(tp, indent)
+		    put : outFile, ""
+
+		label aChild:
+		    OutputProgram(tp, indent) /* no ; necessary */
+
+		label aNoOp:
+
+		label aUnchecked:
+		    unChecked := true
+
+		label aChecked:
+		    if not originalUnChecked then
+			unChecked := false
+		    end if
+
+		label :
+		    nonDecl := tp
+		    exit
+	    end case
+	    tp := tNode(tp).sibling
+	end loop
+	unChecked := oldUnChecked
+    end OutputDeclarations
+
+
+    body procedure OutputFor % (t : TreePointer, indent : int)
+	var register decrease := false
+	var register tp := t
+	const oldLastLoopIsLoop := lastLoopIsLoop
+	const oldLoopExitLabel := loopExitLabel
+	const oldInvariant := currentInvariant
+	var loopIndent := indent+4
+
+	lastLoopIsLoop := true
+	loopExitLabel := nil(eNode)
+	currentInvariant := forInvariant
+
+	OutputIndent(indent)
+	if tNode(tp).operatorNumber = aDecreasing then
+	    tp := tNode(tp).sibling
+	    decrease := true
+	end if
+
+	const ident := tNode(tp).leaf
+	const left := tNode(tNode(tp).sibling).operand
+
+	if IsForDifficult(tNode(left).sibling, decrease) then
+	    loopIndent += 4
+	    OutputExpression (ident, noParen)
+	    put :outFile, " = " ..
+	    OutputExpression (tNode(left).leaf, noParen)
+	    put :outFile, ";"
+
+	    OutputIndent(indent)
+	    put :outFile, "if (" ..
+	    OutputExpression (ident, noParen)
+	    if decrease then
+		put :outFile, " >= " ..
+	    else
+		put :outFile, " <= " ..
+	    end if
+	    OutputExpression(tNode(tNode(left).sibling).leaf, noParen)
+	    put :outFile, ") {"
+	    tp := tNode(tp).sibling
+	    OutputIndent(indent+4)
+	    put :outFile, "for(;;) {"
+	    if timeSlice then
+		needLoopTimeSlice := true
+	    end if
+	    OutputScope(tNode(tp).sibling, indent+8)
+	    OutputIndent(indent+8)
+	    put :outFile, "if (" ..
+	    OutputExpression (ident, noParen)
+	    put :outFile, " == " ..
+	    OutputExpression(tNode(tNode(left).sibling).leaf, noParen)
+	    put :outFile, ") break;"
+
+	    OutputIndent(indent+8)
+	    OutputExpression (ident, noParen)
+	    if decrease then
+		put :outFile, "--;"
+	    else
+		put :outFile, "++;"
+	    end if
+	    OutputIndent(indent+4)
+	    put :outFile, "}"
+	else
+	    put :outFile, "for (" ..
+	    OutputExpression (ident, noParen)
+	    put :outFile, " = " ..
+	    OutputExpression(tNode(left).leaf, noParen)
+	    put :outFile, "; " ..
+
+	    OutputExpression (ident, noParen)
+	    if decrease then
+		/* for (id = upper; id >= lower; id--) { stmts} */
+		put :outFile, " >= " ..
+	    else
+		/* for (id = lower; id <= upper; id++) { stmts} */
+		put :outFile, " <= " ..
+	    end if
+	    OutputExpression(tNode(tNode(left).sibling).leaf, noParen)
+	    put :outFile, "; " ..
+	    OutputExpression (ident, noParen)
+
+	    if decrease then
+		put :outFile, "--" ..
+	    else
+		put :outFile, "++" ..
+	    end if
+
+	    put :outFile, ") {"
+	    if timeSlice then
+		needLoopTimeSlice := true
+	    end if
+	    tp := tNode(tp).sibling
+	    OutputScope(tNode(tp).sibling, indent+4)
+	end if
+	if needLoopTimeSlice then
+	    /* null for loop */
+	    OutputIndent(loopIndent)
+	    put :outFile, predefNames(pLoopTimeSlice), "();"
+	    needLoopTimeSlice := false
+	end if
+	OutputIndent(indent)
+	put :outFile, "}" ..
+
+	if loopExitLabel not= nil(eNode) then
+	    /* must output the label */
+	    put :outFile, ""
+	    OutputIndent(indent)
+	    OutputExpression(loopExitLabel, noParen)
+	    put :outFile, ":" ..
+	end if
+
+	lastLoopIsLoop := oldLastLoopIsLoop
+	loopExitLabel := oldLoopExitLabel
+	currentInvariant := oldInvariant
+    end OutputFor
+
+
+    /*
+     * Output a tree structure 't' (program) to stream 's'.
+     */
+    body procedure OutputProgram % (t:TreePointer, indent : int)
+	var first, next : TreePointer
+	var register expr : ExpressionPointer
+	var lab : int
+	var isleaf : boolean
+	const oldUnChecked := unChecked
+
+	if t = nil(tNode) then
+	    return
+	end if
+
+	isleaf := Tree.IsLeafNode (t)
+	lab := tNode(t).operatorNumber
+	case lab of
+	    label aNoOp, aEndSubprogramBody, aGrant, aImport, aExport:
+		/* do nothing */
+
+	    label aReturn:
+		OutputLineNumber(t, indent)
+		if routineHasHandler then
+		    OutputIndent(indent)
+		    put :outFile, predefNames(pExitHandler), "();"
+		end if
+		if postStatement not= nil(tNode) then
+		    OutputProgram(postStatement, indent)
+		    put : outFile, ";"
+		end if
+		if doMonitorEntryExit and
+			currentMonitorVariable not= nil(eNode) then
+		    OutputIndent(indent)
+		    if currentMonitorPriority = nil(eNode) then
+			/* regular monitor */
+			put :outFile, predefNames(pExitMonitor), "(" ..
+		    else
+			/* device monitor */
+			put :outFile, predefNames(pExitDeviceMonitor), "(" ..
+		    end if
+		    OutputExpression (currentMonitorVariable, noParen)
+		    put :outFile, ");"
+		end if
+		if lineNumbering then
+		    OutputIndent(indent)
+		    put :outFile, predefNames(pRestoreLineAndFile), "();"
+		end if
+		OutputIndent(indent)
+		put : outFile, "return" ..
+
+	    label aResult:
+		const oldRangecheck := currentRangecheck
+
+		currentRangecheck := resultRangecheck
+		OutputLineNumber(t, indent)
+		if routineHasHandler then
+		    OutputIndent(indent)
+		    put :outFile, predefNames(pExitHandler), "();"
+		end if
+		if postStatement not= nil(tNode) then
+		    OutputProgram(postStatement, indent)
+		    put : outFile, ";"
+		end if
+		if doMonitorEntryExit and
+			currentMonitorVariable not= nil(eNode) then
+		    OutputIndent(indent)
+		    if currentMonitorPriority = nil(eNode) then
+			/* regular monitor */
+			put :outFile, predefNames(pExitMonitor), "(" ..
+		    else
+			/* device monitor */
+			put :outFile, predefNames(pExitDeviceMonitor), "(" ..
+		    end if
+		    OutputExpression (currentMonitorVariable, noParen)
+		    put :outFile, ");"
+		end if
+		if lineNumbering then
+		    OutputIndent(indent)
+		    put :outFile, predefNames(pRestoreLineAndFile), "();"
+		end if
+		OutputIndent(indent)
+		put : outFile, "return (" ..
+		if fcnKind = tAddressInt then
+		    put : outFile, "(", macdepType(mAddressint), ") " ..
+		end if
+		OutputExpression (tNode(tNode(t).operand).leaf, noParen)
+		put : outFile, ")" ..
+		currentRangecheck := oldRangecheck
+
+	    label aExit:
+		OutputLineNumber(t, indent)
+		OutputIndent(indent)
+		if lastLoopIsLoop then
+		    put :outFile, "break" ..
+		else
+		    if loopExitLabel = nil(eNode) then
+			Expression.CreateUniqueIdentifier(loopExitLabel)
+		    end if
+		    put :outFile, "goto " ..
+		    OutputExpression(loopExitLabel, noParen)
+		end if
+
+	    label aAssert, aPre, aPost, aInvariant :
+		if lab = aPost then
+		    ForceLineNumberAssignment
+		end if
+		OutputLineNumber(t, indent)
+		OutputIndent(indent)
+		case lab of
+		    label aAssert:
+			put : outFile, predefNames(pAssert), " (" ..
+		    label aPre:
+			put : outFile, predefNames(pPre), " (" ..
+		    label aPost:
+			put : outFile, predefNames(pPost), " (" ..
+		    label aInvariant :
+			put : outFile, predefNames(pInvariant), " (" ..
+		end case
+		OutputExpression (tNode(tNode(t).operand).leaf, noParen)
+		if lab = aInvariant then
+		    put :outFile, ", ", currentInvariant ..
+		end if
+		put : outFile, ")" ..
+
+	    label aFor:
+		OutputLineNumber(t, indent)
+		ForceLineNumberAssignment
+		OutputFor(tNode(t).operand, indent)
+		ForceLineNumberAssignment
+
+	    label aIf :
+		OutputLineNumber(t, indent)
+		OutputIndent(indent)
+		put : outFile, "if (" ..
+		next := tNode(t).operand
+		OutputExpression (tNode(next).leaf, noParen)
+		put : outFile, ") {"
+		next := tNode(next).sibling
+		OutputProgram (next, indent+4)
+		next := tNode(next).sibling
+		loop
+		    exit when next = nil(tNode)
+		    OutputProgram (next, indent+4)
+		    next := tNode(next).sibling
+		end loop
+		OutputIndent(indent)
+		put : outFile, "}" ..
+		ForceLineNumberAssignment
+
+	    label aThen:
+		ForceLineNumberAssignment
+		OutputScope(tNode(t).operand, indent)
+
+	    label aElse :
+		ForceLineNumberAssignment
+		OutputIndent(indent-4)
+		put : outFile, "} else {"
+		OutputScope(tNode(t).operand, indent)
+		assert tNode(t).sibling = nil(tNode)
+
+	    label aPut, aOpen, aGet, aRead, aClose, aWrite, aTell, aSeek:
+		OutputLineNumber(t, indent)
+		OutputIo.OutputIo(t, indent)
+
+	    label aQuit:
+		OutputLineNumber(t, indent)
+		OutputQuit(t, indent)
+
+	    label aPause:
+		OutputLineNumber(t, indent)
+		OutputIndent(indent)
+		put : outFile, predefNames (pPause), "(", intCast ..
+		OutputExpression (tNode(tNode(t).operand).leaf, noParen)
+		put : outFile, ")" ..
+
+	    label aNew, aFree:
+		OutputLineNumber(t, indent)
+		OutputIndent(indent)
+		first := tNode(t).operand
+		expr := tNode(tNode(first).sibling).leaf
+		if eNode(expr).u.operatorNumber = aIdent and
+			Types.HasAttribute(expr, aaRegister) then
+		    if lab = aNew then
+			put : outFile, predefNames (pNewReg), "("  ..
+		    else
+			put : outFile, predefNames (pFreeReg), "("  ..
+		    end if
+		    CTypes.Output(Types.GetType(expr), nil(tNode), outFile,
+			indent)
+		    put : outFile, ", "  ..
+		else
+		    if lab = aNew then
+			put : outFile, predefNames (pNew), "(& " ..
+		    else
+			put : outFile, predefNames (pFree), "(& " ..
+		    end if
+		end if
+		OutputExpression (expr, noParen)
+		first := Types.GetType(tNode(first).leaf)
+		assert tNode(first).operatorNumber = aCollection
+		first := tNode(first).operand
+		if tNode(first).operatorNumber = aForward then
+		    first := tNode(first).operand
+		    assert tNode(first).nodeKind = NodeKinds.ExpressionLeaf
+		     /* first := Types.GetType(tNode(first).leaf) */
+		end if
+		put : outFile, ", ", intCast, " sizeof ("  ..
+		CTypes.Output(first, nil(tNode), outFile, indent)
+		put : outFile, "))"  ..
+
+	    label aBody:
+		OutputBody(tNode(t).operand, indent)
+
+	    /*
+	     * Output this as C code!!
+	     */
+	    label aAsm :
+		OutputLineNumber(t, indent)
+		OutputIndent(indent)
+		next := tNode(t).operand
+		if tNode(next).operatorNumber = aLabel then
+		    /* make this a label */
+		    expr := tNode(tNode(next).operand).leaf
+		    put :outFile, strings(eNode(expr).u.stringValue)
+					(1..eNode(expr).u.stringLen), " : " ..
+		    next := tNode(next).sibling
+		end if
+		expr := tNode(next).leaf
+		/* print the "opcode" without the "'s */
+		put :outFile, strings(eNode(expr).u.stringValue)
+				    (1..eNode(expr).u.stringLen) ..
+		next := tNode(next).sibling
+
+		assert tNode(next).operatorNumber = aBeginAsm
+		next := tNode(next).operand
+		var firstTime := true
+		loop
+		    /* output the arguments */
+		    exit when next = nil(tNode)
+		    if firstTime then
+			firstTime := false
+			put :outFile, " " ..
+		    else
+			put :outFile, ", " ..
+		    end if
+		    expr := tNode(next).leaf
+		    if eNode(expr).u.operatorNumber = aStringLit then
+			Expression.OutputStringValue(eNode(expr).u.stringValue,
+			    eNode(expr).u.stringLen, outFile)
+		    else
+			OutputExpression (expr, noParen)
+		    end if
+		    next := tNode(next).sibling
+		end loop
+
+	    label aProcedure:
+		OutputProcedure(t, indent)
+
+	    label aFunction:
+		OutputFunction(t, indent)
+
+	    label aProcess:
+		OutputProcess (t, indent)
+
+	    label aModule:
+		OutputModule(t, indent)
+
+	    label aMonitor:
+		OutputMonitor(t, indent)
+
+	    label aFork:
+		OutputLineNumber(t, indent)
+		OutputFork(tNode(t).operand, indent)
+
+	    label aSignal:
+		OutputLineNumber(t, indent)
+		next := tNode(t).operand
+		const eKind := ExpnType(tNode(next).leaf)
+
+		OutputIndent(indent)
+		if SimpleExpression(tNode(next).leaf) then
+		    if eKind = tCondition then
+			put :outFile, predefNames(pSignal) ..
+		    elsif eKind = tPriorityCondition then
+			put :outFile, predefNames(pPrioritySignal) ..
+		    elsif eKind = tTimeoutCondition then
+			put :outFile, predefNames(pTimeOutSignal) ..
+		    else
+			assert eKind = tDeferredCondition
+			put :outFile, predefNames(pDeferredSignal) ..
+		    end if
+		else
+		    if eKind = tCondition then
+			put :outFile, predefNames(pComplexSignal) ..
+		    elsif eKind = tPriorityCondition then
+			put :outFile, predefNames(pComplexPrioritySignal) ..
+		    elsif eKind = tTimeoutCondition then
+			put :outFile, predefNames(pComplexTimeoutSignal) ..
+		    else
+			assert eKind = tDeferredCondition
+			put :outFile, predefNames(pComplexDeferredSignal) ..
+		    end if
+		end if
+		OutputExpressionList(tNode(next).leaf)
+
+	    label aWait:
+		OutputLineNumber(t, indent)
+		next := tNode(t).operand
+		const eKind := ExpnType(tNode(next).leaf)
+
+		OutputIndent(indent)
+		if eKind = tCondition then
+		    put :outFile, predefNames(pWait) ..
+		elsif eKind = tPriorityCondition then
+		    put :outFile, predefNames(pPriorityWait) ..
+		elsif eKind = tTimeoutCondition then
+		    put :outFile, predefNames(pTimeOutWait) ..
+		else
+		    assert eKind = tDeferredCondition
+		    put :outFile, predefNames(pDeferredWait) ..
+		end if
+		put :outFile, "(" ..
+		if tNode(next).sibling not= nil(tNode) then
+		    OutputCastedExpression(
+			tNode(tNode(tNode(next).sibling).operand).leaf)
+		    put :outFile, ", " ..
+		end if
+		OutputCastedExpression(tNode(next).leaf)
+		put :outFile, ")" ..
+
+	    label aType:
+		OutputType(tNode(t).operand, indent)
+
+	    label aVar, aConst:
+		OutputVarConst(t, indent)
+
+	    label aCase :
+		OutputLineNumber(t, indent)
+		OutputCase(t, indent)
+
+
+/* 
+ * An assignment or an assignment op statement. The root gives the operation
+ * performed, the left child is the destination (LHS) and the right subtree
+ * is the source (RHS) expression. 
+ */
+	    label aConcatenateAssign, aSetDifferenceAssign,
+		    aSetIntersectionAssign, aSetUnionAssign, aSetXorAssign,
+		    aAndEqual, aBooleanAndEqual, aBooleanOrEqual, aDivEqual,
+		    aMinusEqual, aModEqual, aOrEqual,
+		    aPlusEqual, aRealDivEqual, aShiftLeftEqual,
+		    aShiftRightEqual, aStarEqual, aXorEqual:
+		OutputLineNumber(t, indent)
+		OutputIndent(indent)
+		first := tNode(t).operand
+		next := tNode(first).sibling
+		expr := tNode(first).leaf
+		assert eNode(expr).u.operatorNumber not= aBits
+		OutputReference (expr)
+		put : outFile, TokenToName (lab), " " ..
+	        OutputPossibleAddressintExpression (tNode(next).leaf, noParen)
+
+	    label aAssign, aAssignInverted, aTempAssign:
+		OutputLineNumber(t, indent)
+		OutputIndent(indent)
+		first := tNode(t).operand
+		next := tNode(first).sibling
+		expr := tNode(first).leaf
+		assert eNode(expr).u.operatorNumber not= aBits
+		OutputReference (expr)
+		put : outFile, " = " ..
+		if ExpnType(expr) = tAddressInt then
+		    put :outFile, "(", macdepType(mAddressint), ") " ..
+		    OutputExpression(tNode(next).leaf, paren)
+		else
+		    OutputExpression(tNode(next).leaf, noParen)
+		end if
+
+	    label aBind:
+		OutputIndent(indent)
+		OutputExpression(tNode(t).leaf, noParen)
+
+	    label aBegin:
+		OutputLineNumber(t, indent)
+		OutputIndent(indent)
+		put :outFile, "{"
+		OutputScope(tNode(t).operand, indent+4)
+		OutputIndent(indent)
+		put :outFile, "}" ..
+
+	    label aChild:
+		/* this is a stub */
+		next := tNode(t).operand
+		loop
+		    exit when tNode(next).operatorNumber not= aParent
+		    next := tNode(next).operand
+		end loop
+		assert tNode(next).operatorNumber = aStub
+		next := tNode(next).operand
+		/* there may be type definitions from parameters */
+		loop
+		    exit when tNode(next).operatorNumber not= aType
+		    OutputType(tNode(next).operand, indent)
+		    put :outFile, ";"
+		    next := tNode(next).sibling
+		end loop
+		if tNode(next).operatorNumber = aModule or
+			tNode(next).operatorNumber = aMonitor then
+		    /* skip over name */
+		    next := tNode(tNode(next).operand).sibling
+		    if next not= nil(tNode) and
+			    tNode(next).operatorNumber = aMonitorPriority then
+			next := tNode(next).sibling
+		    end if
+		    OutputChild(next, indent)
+		elsif tNode(next).operatorNumber = aProcedure then
+		    OutputProcedure(next, indent)
+		    put :outFile, ""
+		else
+		    assert tNode(next).operatorNumber = aFunction
+		    OutputFunction(next, indent)
+		    put :outFile, ""
+		end if
+
+	    label aLoop:
+		const oldLastLoopIsLoop := lastLoopIsLoop
+		const oldLoopExitLabel := loopExitLabel
+		const oldInvariant := currentInvariant
+
+		lastLoopIsLoop := true
+		loopExitLabel := nil(eNode)
+		currentInvariant := loopInvariant
+
+		OutputLineNumber(t, indent)
+		OutputIndent(indent)
+		put :outFile, "for(;;) {"
+		if timeSlice then
+		    needLoopTimeSlice := true
+		end if
+		ForceLineNumberAssignment
+		OutputScope(tNode(t).operand, indent+4)
+		if needLoopTimeSlice then
+		    /* null loop */
+		    OutputIndent(indent+4)
+		    put :outFile, predefNames(pLoopTimeSlice), "();"
+		    needLoopTimeSlice := false
+		end if
+		OutputIndent(indent)
+		put :outFile, "}" ..
+
+		if loopExitLabel not= nil(eNode) then
+		    /* must output the label */
+		    put :outFile, ""
+		    OutputIndent(indent)
+		    OutputExpression(loopExitLabel, noParen)
+		    put :outFile, ":" ..
+		end if
+
+		lastLoopIsLoop := oldLastLoopIsLoop
+		loopExitLabel := oldLoopExitLabel
+		currentInvariant := oldInvariant
+		ForceLineNumberAssignment
+
+	    label aUnchecked, aUncheckedStmt:
+		unChecked := true
+
+	    label aChecked, aCheckedStmt:
+		if not originalUnChecked then
+		    unChecked := false
+		end if
+
+	    label :
+		/* this better be an expression */
+		assert tNode(t).leaf not= nil(eNode)
+
+		OutputLineNumber(t, indent)
+		OutputIndent(indent)
+		OutputExpression (tNode(t).leaf, noParen)
+	end case
+	unChecked := oldUnChecked
+    end OutputProgram
+
+
+    body procedure OutputStub % (t : TreePointer, indent : int)
+	var tp := tNode(t).operand
+
+	/* there may be type definitions from parameters */
+	loop
+	    exit when tNode(tp).operatorNumber not= aType
+	    OutputType(tNode(tp).operand, indent)
+	    put :outFile, ";"
+	    tp := tNode(tp).sibling
+	end loop
+	const realNode := tp
+
+	if tNode(tp).operatorNumber = aModule or
+		tNode(tp).operatorNumber = aMonitor then
+	    var register temp := tNode(tp).operand
+
+	    temp := tNode(tp).operand	/* moduleId */
+	    var dummy : TreePointer
+
+	    OutputDeclarations(tNode(temp).sibling, indent, dummy)
+	    tp := tNode(tp).sibling
+	    if tp not= nil(tNode) and tNode(tp).operatorNumber = aBody then
+		/* module or monitor implementation */
+		OutputProgram(tNode(tp).operand, indent)
+	    end if
+	else
+	    if tNode(tp).sibling not= nil(tNode) then
+		assert tNode(tNode(tp).sibling).operatorNumber = aIs
+		const subprogramBody := tNode(tNode(tp).sibling).operand
+		var oldInRoutine := inRoutine
+
+		tp := realNode
+		inRoutine := true
+		Types.ClearAttribute(tNode(tNode(tp).operand).leaf, aaExternal)
+		if tNode(tp).operatorNumber = aProcedure then
+		    OutputProcedureHeader(tNode(tp).operand, indent, true)
+		else
+		    assert tNode(tp).operatorNumber = aFunction
+		    OutputFunctionHeader(tNode(tp).operand, indent, true)
+		end if
+		OutputHandlerScope(tNode(tNode(tp).operand).leaf,
+				   subprogramBody, indent+4)
+		if tNode(tp).operatorNumber = aFunction then
+		    OutputIndent(indent+4)
+		    put :outFile, "/* NOTREACHED */"
+		    if not unChecked then
+			OutputIndent(indent+4)
+			put :outFile, predefNames(pFunctionResultAbort), ";"
+		    end if
+		end if
+		OutputIndent(indent)
+		put :outFile, "}" ..
+		inRoutine := oldInRoutine
+	    else
+		OutputProgram(tp, indent)
+		put :outFile, ";"
+	    end if
+	end if
+    end OutputStub
+
+
+    body procedure OutputChild % (t : TreePointer, indent : int)
+	var register tp := t
+	var register temp : TreePointer
+
+	loop
+	    exit when tp = nil(tNode)
+	    case tNode(tp).operatorNumber of
+		label aFunction:
+		    temp := tNode(tp).operand
+		    if Types.HasAttribute(tNode(temp).leaf, aaGrant) then
+			/* pretend this is a forward fcn */
+			Types.EnterAttribute(tNode(temp).leaf, aaForward)
+			OutputFunction(tp, indent)
+			put :outFile, ""
+		    end if
+
+		label aProcedure:
+		    temp := tNode(tp).operand
+		    if Types.HasAttribute(tNode(temp).leaf, aaGrant) then
+			/* pretend this is a forward procedure */
+			Types.EnterAttribute(tNode(temp).leaf, aaForward)
+			OutputProcedure(tp, indent)
+			put :outFile, ""
+		    end if
+
+		label aModule, aMonitor, aParent, aStub:
+		    OutputChild(tNode(tp).operand, indent)
+
+		label aType:
+		    OutputType(tNode(tp).operand, indent)
+		    put :outFile, ";"
+
+		label aBody:
+		    temp := tNode(tp).operand
+		    if tNode(temp).operatorNumber = aModule or
+			    tNode(temp).operatorNumber = aMonitor then
+			OutputChild(tNode(temp).operand, indent)
+		    end if
+
+		label aVar, aConst:
+		    temp := tNode(tp).operand
+		    if Types.HasAttribute(tNode(temp).leaf, aaGrant) then
+			Types.EnterAttribute(tNode(temp).leaf, aaExternal)
+			OutputVarConst(tp, indent)
+			put :outFile, ";"
+		    elsif Types.HasAttribute(tNode(temp).leaf, aaExternal) then
+			OutputVarConst(tp, indent)
+			put :outFile, ";"
+		    end if
+
+		label aChild:
+		    temp := tNode(tp).operand
+		    loop
+			exit when tNode(temp).operatorNumber not= aParent
+			temp := tNode(temp).operand
+		    end loop
+		    if tNode(temp).operatorNumber = aCompile then
+			temp := tNode(temp).operand
+			if tNode(temp).operatorNumber = aMissingStub then
+			    temp := tNode(temp).operand
+			    temp := tNode(temp).sibling
+			    assert tNode(temp).operatorNumber = aBody
+			    OutputProgram(tNode(temp).operand, indent)
+			else
+			    assert tNode(temp).operatorNumber = aStub
+			    OutputStub(temp, indent)
+			end if
+			exit
+		    else
+			assert tNode(temp).operatorNumber = aStub
+			OutputChild(tNode(temp).operand, indent)
+		    end if
+
+		label :
+	    end case
+	    tp := tNode(tp).sibling
+	end loop
+    end OutputChild
+
+
+/* 
+ * Program - take a parse tree 't' and output it as a sequence of Tokens   
+ * in a format readable by the allocator on stream 's'. Just call Output  
+ * Program to dump the tree and then end it all with the aEndOfFile token.
+ */
+    body procedure Program % (t:TreePointer, s:int)
+	var register tp := t
+
+	outFile := s
+	put :outFile, "#include ", includeFile
+
+	if overrideInclude not= "" then
+	    put :outFile, "#include ", overrideInclude
+	end if
+
+	if lineNumbering then
+	    LineInfo.WriteFileTable(outFile)
+	end if
+
+	assert tNode(tp).operatorNumber = aRoot
+	tp := tNode(tp).operand
+	if tNode(tp).operatorNumber = aCompile then
+	    if tNode(tp).operand not= nil(tNode) and
+		    tNode(tNode(tp).operand).operatorNumber = aStub then
+		/* orphan module/monitor/routine */
+		mainModuleIsOrphan := true
+		OutputStub(tNode(tp).operand, 0)
+		put :outFile, ""
+	    else
+		var next : TreePointer
+
+		OutputDeclarations(tNode(tp).operand, 0, next)
+		inRoutine := true
+		put :outFile, macdepType(mVoid), " TProg () {"
+		if disableUnderflowChecking then
+		    put :outFile, "    ", disableUnderflowCheckingString
+		end if
+		if lineNumbering then
+		    OutputIndent(4)
+		    put :outFile, predefNames(pSetFileTable), "();"
+		end if
+		OutputScope(next, 4)
+		put :outFile, "}"
+	    end if
+	else
+	    /* this is a child compilation */
+	    OutputChild(tp, 0)
+	    put :outFile, ""
+	end if
+    end Program
+
+end Output

@@ -1,0 +1,152 @@
+%
+%	Computer Systems Research Group
+%   	University of Toronto
+%  
+%	Turing Plus System Routines in UNIX environment - V1.0
+%   	Author:	Mark Mendell
+%   	Date:	January 1984
+%       Revision:  May 1991 (Mark Funkenhauser, David Penny)
+%
+%    Copyright (C) 1984  The University of Toronto
+%    Copyright (C) 1991  The University of Toronto
+
+% This module provides an interface to the Turing Plus System routines.
+% This module should be included in the user's program
+% using the include statement:
+%
+%	include "%system"
+%
+
+
+	%
+	% Return the number of arguments on the command line.
+	% E.g. for command "t.x y"  nargs returns 1.
+	%
+    external "TL_TLI_TLIARC" var nargs : int
+
+	%
+	% Return the i'th argument from the command line.  The 0'th
+	% argument is the command name.  0 <= i <= nargs.  The argument may be
+	% truncated to fit.
+	%
+    external "TL_TLI_TLIFA" function fetcharg (i : int) : string
+
+	%
+	% Get the value of a UNIX environment variable.  The value may be
+	% truncated to fit.
+	% (N.B. Turing functions returning strings get compiled into procedures
+	%       that are passed the address of the result as the last param.)
+	%
+    external "TL_TLX_TLXGE" function getenv (symbol : string) : string
+
+	%
+	% Assigns the current date to the variable d in the format
+	% "dd mmm yy", where mmm is the first 3 characters of the month,
+	% i.e. "Apr".
+    external "TL_TLX_TLXDT" procedure date (var d : string)
+
+
+	%
+	% Assigns the current time to the variable t in the format "hh:mm:ss".
+	%
+    external "TL_TLX_TLXTM" procedure time (var t : string)
+
+	%
+	% Assigns the number of central processor milliseconds of user time
+	% used by this process to the variable c.
+	%
+    external "TL_TLX_TLXCL" procedure clock (var c : int)
+
+	%
+	% Assigns the number of central processor milliseconds of system time
+	% used by this process to the variable c.
+	%
+    external "TL_TLX_TLXSC" procedure sysclock (var c : int)
+
+	%
+	% Assigns the time in seconds since 00:00:00 GMT January 1, 1970 to
+	% the variable c.
+	%
+    external "time" procedure wallclock (var c : int)
+
+	%
+	% Executes the shell command str, as if it was typed at the terminal.
+	% ret is assigned the return code from the command.  ret := 127 if
+	% the shell cannot be executed.  /bin/sh is used for the execution
+	%
+    external "TL_TLX_TLXSYS" procedure system (str : string, var ret : int)
+
+	%
+	% Return the process id of the current UNIX process
+	%
+    external function getpid : int
+
+	%
+	% Flush all buffered output streams.
+	%
+    external "TL_TLI_TLIFS" procedure flushstreams
+
+	%
+	% Terminate the Turing program with a given exit code
+	%
+    external "TL_TLK_TLKUEXIT" procedure sysexit (exitcode : int)
+
+	%
+	% Give the elapsed simulated time
+	% (each epoch is "maxnat" pause units)
+	%
+    external "TL_TLK_TLKTIME"  var simutime : nat
+    external "TL_TLK_TLKEPOCH" var simuepoch: nat
+
+	%
+	% Dump the state of all processes
+	%
+    external "TL_TLK_TLKUDMPA" procedure dumpstate
+
+
+	%
+	% Enable real-time timeslicing
+	% (must not have done a "pause" or timeout wait prior to this call)
+	%
+    external "TL_TLK_TLKCINI" procedure startclock
+
+	% 
+	% Is real-time timeslicing enabled?
+	%
+    external "TL_TLK_TLKCLKON" var clockon: boolean
+
+       %
+       % TL_TLK_TLKHZ : represents the number of time units per second
+       %                (e.g "pause" units)
+       %                (e.g 1000 for milliseconds)
+       %                The language should make a decision and define
+       %                what a time unit is. But for now , use TLKHZ
+       %
+       % TL_TLK_TLKCRESO : represents the time resolution;
+       %                   the smallest number of time units that the
+       %                   machine can accuratly represent.
+       %                   ( = TLKHZ div hardwareClock_interrupts_perSecond )
+       %
+    external "TL_TLK_TLKHZ" var Hz: nat
+    external "TL_TLK_TLKCRESO" var clockreso: nat
+
+	%
+	% Elapsed time in "pause" units
+	% (each epoch is "maxnat" pause units)
+	%
+    external "TL_TLK_TLKTIME"  var ticks: nat
+    external "TL_TLK_TLKEPOCH" var epoch: nat
+
+
+	%
+	% Setting and getting current process Turing ID
+	%
+    external "TL_TLK_TLKPSID" procedure settid(id: nat4)
+    external "TL_TLK_TLKPGID" function gettid: nat4
+
+
+	% 
+	% Setting another processes' priority
+	% ("pd" should be the optional value returned on a fork of that proc)
+	%
+    external "TL_TLK_TLKRSETP" procedure setprio(pd: addressint, prio: nat)

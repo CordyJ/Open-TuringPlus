@@ -1,0 +1,1955 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+% 
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+% 
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+/*
+ *   Turing Plus to C Translator
+ *    Module:Transform T+ expressions to a form that C likes
+ *    By:    Mark Mendell
+ *    Date:  8 Dec 1986
+ */
+body "transexpn.st" module TransExpn
+    grant var Expression, var Tree, var tNode, var eNode, BitMask, ExpnType,
+	  var Types, OneToZeroOrigin, asNode, VariableId, InRange,
+	  CreateBeginBlock, ManifestExpression, FindOperand, CreateCommaList,
+	  var BBAndFCCallNode
+
+    var BBAndFCCallNode : ExpressionPointer
+
+    procedure TransExpnList (register t : TreePointer,
+				      ep, subExpn : ExpressionPointer)
+	var register e := ep
+	loop
+	    exit when e = nil(eNode)
+	    TransExpn(t, e, subExpn)
+	    e := eNode(e).sibling
+	end loop
+    end TransExpnList
+
+
+    child "trexpnutil.st"
+
+
+    /* transform a -> b to 	(not a) or b */
+    procedure TransformImplication (t : TreePointer,
+	    ep, subExpn : ExpressionPointer)
+	var register e := eNode(ep).u.operand	/* "a" node" */
+	var register EP := ep
+
+	/* transform the 2 expressions */
+	TransExpn (t, e, subExpn)
+	TransExpn (t, eNode(e).sibling, eNode(e).sibling)
+
+	/* find the original expression again */
+	EP := FindOperand(ep)
+	e := eNode(EP).u.operand
+
+	/* change this to an OR */
+	tag eNode(EP).u, aInfixOr
+
+	/* add the NOT node */
+	var register x : ExpressionPointer
+	new eNode, eNode(EP).u.operand
+	x := eNode(EP).u.operand
+	tag eNode(x).u, aNot
+
+	/* attatch the "b" node to this one */
+	eNode(x).u.operand := e
+	eNode(x).sibling := eNode(e).sibling
+
+	/* detatch the old sibling */
+	eNode(e).sibling := nil(eNode)
+    end TransformImplication
+
+
+    /* right hand bits (xx, a..b) ==> (xx AND BitMask(a,b)) SHR a */
+    procedure TransformBitsExpression (t: TreePointer,
+				       e, subExpn: ExpressionPointer)
+	pre eNode(e).u.operatorNumber = aBits
+
+	var register x,ep : ExpressionPointer
+	var register E := e
+
+	ep := eNode(e).u.operand
+	TransExpn(t, ep, subExpn)
+
+	/* find the original expression again */
+	E := FindOperand(e)
+
+	assert eNode(eNode(ep).sibling).u.operatorNumber = aSubrange or
+		eNode(eNode(ep).sibling).u.operatorNumber = aEnum or
+		eNode(eNode(ep).sibling).u.operatorNumber = aPacked
+
+	/* ep now points to the expn (xx) */
+
+	if eNode(eNode(ep).sibling).u.operatorNumber = aPacked then
+	    x := eNode(eNode(eNode(ep).sibling).u.operand).u.operand /* "a" */
+	else
+	    x := eNode(eNode(ep).sibling).u.operand		/* "a" */
+	end if
+
+	const lowerBound := eNode(x).u.integerValue
+	const bitMask := BitMask(lowerBound,
+				 eNode(eNode(x).sibling).u.integerValue)
+
+	/* make the AND node */
+	new eNode, x
+	const newNode := x
+	tag eNode(x).u, aLogicalAnd
+
+	/* put the expn in as the first operand to the AND */
+	eNode(x).u.operand := ep
+
+	/* place the bitmask as the second operand to the AND */
+	new eNode, eNode(ep).sibling
+	x := eNode(ep).sibling
+
+	tag eNode(x).u, aIntegerLit
+	eNode(x).u.integerValue := bitMask
+	eNode(x).u.integerKind := iInteger
+	eNode(x).sibling := nil(eNode)
+
+	/* put the lower bound as the sibling of the AND */
+	new eNode, eNode(newNode).sibling
+	x := eNode(newNode).sibling
+	tag eNode(x).u, aIntegerLit
+	eNode(x).u.integerValue := lowerBound
+	eNode(x).u.integerKind := iInteger
+	eNode(x).sibling := nil(eNode)
+
+	/* now change the original aBits to SHR */
+	x := eNode(E).sibling
+	tag eNode(E).u, aShiftRight
+	eNode(E).sibling := x
+	eNode(E).u.operand := newNode
+    end TransformBitsExpression
+
+
+    procedure TransParamList (t : TreePointer,
+			      subprogram, ep, subExpn : ExpressionPointer)
+#if DEBUG then
+	handler (quitCode)
+	    if quitCode not= excpSIGINT then
+		put :0, "TransParamList Abort:"
+		Expression.Dump(subprogram, 0, 0)
+		put :0, ""
+		Expression.Dump(ep, 0, 0)
+		put :0, ""
+	    end if
+	    quit >
+	end handler
+#end if
+
+	var register e := ep
+	var register params := Types.GetType(VariableId(subprogram))
+
+	params := tNode(params).operand
+	loop
+	    exit when tNode(params).operatorNumber = aSubs
+	    params := tNode(params).sibling
+	end loop
+	params := tNode(params).operand
+
+	loop
+	    exit when e = nil(eNode)
+	    TransExpn(t, e, subExpn)
+	    if not Types.HasAttribute(tNode(params).leaf, aaVar) then
+		const pKind := Types.GetKind(tNode(params).leaf)
+
+		const register E := FindOperand(e)
+		const eKind := ExpnType(E)
+		case pKind of
+		    label tString, tParameterString :
+			TransformToString(t, E, eKind, subExpn)
+
+		    label tChar:
+			TransformToChar(t, E, eKind, subExpn)
+
+		    label tCharString, tParameterCharString:
+			TransformToCharString(t, E, eKind, subExpn)
+
+		    label :
+		end case
+	    end if
+	    e := eNode(e).sibling
+	    if tNode(params).sibling not= nil(tNode) then
+		params := tNode(params).sibling
+	    end if
+	end loop
+    end TransParamList
+
+
+    procedure TransformPredefinedCall(t : TreePointer,
+				      ep, subExpn : ExpressionPointer)
+	var register e := eNode(eNode(ep).u.operand).sibling
+	var register EP := FindOperand(ep)
+
+	if e = nil(eNode) then
+	    /* no parameters */
+	    return
+	end if
+
+	assert eNode(e).u.operatorNumber = aSubs
+	e := eNode(e).u.operand
+	case eNode(eNode(EP).u.operand).u.funcOrProcNumber of
+	    label pRepeat, pIntstr, pNatstr,
+		    pRealstr, pFrealstr, pErealstr:
+		/* these have a string result */
+		var statementHolder : TreePointer
+
+		CreateBeginBlock(t, statementHolder)
+
+		const originalStatement := tNode(statementHolder).sibling
+		var register tn := statementHolder
+		var newExpn : ExpressionPointer
+		if subExpn not= nil(eNode) then
+		    /* must do this before following TransExpn's */
+		    CreateCommaList(subExpn, newExpn)
+		end if
+
+		case eNode(eNode(EP).u.operand).u.funcOrProcNumber of
+		    label pRepeat:
+			TransExpn(t, e, subExpn)
+			TransformToString(t, e, ExpnType(e), subExpn)
+			e := eNode(e).sibling
+			TransExpn(t, e, subExpn)
+
+		    label pRealstr:
+			TransExpn(t, e, subExpn)
+			e := eNode(e).sibling
+			TransExpn(t, e, subExpn)
+
+		    label pIntstr, pNatstr, pFrealstr:
+			TransExpn(t, e, subExpn)
+			e := eNode(e).sibling
+			TransExpn(t, e, subExpn)
+			e := eNode(e).sibling
+			TransExpn(t, e, subExpn)
+
+		    label pErealstr:
+			TransExpn(t, e, subExpn)
+			e := eNode(e).sibling
+			TransExpn(t, e, subExpn)
+			e := eNode(e).sibling
+			TransExpn(t, e, subExpn)
+			e := eNode(e).sibling
+			TransExpn(t, e, subExpn)
+		end case
+		/* find the original expression again */
+		EP := FindOperand(EP)
+
+		/* declare the temporary */
+		var newId : ExpressionPointer
+		Expression.CreateUniqueIdentifier(newId)
+
+		tNode(tn).operatorNumber := aVar
+		tNode(tn).nodeKind := NodeKinds.OperatorNode
+		tNode(tn).leaf := nil(eNode)
+
+		new tNode, tNode(tn).operand
+		tn := tNode(tn).operand
+
+		tNode(tn).operatorNumber := 0
+		tNode(tn).nodeKind := NodeKinds.ExpressionLeaf
+		tNode(tn).leaf := newId
+		tNode(tn).operand := nil(tNode)
+		tNode(tn).transformed := false
+		tNode(tn).lineNumber := 0
+
+		tNode(tn).sibling := predtree(pWithType, pString)
+		Types.SetType(newId,
+		    tNode(predtree(pWithType, pString)).operand)
+		Types.EnterTypeInfo(newId)
+
+		/* fake out the static test */
+		Types.EnterAttribute(newId, aaGrant)
+
+		/* add a new call, and add in the extra parameter */
+		if subExpn = nil(eNode) then
+		    /* not in a complex boolean expn */
+		    tn := statementHolder
+		    new tNode, tNode(tn).sibling
+		    tn := tNode(tn).sibling
+
+		    tNode(tn).sibling := originalStatement
+		    tNode(tn).operatorNumber := aCall
+		    tNode(tn).transformed := true
+		    tNode(tn).nodeKind := NodeKinds.ExpressionLeaf
+		    tNode(tn).lineNumber := 0
+		    Expression.Copy(ep, tNode(tn).leaf)
+
+		    e := eNode(tNode(tn).leaf).u.operand	/* fcn */
+		else
+		    var dummy : ExpressionPointer
+
+		    EP := FindOperand(EP)
+		    Expression.Copy(EP, dummy)
+		    eNode(newExpn).u := eNode(dummy).u
+		    e := eNode(newExpn).u.operand
+		end if
+		e := eNode(e).sibling
+		assert eNode(e).u.operatorNumber = aSubs
+		e := eNode(e).u.operand
+		loop
+		    exit when eNode(e).sibling = nil(eNode)
+		    e := eNode(e).sibling
+		end loop
+		Expression.Copy(newId, eNode(e).sibling)
+
+		/* replace the substring by the temporary */
+		tag eNode(EP).u, aIdent
+		eNode(EP).u.referenceValue := eNode(newId).u.referenceValue
+
+	    label pIndex:
+		/* first and second parameters are strings */
+		TransExpn(t, e, subExpn)
+		TransformToString(t, e, ExpnType(e), subExpn)
+		e := eNode(e).sibling
+		TransExpn(t, e, subExpn)
+		TransformToString(t, e, ExpnType(e), subExpn)
+
+	    label pLength, pStrint, pStrnat, pStrreal:
+		/* first parameter is a string */
+		TransExpn(t, e, subExpn)
+		TransformToString(t, e, ExpnType(e), subExpn)
+		if eNode(e).sibling not= nil(eNode) then
+		    TransExpn(t, eNode(e).sibling, subExpn)
+		end if
+
+	    label pOrd:
+		/* first parameter might be a char! */
+		const register eKind := ExpnType(e)
+
+		TransExpn(t, e, subExpn)
+		case eKind of
+		    label tChar, tString, tCharString, tFlexCharString,
+			    tParameterString, tParameterCharString:
+			TransformToChar(t, e, eKind, subExpn)
+		    label :
+		end case
+
+	    label pLower:
+		TransExpn(t, e, subExpn)
+		const register varId := VariableId(e)
+		case Types.GetKind(varId) of
+		    label tString, tCharString, tFlexCharString,
+			    tParameterString, tParameterCharString:
+			tag eNode(EP).u, aIntegerLit
+			eNode(EP).u.integerValue := 1
+			eNode(EP).u.integerKind := iInteger
+
+		    label tArray, tFlexArray, tParameterArray,
+			    tParameterArrayParameterCharString,
+			    tParameterArrayParameterString:
+			var register as := Types.ArrayStringInformation(varId)
+
+			for : 2 .. Expression.GetInteger(eNode(e).sibling)
+			    as := asNode(as).next
+			end for
+			tag eNode(EP).u, aIntegerLit
+			eNode(EP).u.integerKind := iInteger
+			if asNode(as).u.kind = manifestUpperBound then
+			    eNode(EP).u.integerValue := asNode(as).u.mLower
+			else
+			    eNode(EP).u.integerValue := asNode(as).u.nmLower
+			end if
+
+		    label tSubrange, tEnumeration:
+			const register temp := Types.GetType(varId)
+
+			eNode(EP).u := eNode(tNode(tNode(temp).operand).leaf).u
+		end case
+
+	    label pUpper:
+		TransExpn(t, e, subExpn)
+		const register varId := VariableId(e)
+		var register as := Types.ArrayStringInformation(varId)
+
+		case Types.GetKind(varId) of
+		    label tString, tCharString, tFlexCharString,
+			    tParameterString, tParameterCharString:
+			if asNode(as).u.kind = manifestStringLength then
+			    tag eNode(EP).u, aIntegerLit
+			    eNode(EP).u.integerValue :=
+				asNode(as).u.mStringUpper
+			    eNode(EP).u.integerKind := iInteger
+			else
+			    eNode(EP).u := eNode(asNode(as).u.nmStringUpper).u
+			end if
+
+		    label tArray, tFlexArray, tParameterArray,
+			    tParameterArrayParameterCharString,
+			    tParameterArrayParameterString:
+			for : 2 .. Expression.GetInteger(eNode(e).sibling)
+			    as := asNode(as).next
+			end for
+			if asNode(as).u.kind = manifestUpperBound then
+			    tag eNode(EP).u, aIntegerLit
+			    eNode(EP).u.integerKind := iInteger
+			    eNode(EP).u.integerValue := asNode(as).u.mUpper
+			else
+			    eNode(EP).u := eNode(asNode(as).u.nmUpper).u
+			end if
+
+		    label tSubrange, tEnumeration:
+			const register temp := Types.GetType(varId)
+
+			eNode(EP).u :=
+			    eNode(tNode(tNode(tNode(
+				temp).operand).sibling).leaf).u
+		end case
+
+	    label pStrmove:
+		var register x := eNode(eNode(e).sibling).sibling
+
+		TransExpn(t, eNode(e).sibling, subExpn)
+		TransExpn(t, eNode(x).sibling, subExpn)
+		TransExpn(t, eNode(eNode(x).sibling).sibling, subExpn)
+		EP := FindOperand(EP)
+		if eNode(e).u.operatorNumber = aString then
+		    if eNode(x).u.operatorNumber = aString then
+			eNode(eNode(EP).u.operand).u.funcOrProcNumber :=
+			    pStrmoveSS
+		    else
+			assert eNode(x).u.operatorNumber = aChar
+			eNode(eNode(EP).u.operand).u.funcOrProcNumber :=
+			    pStrmoveSC
+			TransformToCharString(t, eNode(x).sibling,
+			    ExpnType(eNode(x).sibling), subExpn)
+		    end if
+		else
+		    assert eNode(e).u.operatorNumber = aChar
+		    TransformToCharString(t, eNode(e).sibling,
+			ExpnType(eNode(e).sibling), subExpn)
+		    if eNode(x).u.operatorNumber = aString then
+			eNode(eNode(EP).u.operand).u.funcOrProcNumber :=
+			    pStrmoveCS
+		    else
+			assert eNode(x).u.operatorNumber = aChar
+			eNode(eNode(EP).u.operand).u.funcOrProcNumber :=
+			    pStrmoveCC
+			TransformToCharString(t, eNode(x).sibling,
+			    ExpnType(eNode(x).sibling), subExpn)
+		    end if
+		end if
+		/* remove the descriptors */
+		x := eNode(eNode(EP).u.operand).sibling
+		assert eNode(x).u.operatorNumber = aSubs
+		eNode(x).u.operand := eNode(eNode(x).u.operand).sibling
+		x := eNode(x).u.operand
+		eNode(x).sibling := eNode(eNode(x).sibling).sibling
+
+	    label pStrreplace:
+		var register x := eNode(e).sibling
+
+		TransExpn(t, e, subExpn)
+		TransExpn(t, eNode(x).sibling, subExpn)
+		TransExpn(t, eNode(eNode(x).sibling).sibling, subExpn)
+		EP := FindOperand(EP)
+		if eNode(x).u.operatorNumber = aString then
+		    eNode(eNode(EP).u.operand).u.funcOrProcNumber :=
+			pStrreplaceS
+		else
+		    assert eNode(x).u.operatorNumber = aChar
+		    % TransformToCharString(t, eNode(x).sibling,
+		    %	ExpnType(eNode(x).sibling), subExpn)
+		    eNode(eNode(EP).u.operand).u.funcOrProcNumber :=
+			pStrreplaceC
+		end if
+		/* remove the descriptor */
+		eNode(e).sibling := eNode(x).sibling
+
+	    label :
+		TransExpnList(t, e, subExpn)
+	end case
+    end TransformPredefinedCall
+
+
+    /* tranform a procedure call */
+    procedure TransformCall (t : TreePointer,
+			     ep, subExpn : ExpressionPointer)
+	/* transform the subprogram */
+	var register e := eNode(ep).u.operand
+	var register EP := ep
+
+	if eNode(e).u.operatorNumber = aPredefinedId then
+	    TransformPredefinedCall(t, ep, subExpn)
+	    return
+	end if
+
+	if Types.HasAttribute(VariableId(e), aaNonScalar) then
+	    /*
+	     * non-scalar function result;  make a temp, add it as the
+	     * last parameter, and replace function with temp
+	     */
+	    var statementHolder : TreePointer
+
+	    CreateBeginBlock(t, statementHolder)
+
+	    const originalStatement := tNode(statementHolder).sibling
+
+	    /* now transform the call, in order to get the correct code order */
+	    TransExpn (t, e, subExpn)
+	    e := eNode(e).sibling
+
+	    /* find the original expression again */
+	    EP := FindOperand(ep)
+
+	    if e not= nil(eNode) then
+		assert eNode(e).u.operatorNumber = aSubs
+		TransParamList(t, eNode(EP).u.operand,
+			       eNode(e).u.operand, subExpn)
+	    end if
+
+	    /* we can now add statements starting with statementHolder */
+
+	    /* declare the temporary */
+	    var newId : ExpressionPointer
+	    Expression.CreateUniqueIdentifier(newId)
+
+	    var register tn := statementHolder
+
+	    tNode(tn).operatorNumber := aVar
+	    tNode(tn).nodeKind := NodeKinds.OperatorNode
+	    tNode(tn).leaf := nil(eNode)
+
+	    new tNode, tNode(tn).operand
+	    tn := tNode(tn).operand
+
+	    tNode(tn).operatorNumber := 0
+	    tNode(tn).nodeKind := NodeKinds.ExpressionLeaf
+	    tNode(tn).leaf := newId
+	    tNode(tn).operand := nil(tNode)
+	    tNode(tn).transformed := true
+	    tNode(tn).lineNumber := 0
+
+	    new tNode, tNode(tn).sibling
+	    tn := tNode(tn).sibling
+	    tNode(tn).operatorNumber := aType
+	    tNode(tn).nodeKind := NodeKinds.OperatorNode
+	    tNode(tn).operand := nil(tNode)	/* temp */
+	    tNode(tn).leaf := nil(eNode)
+	    tNode(tn).sibling := nil(tNode)
+	    tNode(tn).transformed := true
+	    tNode(tn).lineNumber := 0
+
+	    /* find the function result type */
+	    const register x := eNode(ep).u.operand
+	    var register y := Types.GetType(x)
+	    y := tNode(y).operand	/* fcn name */
+	    y := tNode(y).sibling	/* subs or fcn result */
+	    if tNode(y).operatorNumber = aSubs then
+		y := tNode(y).sibling	/* fcn result */
+	    end if
+	    tNode(tn).operand := Types.GetTree(tNode(y).leaf)
+	    Types.SetType(newId, tNode(tn).operand)
+	    Types.EnterTypeInfo(newId)
+
+	    /* fake out the static test */
+	    Types.EnterAttribute(newId, aaGrant)
+
+	    /* add a new call, and add in the extra parameter */
+	    if subExpn = nil(eNode) then
+		tn := statementHolder
+		new tNode, tNode(tn).sibling
+		tn := tNode(tn).sibling
+
+		tNode(tn).sibling := originalStatement
+		tNode(tn).operatorNumber := aCall
+		tNode(tn).transformed := true
+		tNode(tn).nodeKind := NodeKinds.ExpressionLeaf
+		tNode(tn).lineNumber := 0
+		Expression.Copy(EP, tNode(tn).leaf)
+
+		e := eNode(tNode(tn).leaf).u.operand	/* fcn */
+	    else
+		var newExpn, dummy : ExpressionPointer
+
+		CreateCommaList(subExpn, newExpn)
+		Expression.Copy(EP, dummy)
+		eNode(newExpn).u := eNode(dummy).u
+		e := eNode(newExpn).u.operand
+	    end if
+	    if eNode(e).sibling = nil(eNode) then
+		/* must add a parameter */
+		new eNode, eNode(e).sibling
+		e := eNode(e).sibling
+		eNode(e).sibling := nil(eNode)
+		tag eNode(e).u, aSubs
+
+		Expression.Copy(newId, eNode(e).u.operand)
+	    else
+		e := eNode(e).sibling
+		assert eNode(e).u.operatorNumber = aSubs
+		e := eNode(e).u.operand
+		loop
+		    exit when eNode(e).sibling = nil(eNode)
+		    e := eNode(e).sibling
+		end loop
+		Expression.Copy(newId, eNode(e).sibling)
+	    end if
+
+	    /* replace the substring by the temporary */
+	    tag eNode(EP).u, aIdent
+	    eNode(EP).u.referenceValue := eNode(newId).u.referenceValue
+	else
+	    TransExpn (t, e, subExpn)
+	    e := eNode(e).sibling
+
+	    /* find the original expression again */
+	    EP := FindOperand(ep)
+
+	    if e not= nil(eNode) then
+		assert eNode(e).u.operatorNumber = aSubs
+		TransParamList(t, eNode(EP).u.operand,
+			       eNode(e).u.operand, subExpn)
+	    end if
+	end if
+    end TransformCall
+
+
+    /* set comparisons  aInfixCompare compOP a b */
+    procedure SetComparison (t : TreePointer, ep : ExpressionPointer,
+			     subExpn : ExpressionPointer)
+	var register EP := ep
+	var register e := eNode(EP).u.operand
+	const operation := eNode(e).u.operatorNumber
+	const firstOperand := eNode(e).u.operand
+	const variable := VariableId(firstOperand)
+
+	if variable = nil(eNode) /* first operand is set const */ or
+		Types.HasAttribute(variable, aaSmallSet) then
+	    TransExpn (t, firstOperand, subExpn)
+	    TransExpn (t, eNode(firstOperand).sibling, subExpn)
+
+	    if operation = aEqual or operation = aNotEqual then
+		return
+	    end if
+
+	    /* transform <= and >= to set difference, compare to 0 */
+	    tag eNode(EP).u, aInfixCompare
+	    new eNode, eNode(EP).u.operand
+	    e := eNode(EP).u.operand
+
+	    tag eNode(e).u, aEqual
+	    eNode(e).sibling := nil(eNode)
+
+	    new eNode, eNode(e).u.operand
+	    e := eNode(e).u.operand
+
+	    tag eNode(e).u, aIntegerLit
+	    eNode(e).u.integerValue := 0
+	    eNode(e).u.integerKind := iInteger
+
+	    new eNode, eNode(e).sibling
+	    e := eNode(e).sibling
+
+	    tag eNode(e).u, aSetDifference
+	    eNode(e).sibling := nil(eNode)
+
+	    if operation = aSetLessEqual then
+		/* use the operands in the current order */
+		eNode(e).u.operand := firstOperand
+	    else
+		/* reverse the operands */
+		eNode(e).u.operand := eNode(firstOperand).sibling
+		e := eNode(e).u.operand
+		eNode(e).sibling := firstOperand
+		e := eNode(e).sibling
+		eNode(e).sibling := nil(eNode)
+	    end if
+	    return
+	end if
+	/*
+	 * we are in big set land;
+	 * Allocate a temporary
+	 * Call a predefined routine to compute the answer
+	 * replace the expression with the temporary
+	 */
+	var newId, subsExpn : ExpressionPointer
+
+	BeginBlockAndFunctionCall(t, predtree(pWithType, pNat4),
+	    SetCmpOp(operation, subExpn), newId, subsExpn, subExpn)
+
+	/* now translate the operands */
+	TransExpn (t, firstOperand, subExpn)
+	TransExpn (t, eNode(firstOperand).sibling, subExpn)
+
+	EP := FindOperand(ep)
+	e := subsExpn
+	Expression.Copy(newId, eNode(e).u.operand)
+	e := eNode(e).u.operand
+	eNode(e).sibling := firstOperand
+
+	/* now change expression to the temporary */
+	eNode(EP).u := eNode(newId).u
+    end SetComparison
+
+
+    /* transform a CMP b */
+    procedure TransformComparison (t : TreePointer,
+				   ep, subExpn : ExpressionPointer)
+	var register e := eNode(ep).u.operand	/* "a" node */
+	var register EP := ep
+
+	/* transform the 2 expressions */
+	const op := eNode(e).u.operatorNumber
+	case op of
+	    label aEqual, aGreater, aGreaterEqual, aLess,
+		    aLessEqual, aNotEqual,
+		    aSetGreaterEqual, aSetLessEqual :
+		e := eNode(e).u.operand
+		const register eKind := ExpnType(e)
+		const register e2Kind := ExpnType(eNode(e).sibling)
+
+		if eKind = tString or eKind = tParameterString or
+			e2Kind = tString or e2Kind = tParameterString then
+		    TransExpn (t, e, subExpn)
+		    TransExpn (t, eNode(e).sibling, subExpn)
+		    TransformToString(t, e, ExpnType(e), subExpn)
+		    TransformToString(t, eNode(e).sibling,
+			ExpnType(eNode(e).sibling), subExpn)
+
+		    /* find the original expression again */
+		    EP := FindOperand(ep)
+		    e := eNode(eNode(EP).u.operand).u.operand
+		    StringComparison(t, EP)
+
+		elsif eKind = tCharString or eKind = tParameterCharString or
+			eKind = tFlexCharString or e2Kind = tCharString or
+			e2Kind = tParameterCharString or
+			e2Kind = tFlexCharString then
+		    TransExpn (t, e, subExpn)
+		    TransExpn (t, eNode(e).sibling, subExpn)
+		    TransformToCharString(t, e, ExpnType(e), subExpn)
+		    TransformToCharString(t, eNode(e).sibling,
+			ExpnType(eNode(e).sibling), subExpn)
+
+		    /* find the original expression again */
+		    EP := FindOperand(ep)
+		    e := eNode(eNode(EP).u.operand).u.operand
+		    CharStringComparison(t, EP)
+
+		elsif eKind = tSet or e2Kind = tSet or op = aSetGreaterEqual or
+			op = aSetLessEqual then
+		    /* must translate the expns in SetComparison for big sets */
+		    SetComparison(t, EP, subExpn)
+
+		else
+		    TransExpn (t, e, subExpn)
+		    TransExpn (t, eNode(e).sibling, subExpn)
+		end if
+		return
+
+	    label :
+	end case
+
+	TransExpn (t, e, subExpn)
+	TransExpn (t, eNode(e).sibling, subExpn)
+
+	/* find the original expression again */
+	EP := FindOperand(ep)
+	e := eNode(EP).u.operand
+	e := eNode(eNode(e).sibling).sibling
+
+	var wasIn : boolean
+
+	if eNode(e).u.operatorNumber = aNotIn then
+	    wasIn := false
+	else
+	    wasIn := true
+	end if
+
+	/* must transform a to set, AND the sets, and compare for 0/not 0 */
+	e := eNode(e).u.operand
+	const lowBound := Expression.GetInteger(e)
+	const upperBound := eNode(e).sibling
+
+	const numElemsMinus1 := Expression.GetInteger(upperBound) - lowBound
+	if numElemsMinus1 < 32 then
+	    var register x : ExpressionPointer
+	    var saveE : ExpressionPointer
+
+	    e := eNode(EP).u.operand	/* point to the aInfixCompare */
+
+	    /* save the first operand */
+	    Expression.Copy(e, saveE)
+
+	    const secondOp := eNode(e).sibling
+
+	    /* Change the first operand to a comparison */
+	    if wasIn then
+		tag eNode(e).u, aNotEqual
+	    else
+		tag eNode(e).u, aEqual
+	    end if
+	    eNode(e).sibling := nil(eNode)
+
+	    /* add a set intersection */
+	    new eNode, eNode(e).u.operand
+	    e := eNode(e).u.operand
+	    tag eNode(e).u, aSetIntersection
+
+	    new eNode, eNode(e).u.operand
+	    x := eNode(e).u.operand
+	    const firstOp := x
+
+	    /* change expn to a predefined call */
+	    tag eNode(x).u, aCall
+
+	    new eNode, eNode(x).u.operand
+	    x := eNode(x).u.operand
+	    tag eNode(x).u, aPredefinedId
+	    if numElemsMinus1 < 16 then
+		eNode(x).u.funcOrProcNumber := pRealSmallSetConstructor
+	    else
+		eNode(x).u.funcOrProcNumber := pSmallSetConstructor
+	    end if
+
+	    new eNode, eNode(x).sibling
+	    x := eNode(x).sibling
+
+	    tag eNode(x).u, aSubs
+	    InRange(saveE, upperBound, lowBound, eNode(x).u.operand,
+		    true, 19)
+	    eNode(x).sibling := nil(eNode)
+
+	    /* set the second operand of the intersection to the set */
+	    eNode(firstOp).sibling := secondOp
+	    eNode(eNode(firstOp).sibling).sibling := nil(eNode)
+
+	    /* set the compare operand to 0 */
+	    new eNode, eNode(e).sibling
+	    e := eNode(e).sibling
+
+	    tag eNode(e).u, aIntegerLit
+	    eNode(e).u.integerValue := 0
+	    eNode(e).u.integerKind := iInteger
+	    eNode(e).sibling := nil(eNode)
+	else
+	    /* Large Set "in" */
+	    LargeSetIn(t, EP, lowBound, upperBound, wasIn, subExpn)
+	end if
+    end TransformComparison
+
+
+    /* transform substrings */
+    procedure TransformSubstring (t : TreePointer,
+				  ep, subExpn : ExpressionPointer)
+	var register e := eNode(ep).u.operand	/* string expn node */
+	var register EP := ep
+
+	/* find the kind of the string */
+	const sKind := ExpnType(e)
+
+	/* find the substring kind */
+	var register x := e
+	loop
+	    exit when eNode(x).u.operatorNumber = aEndSubstring
+	    x := eNode(x).sibling
+	end loop
+
+	/* check the kind of the substring */
+	case sKind of
+	    label tCharString,  tFlexCharString, tParameterCharString:
+		if eNode(x).u.substringKind mod 256 = ssNone then
+		    /* transform the arguments */
+		    x := e
+		    loop
+			exit when eNode(x).u.operatorNumber = aEndSubstring
+			TransExpn(t, x, subExpn)
+			x := eNode(x).sibling
+		    end loop
+		    TransFormSingleCharCharSubstring(e, x)
+		    return
+		end if
+	    label :
+	end case
+
+	/* create the procedure call for the substring operation */
+	/* this ordering is necessary to get the proper nesting */
+	var newId : ExpressionPointer
+
+	CreatePredefinedSubstringCall(t, e, sKind,
+	    eNode(x).u.substringKind, newId, subExpn)
+
+	/* now transform the arguments */
+	x := e
+	loop
+	    /* aEndSubstring now is the result */
+	    exit when eNode(x).sibling = nil(eNode)
+	    TransExpn(t, x, subExpn)
+	    x := eNode(x).sibling
+	end loop
+
+	/* find the original expression again */
+	EP := FindOperand(ep)
+
+	/* replace the substring by the temporary */
+	eNode(EP).u := eNode(newId).u
+    end TransformSubstring
+
+
+    /* transform string concatenate  -- aConcatenate left right */
+    procedure TransformConcatenate (tr : TreePointer,
+				    ep, subExpn : ExpressionPointer)
+	var register e := eNode(ep).u.operand	/* left expn node */
+	var register EP := ep
+	var t := tr
+	const firstOperand := e
+
+	/*
+	 * put the statement into a begin block
+	 * allocate a temporary for the result string
+	 * move the concatenate operation before this statement and
+	 *	replace it by the proper procedure call
+	 * replace this node by a reference to the temporary
+	 */
+	var newId, subsExpn : ExpressionPointer
+
+	BeginBlockAndFunctionCall(tr, predtree(pWithType, pString),
+	    pStringConcatenate, newId, subsExpn, subExpn)
+	t := tNode(tNode(tr).operand).sibling
+
+	/* transform the operands */
+	TransExpn(tr, e, subExpn)
+	TransExpn(tr, eNode(e).sibling, subExpn)
+
+	/* find the original expression again */
+	EP := FindOperand(ep)
+
+	var eKind := ExpnType(e)
+	if not (eKind = tString or eKind = tParameterString) then
+	    TransformToString(t, e, eKind, subExpn)
+	end if
+
+	e := eNode(e).sibling
+	eKind := ExpnType(e)
+	if not (eKind = tString or eKind = tParameterString) then
+	    TransformToString(t, e, eKind, subExpn)
+	end if
+
+	/* enter the arguments */
+	e := subsExpn
+	eNode(e).u.operand := firstOperand
+	eNode(e).sibling := nil(eNode)
+	e := eNode(e).u.operand
+	e := eNode(e).sibling
+	Expression.Copy(newId, eNode(e).sibling)
+
+	/* replace the substring by the temporary */
+	eNode(EP).u := eNode(newId).u
+    end TransformConcatenate
+
+
+    /* transform a set operation */
+    procedure TransformSetOperation (t : TreePointer,
+				     ep, subExpn : ExpressionPointer)
+	/* input aOp a b */
+	var register e := eNode(ep).u.operand
+
+	const variable := VariableId(e)
+	if variable = nil(eNode) /* small set constant */ or
+		Types.HasAttribute(variable, aaSmallSet) then
+	    TransExpn(t, e, subExpn)	/* transform the operands */
+	    TransExpn(t, eNode(e).sibling, subExpn)
+	    return
+	end if
+
+	/* Large set operation */
+	var newStmt : TreePointer
+	var register tp : TreePointer
+	var newId : ExpressionPointer
+
+	if subExpn = nil(eNode) then
+	    /* The code can go at the statement level */
+	    CreateBeginBlock(t, newStmt)
+	    const origStmt := tNode(newStmt).sibling
+
+	    TransExpnList(t, e, subExpn)	/* transform the operands */
+
+	    var typeTree := Types.GetTree(variable)
+
+	    CreateLargeSetTemp(newStmt, newId, tNode(typeTree).leaf)
+	    tp := newStmt
+
+	    /*
+	     * create the predefined call --
+	     *	LRGSETop(newId, a, b)
+	     */
+
+	    new tNode, tNode(tp).sibling
+	    tp := tNode(tp).sibling
+	    tNode(tp).nodeKind := NodeKinds.ExpressionLeaf
+	    tNode(tp).operatorNumber := aCall
+	    tNode(tp).transformed := true
+	    tNode(tp).operand := nil(tNode)
+	    tNode(tp).sibling := origStmt
+	    tNode(tp).lineNumber := 0
+
+	    new eNode, tNode(tp).leaf
+	    e := tNode(tp).leaf
+	    tag eNode(e).u, aCall
+	    eNode(e).sibling := nil(eNode)
+
+	    new eNode, eNode(e).u.operand
+	    e := eNode(e).u.operand
+	    tag eNode(e).u, aPredefinedId
+	    case eNode(ep).u.operatorNumber of
+		label aSetUnion:
+		    eNode(e).u.funcOrProcNumber := pLargeSetUnion
+
+		label aSetIntersection:
+		    eNode(e).u.funcOrProcNumber := pLargeSetIntersection
+
+		label aSetDifference:
+		    eNode(e).u.funcOrProcNumber := pLargeSetDifference
+
+		label aSetXor:
+		    eNode(e).u.funcOrProcNumber := pLargeSetXor
+	    end case
+
+	    new eNode, eNode(e).sibling
+	    e := eNode(e).sibling
+
+	    tag eNode(e).u, aSubs
+	    eNode(e).sibling := nil(eNode)
+	    Expression.Copy(newId, eNode(e).u.operand)
+	    e := eNode(e).u.operand
+	    Expression.Copy(eNode(ep).u.operand, eNode(e).sibling)
+	    e := eNode(e).sibling
+	    Expression.Copy(eNode(eNode(ep).u.operand).sibling,
+		eNode(e).sibling)
+
+	    /* replace the expn by the temp */
+	    eNode(ep).u := eNode(newId).u
+	else
+	    /* this must go in a comma list;  use functional calls */
+	    var subsExpn : ExpressionPointer
+	    var register typeTree := Types.GetTree(variable)
+	    var register dummy : TreePointer
+
+	    assert tNode(typeTree).operatorNumber not= aType
+
+	    /* make up an aType node */
+
+	    new tNode, dummy
+	    tNode(dummy).operand := typeTree
+	    typeTree := dummy
+
+	    tNode(dummy).operatorNumber := aType
+	    tNode(dummy).nodeKind := NodeKinds.OperatorNode
+	    tNode(dummy).sibling := nil(tNode)
+	    tNode(dummy).leaf := nil(eNode)
+	    tNode(dummy).transformed := true
+	    tNode(dummy).lineNumber := 0
+
+	    case eNode(ep).u.operatorNumber of
+		label aSetUnion:
+		    BeginBlockAndFunctionCall(t, typeTree, pLargeSetUnionFcn,
+			newId, subsExpn, subExpn)
+
+		label aSetIntersection:
+		    BeginBlockAndFunctionCall(t, typeTree,
+			pLargeSetIntersectionFcn, newId, subsExpn, subExpn)
+
+		label aSetDifference:
+		    BeginBlockAndFunctionCall(t, typeTree,
+			pLargeSetDifferenceFcn, newId, subsExpn, subExpn)
+
+		label aSetXor:
+		    BeginBlockAndFunctionCall(t, typeTree, pLargeSetXorFcn,
+			newId, subsExpn, subExpn)
+	    end case
+
+	    TransExpnList(t, e, subExpn)	/* transform the operands */
+	    const register EP := FindOperand(ep)
+
+	    /*
+	     * create the predefined call --
+	     *	LRGSETop(newId, a, b)
+	     */
+
+	    e := subsExpn
+	    Expression.Copy(newId, eNode(e).u.operand)
+	    e := eNode(e).u.operand
+	    Expression.Copy(eNode(EP).u.operand, eNode(e).sibling)
+	    e := eNode(e).sibling
+	    Expression.Copy(eNode(eNode(EP).u.operand).sibling,
+		eNode(e).sibling)
+
+	    /* replace the expn by the temp */
+	    eNode(EP).u := eNode(newId).u
+	end if
+    end TransformSetOperation
+
+
+    procedure LargeSetExpnConstructor (t : TreePointer, ep : ExpressionPointer,
+			      	       lowBound : int4,
+				       upperBound : ExpressionPointer,
+				       subExpn : ExpressionPointer)
+	pre eNode(ep).u.operatorNumber = aSet
+
+	var register EP := FindOperand(ep)
+	var newId : ExpressionPointer
+	var register e := eNode(EP).u.operand
+	const variable := VariableId(e)
+	var typeTree := Types.GetTree(variable)
+	var subsExpn : ExpressionPointer
+	var elements := eNode(eNode(eNode(EP).u.operand).sibling).u.operand
+
+	if tNode(typeTree).operatorNumber not= aType then
+	    assert tNode(typeTree).operatorNumber = aSet
+	    /* make up an aType node */
+	    var register dummy : TreePointer
+
+	    new tNode, dummy
+	    tNode(dummy).operand := typeTree
+	    typeTree := dummy
+
+	    tNode(dummy).operatorNumber := aType
+	    tNode(dummy).nodeKind := NodeKinds.OperatorNode
+	    tNode(dummy).sibling := nil(tNode)
+	    tNode(dummy).leaf := nil(eNode)
+	    tNode(dummy).transformed := true
+	    tNode(dummy).lineNumber := 0
+	end if
+
+	/* clear the set */
+	var register lastElement : ExpressionPointer
+
+	if elements not= nil(eNode) and
+		eNode(elements).u.operatorNumber = aAll then
+	    BeginBlockAndFunctionCall(t, typeTree, pLargeSetAllFcn, newId,
+		subsExpn, subExpn)
+	    e := subsExpn
+	    Expression.Copy(newId, eNode(e).u.operand)
+
+	    /* replace the expn with the temp */
+	    EP := FindOperand(ep)
+	    elements := eNode(eNode(eNode(EP).u.operand).sibling).u.operand
+	    eNode(EP).u := eNode(newId).u
+	    return
+	else
+	    BeginBlockAndFunctionCall(t, typeTree, pLargeSetClearFcn, newId,
+		subsExpn, subExpn)
+	    lastElement := BBAndFCCallNode
+	    e := subsExpn
+	    Expression.Copy(newId, eNode(e).u.operand)
+
+	    EP := FindOperand(ep)
+	    elements := eNode(eNode(eNode(EP).u.operand).sibling).u.operand
+	    TransExpnList(t, elements, subExpn)
+	    EP := FindOperand(ep)
+	    elements := eNode(eNode(eNode(EP).u.operand).sibling).u.operand
+	end if
+
+	/* now set each element */
+	e := elements
+	loop
+	    exit when e = nil(eNode)
+
+	    var register x : ExpressionPointer
+
+	    new eNode, x
+	    eNode(x).sibling := eNode(lastElement).sibling
+	    eNode(lastElement).sibling := x
+	    lastElement := x
+	    tag eNode(x).u, aCall
+
+	    new eNode, eNode(x).u.operand
+	    x := eNode(x).u.operand
+	    tag eNode(x).u, aPredefinedId
+	    if ManifestExpression(e) then
+		eNode(x).u.funcOrProcNumber := pLargeSetManifestConstructor
+	    else
+		eNode(x).u.funcOrProcNumber := pLargeSetConstructorFcn
+	    end if
+
+	    new eNode, eNode(x).sibling
+	    x := eNode(x).sibling
+
+	    tag eNode(x).u, aSubs
+	    eNode(x).sibling := nil(eNode)
+	    Expression.Copy(newId, eNode(x).u.operand)
+	    x := eNode(x).u.operand
+	    InRange(e, upperBound, lowBound, eNode(x).sibling, true, 19)
+
+	    e := eNode(e).sibling
+	end loop
+
+	/* replace the expn with the temp */
+	eNode(EP).u := eNode(newId).u
+    end LargeSetExpnConstructor
+
+
+
+    procedure LargeSetConstructor(t : TreePointer, ep : ExpressionPointer,
+			      lowBound : int4, upperBound : ExpressionPointer,
+			      subExpn : ExpressionPointer)
+	if subExpn not= nil(eNode) then
+	    LargeSetExpnConstructor(t, ep, lowBound, upperBound, subExpn)
+	    return
+	end if
+
+	var newStmt : TreePointer
+	var newId : ExpressionPointer
+	var register tp : TreePointer
+	var register e : ExpressionPointer
+
+	CreateBeginBlock(t, newStmt)
+	CreateLargeSetTemp(newStmt, newId, eNode(ep).u.operand)
+
+	/* clear the set temp */
+	const origStmt := tNode(newStmt).sibling
+	tp := newStmt
+
+	new tNode, tNode(tp).sibling
+	tp := tNode(tp).sibling
+	tNode(tp).nodeKind := NodeKinds.ExpressionLeaf
+	tNode(tp).operatorNumber := aCall
+	tNode(tp).transformed := true
+	tNode(tp).lineNumber := 0
+
+	new eNode, tNode(tp).leaf
+	e := tNode(tp).leaf
+	tag eNode(e).u, aCall
+
+	new eNode, eNode(e).u.operand
+	e := eNode(e).u.operand
+	tag eNode(e).u, aPredefinedId
+	const elements := eNode(eNode(eNode(ep).u.operand).sibling).u.operand
+
+	if elements not= nil(eNode) and
+		eNode(elements).u.operatorNumber = aAll then
+	    eNode(e).u.funcOrProcNumber := pLargeSetAll
+
+	    new eNode, eNode(e).sibling
+	    e := eNode(e).sibling
+
+	    tag eNode(e).u, aSubs
+	    Expression.Copy(newId, eNode(e).u.operand)
+	    eNode(e).sibling := nil(eNode)
+
+	    /* link up the original stmt */
+	    tNode(tp).sibling := origStmt
+
+	    /* replace the expn with the temp */
+	    eNode(ep).u := eNode(newId).u
+
+	    /* all done now */
+	    return
+	else
+	    eNode(e).u.funcOrProcNumber := pLargeSetClear
+
+	    new eNode, eNode(e).sibling
+	    e := eNode(e).sibling
+
+	    tag eNode(e).u, aSubs
+	    Expression.Copy(newId, eNode(e).u.operand)
+	    eNode(e).sibling := nil(eNode)
+	end if
+
+	TransExpnList(t, elements, subExpn)
+
+	/* now set each element */
+	e := elements
+	loop
+	    exit when e = nil(eNode)
+
+	    var register x : ExpressionPointer
+
+	    new tNode, tNode(tp).sibling
+	    tp := tNode(tp).sibling
+	    tNode(tp).nodeKind := NodeKinds.ExpressionLeaf
+	    tNode(tp).operatorNumber := aCall
+	    tNode(tp).transformed := true
+	    tNode(tp).lineNumber := 0
+
+	    new eNode, tNode(tp).leaf
+	    x := tNode(tp).leaf
+	    tag eNode(x).u, aCall
+
+	    new eNode, eNode(x).u.operand
+	    x := eNode(x).u.operand
+	    tag eNode(x).u, aPredefinedId
+	    if ManifestExpression(e) then
+		eNode(x).u.funcOrProcNumber := pLargeSetManifestConstructor
+	    else
+		eNode(x).u.funcOrProcNumber := pLargeSetConstructor
+	    end if
+
+	    new eNode, eNode(x).sibling
+	    x := eNode(x).sibling
+
+	    tag eNode(x).u, aSubs
+	    eNode(x).sibling := nil(eNode)
+	    Expression.Copy(newId, eNode(x).u.operand)
+	    x := eNode(x).u.operand
+	    InRange(e, upperBound, lowBound, eNode(x).sibling, true, 19)
+
+	    e := eNode(e).sibling
+	end loop
+
+	/* link up the original stmt */
+	tNode(tp).sibling := origStmt
+
+	/* replace the expn with the temp */
+	eNode(ep).u := eNode(newId).u
+    end LargeSetConstructor
+
+
+    /* transform set constructors */
+    procedure TransformSetConstructor (t : TreePointer,
+				       ep, subExpn : ExpressionPointer)
+	/* input aSet setType aSubs expn expn expn */
+	var register e := eNode(ep).u.operand
+
+	var register ty := Types.GetType(e)
+
+	assert tNode(ty).operatorNumber = aSet
+	ty := tNode(ty).operand
+	if tNode(ty).operatorNumber not= aSubrange and
+		tNode(ty).operatorNumber not= aEnum then
+	    if tNode(ty).operatorNumber = aPacked then
+		ty := tNode(ty).operand
+	    else
+		ty := Types.GetType(tNode(ty).leaf)
+	    end if
+	    assert tNode(ty).operatorNumber = aSubrange or
+		tNode(ty).operatorNumber = aEnum
+	end if
+
+	const lowBound := Expression.GetInteger(tNode(tNode(ty).operand).leaf)
+	const upperBound := tNode(tNode(tNode(ty).operand).sibling).leaf
+
+	if Types.HasAttribute(e, aaSmallSet) then
+	    /* change each expression to a SmallSetConstructor(expn,low,high) */
+	    var register x : ExpressionPointer
+	    var register saveE : ExpressionPointer
+
+	    e := eNode(e).sibling
+	    assert eNode(e).u.operatorNumber = aSubs
+	    e := eNode(e).u.operand
+	    if e = nil(eNode) then
+		/* set() -- replace the expn with 0 */
+		e := ep
+		Expression.Free(eNode(e).u.operand)
+		tag eNode(e).u, aIntegerLit
+		eNode(e).u.integerValue := 0
+		eNode(e).u.integerKind := iInteger
+		return
+	    elsif eNode(e).u.operatorNumber = aAll then
+		/* set(all) -- replace expn with proper value */
+		e := ep
+		Expression.Free(eNode(e).u.operand)
+		tag eNode(e).u, aIntegerLit
+		eNode(e).u.integerValue := SetAll(lowBound,
+				    Expression.GetInteger(upperBound))
+		eNode(e).u.integerKind := iInteger
+		return
+	    end if
+	    loop
+		exit when e = nil(eNode)
+		/* save the top node of the expression */
+		new eNode, saveE
+		eNode(saveE).u := eNode(e).u
+		eNode(saveE).sibling := nil(eNode)
+
+		/* change expn to a predefined call */
+		tag eNode(e).u, aCall
+
+		new eNode, eNode(e).u.operand
+		x := eNode(e).u.operand
+		tag eNode(x).u, aPredefinedId
+		if Expression.GetInteger(upperBound) - lowBound < 16 then
+		    eNode(x).u.funcOrProcNumber := pRealSmallSetConstructor
+		else
+		    eNode(x).u.funcOrProcNumber := pSmallSetConstructor
+		end if
+
+		new eNode, eNode(x).sibling
+		x := eNode(x).sibling
+
+		tag eNode(x).u, aSubs
+		InRange(saveE, upperBound, lowBound, eNode(x).u.operand,
+			true, 19)
+		eNode(x).sibling := nil(eNode)
+
+		e := eNode(e).sibling
+	    end loop
+	else
+	    /*
+	     * Large set constructor:
+	     *	replace with a temp;  create the temp set properly
+	     */
+	    LargeSetConstructor(t, ep, lowBound, upperBound, subExpn)
+	end if
+    end TransformSetConstructor
+
+
+    procedure TransformModDiv (t : TreePointer, ep, subExpn : ExpressionPointer)
+	var register x := eNode(ep).u.operand
+	var register temp : ExpressionPointer
+	var register EP := ep
+
+	TransExpn(t, x, subExpn)
+	TransExpn(t, eNode(x).sibling, subExpn)
+
+	/* find the original expression again */
+	EP := FindOperand(ep)
+
+	if ExpnType(x) not= tReal and ExpnType(eNode(x).sibling) not= tReal then
+	    return
+	end if
+
+	/* change this to a call to (int|mod)div */
+	new eNode, temp
+	const newNode := temp
+
+	eNode(temp).sibling := nil(eNode)
+	tag eNode(temp).u, aCall
+	eNode(temp).sibling := nil(eNode)
+
+	new eNode, eNode(temp).u.operand
+	temp := eNode(temp).u.operand
+	tag eNode(temp).u, aPredefinedId
+	if eNode(EP).u.operatorNumber = aDiv then
+	    eNode(temp).u.funcOrProcNumber := pRealDiv8
+	else
+	    eNode(temp).u.funcOrProcNumber := pRealMod8
+	end if
+
+	new eNode, eNode(temp).sibling
+	temp := eNode(temp).sibling
+
+	tag eNode(temp).u, aSubs
+	eNode(temp).sibling := nil(eNode)
+	eNode(temp).u.operand := eNode(x).sibling
+	temp := eNode(x).sibling
+
+	eNode(temp).sibling := x
+	eNode(x).sibling := nil(eNode)
+
+	/* replace the node by the call */
+	eNode(EP).u := eNode(newNode).u
+    end TransformModDiv
+
+
+    /*
+     * Change this to a call to a library routine
+     */
+    procedure TransformExponential (t : TreePointer,
+				    ep, subExpn : ExpressionPointer)
+	var register x := eNode(ep).u.operand
+	var register temp : ExpressionPointer
+
+	TransExpn(t, x, subExpn)
+	TransExpn(t, eNode(x).sibling, subExpn)
+
+	/* find the original expression again */
+	var register EP := FindOperand(ep)
+
+	new eNode, temp
+	const newNode := temp
+	eNode(temp).sibling := nil(eNode)
+	tag eNode(temp).u, aCall
+	eNode(temp).sibling := nil(eNode)
+
+	new eNode, eNode(temp).u.operand
+	temp := eNode(temp).u.operand
+	tag eNode(temp).u, aPredefinedId
+	if ExpnType(eNode(x).sibling) = tReal then
+	    eNode(temp).u.funcOrProcNumber := pPowerrr
+	else
+	    if ExpnType(x) = tReal then
+		eNode(temp).u.funcOrProcNumber := pPowerri
+	    else
+		eNode(temp).u.funcOrProcNumber := pPowerii
+	    end if
+	end if
+
+	new eNode, eNode(temp).sibling
+	temp := eNode(temp).sibling
+
+	tag eNode(temp).u, aSubs
+	eNode(temp).sibling := nil(eNode)
+	eNode(temp).u.operand := eNode(x).sibling
+	temp := eNode(x).sibling
+
+	eNode(temp).sibling := x
+	eNode(x).sibling := nil(eNode)
+
+	/* replace the node by the call */
+	eNode(EP).u := eNode(newNode).u
+    end TransformExponential
+
+
+    procedure TransformRangeCheck (t : TreePointer,
+				    ep, subExpn : ExpressionPointer)
+	var register e := ep
+
+	TransExpnList(t, eNode(e).u.operand, subExpn)
+
+	if unChecked then
+	    /* just replace ep by first operand */
+	    eNode(ep).u := eNode(eNode(ep).u.operand).u
+	else
+	    /* try to optimize this.  the semantic pass is pessimistic */
+	    e := eNode(e).u.operand
+	    if eNode(e).u.operatorNumber = aIntegerLit then
+		/* this must be manifest */
+		const val := Expression.GetInteger(e)
+
+		e := eNode(e).sibling
+		if Expression.GetInteger(e) <= val and
+		    val <= Expression.GetInteger(eNode(e).sibling) then
+		    /* just replace ep by first operand */
+		    eNode(ep).u := eNode(eNode(ep).u.operand).u
+		end if
+	    end if
+	end if
+    end TransformRangeCheck
+
+
+    /*
+     * Return true if the expression can be casted for a #
+     */
+    procedure TransformHash (t : TreePointer, ep, subExpn : ExpressionPointer)
+	var register e := eNode(ep).u.operand
+
+	if CastableExpression(e) then
+	    TransExpn(t, e, subExpn)
+	    return
+	end if
+
+	/* must assign this expression to a temporary */
+	var statementHolder : TreePointer
+	var newId, newExpn : ExpressionPointer
+
+	CreateBeginBlock(t, statementHolder)
+	var register tn := statementHolder
+	const originalSibling := tNode(tn).sibling
+
+	if subExpn not= nil(eNode) then
+	    /* must do this before following TransExpn */
+	    CreateCommaList(subExpn, newExpn)
+	end if
+
+	TransExpn(t, e, subExpn)
+
+	Expression.CreateUniqueIdentifier(newId)
+	Types.EnterAttribute(newId, aaGrant)	/* fake out "static" */
+
+	tNode(tn).operatorNumber := aVar
+	tNode(tn).nodeKind := NodeKinds.OperatorNode
+	tNode(tn).leaf := nil(eNode)
+
+	new tNode, tNode(tn).operand
+	tn := tNode(tn).operand
+
+	tNode(tn).operatorNumber := 0
+	tNode(tn).nodeKind := NodeKinds.ExpressionLeaf
+	tNode(tn).leaf := newId
+	tNode(tn).operand := nil(tNode)
+	tNode(tn).transformed := true
+	tNode(tn).lineNumber := 0
+
+	new tNode, tNode(tn).sibling
+	tn := tNode(tn).sibling
+	tNode(tn).operatorNumber := aType
+	tNode(tn).nodeKind := NodeKinds.OperatorNode
+	ExpnTypeTree(e, tNode(tn).operand)
+	tNode(tn).sibling := nil(tNode)
+	tNode(tn).leaf := nil(eNode)
+	tNode(tn).transformed := true
+	tNode(tn).lineNumber := 0
+
+	Types.SetType(newId, tNode(tn).operand)
+	Types.EnterTypeInfo(newId)
+
+	/* do the assignment */
+	if subExpn not= nil(eNode) then
+	    var register x := newExpn
+
+	    tag eNode(x).u, aAssign
+
+	    new eNode, eNode(x).u.operand
+	    x := eNode(x).u.operand
+	    eNode(x).u := eNode(newId).u
+
+	    Expression.Copy(e, eNode(x).sibling)
+	    x := eNode(x).sibling
+	    eNode(x).sibling := nil(eNode)
+	    tNode(statementHolder).sibling := originalSibling
+	    fixupExpressionAssignment(newExpn, tn)
+	else
+	    /* can make this a statement */
+	    tn := statementHolder
+	    new tNode, tNode(tn).sibling
+	    tn := tNode(tn).sibling
+	    tNode(tn).operatorNumber := aTempAssign
+	    tNode(tn).nodeKind := NodeKinds.OperatorNode
+	    tNode(tn).leaf := nil(eNode)
+	    tNode(tn).sibling := originalSibling
+	    tNode(tn).transformed := true
+	    tNode(tn).lineNumber := 0
+
+	    new tNode, tNode(tn).operand
+	    tn := tNode(tn).operand
+	    tNode(tn).operatorNumber := 0
+	    tNode(tn).nodeKind := NodeKinds.ExpressionLeaf
+	    tNode(tn).leaf := newId
+	    tNode(tn).operand := nil(tNode)
+	    tNode(tn).transformed := true
+	    tNode(tn).lineNumber := 0
+
+	    new tNode, tNode(tn).sibling
+	    tn := tNode(tn).sibling
+	    tNode(tn).operatorNumber := 0
+	    tNode(tn).nodeKind := NodeKinds.ExpressionLeaf
+	    Expression.Copy(e, tNode(tn).leaf)
+	    tNode(tn).operand := nil(tNode)
+	    tNode(tn).sibling := nil(tNode)
+	    tNode(tn).transformed := true
+	    tNode(tn).lineNumber := 0
+	end if
+
+	/* replace the expression with the new id */
+	eNode(e).u := eNode(newId).u
+    end TransformHash
+
+
+    /*
+     * Tranform the type cheat;  also store a unique id after the expression
+     *		(replace the aTypeCheatSize if present)
+     */
+    procedure TransformTypeCheat (t : TreePointer,
+				  ep, subExpn : ExpressionPointer)
+	var register e := eNode(ep).u.operand
+
+	/* have we been here before? */
+	if eNode(eNode(e).sibling).sibling not= nil(eNode) and
+		eNode(eNode(eNode(e).sibling).sibling).u.operatorNumber =
+		    aIdent then
+	    /* we MUST have been here before */
+	    return
+	end if
+
+	if not SimpleType(eNode(e).u.expnType) then
+	    SimplifyType(t, eNode(e).u.expnType)
+	end if
+
+	/* if it is an "at" cheat, or */
+	/* if it is "cast"able, and there is no size field, then leave it */
+	if (IsVariable(eNode(e).sibling) and
+		    eNode(eNode(e).sibling).sibling = nil(eNode)) or
+		eNode(eNode(e).sibling).u.operatorNumber = aAt then
+	    /* just transform the expression */
+	    TransExpn(t, eNode(e).sibling, subExpn)
+	    /* create the new id */
+	    e := eNode(e).sibling
+	    Expression.CreateUniqueIdentifier(eNode(e).sibling)
+	    const newerId := eNode(e).sibling
+	    e := eNode(e).sibling
+	    eNode(e).sibling := nil(eNode)
+	    Types.SetType(newerId, eNode(eNode(ep).u.operand).u.expnType)
+	    Types.EnterTypeInfo(newerId)
+	    SetIndirection(newerId, Types.GetKind(newerId),
+		eNode(eNode(ep).u.operand).u.expnType)
+
+	    return
+	end if
+
+	/* must assign this expression to a temporary */
+	var statementHolder : TreePointer
+	var newId, newExpn : ExpressionPointer
+
+	CreateBeginBlock(t, statementHolder)
+	var register tn := statementHolder
+	const originalSibling := tNode(tn).sibling
+
+	if subExpn not= nil(eNode) then
+	    /* must do this before following TransExpn */
+	    CreateCommaList(subExpn, newExpn)
+	end if
+
+	TransExpn(t, eNode(e).sibling, subExpn)
+
+	Expression.CreateUniqueIdentifier(newId)
+	Types.EnterAttribute(newId, aaGrant)	/* fake out "static" */
+
+	tNode(tn).operatorNumber := aVar
+	tNode(tn).nodeKind := NodeKinds.OperatorNode
+	tNode(tn).leaf := nil(eNode)
+
+	new tNode, tNode(tn).operand
+	tn := tNode(tn).operand
+
+	tNode(tn).operatorNumber := 0
+	tNode(tn).nodeKind := NodeKinds.ExpressionLeaf
+	tNode(tn).leaf := newId
+	tNode(tn).operand := nil(tNode)
+	tNode(tn).transformed := true
+	tNode(tn).lineNumber := 0
+
+	new tNode, tNode(tn).sibling
+	tn := tNode(tn).sibling
+	tNode(tn).operatorNumber := aType
+	tNode(tn).nodeKind := NodeKinds.OperatorNode
+	tNode(tn).transformed := true
+	if eNode(eNode(e).sibling).sibling = nil(eNode) then
+	    ExpnTypeTree(eNode(e).sibling, tNode(tn).operand)
+	else
+	    /* must assign to the proper size temp */
+	    const register x := eNode(e).sibling
+
+	    tNode(tn).operand := TreeFromKindSize(ExpnType(x),
+		eNode(eNode(eNode(x).sibling).u.operand).u.integerValue)
+	end if
+	tNode(tn).sibling := nil(tNode)
+	tNode(tn).leaf := nil(eNode)
+	tNode(tn).lineNumber := 0
+
+	Types.SetType(newId, tNode(tn).operand)
+	Types.EnterTypeInfo(newId)
+
+	/* do the assignment */
+	if subExpn not= nil(eNode) then
+	    var register x := newExpn
+
+	    tag eNode(x).u, aAssign
+
+	    new eNode, eNode(x).u.operand
+	    x := eNode(x).u.operand
+	    eNode(x).u := eNode(newId).u
+
+	    Expression.Copy(eNode(e).sibling, eNode(x).sibling)
+	    x := eNode(x).sibling
+	    eNode(x).sibling := nil(eNode)
+	    tNode(statementHolder).sibling := originalSibling
+	    fixupExpressionAssignment(newExpn, tn)
+	else
+	    /* can make this a statement */
+	    tn := statementHolder
+	    new tNode, tNode(tn).sibling
+	    tn := tNode(tn).sibling
+	    tNode(tn).operatorNumber := aTempAssign
+	    tNode(tn).nodeKind := NodeKinds.OperatorNode
+	    tNode(tn).leaf := nil(eNode)
+	    tNode(tn).sibling := originalSibling
+	    tNode(tn).transformed := true
+	    tNode(tn).lineNumber := 0
+
+	    new tNode, tNode(tn).operand
+	    tn := tNode(tn).operand
+	    tNode(tn).operatorNumber := 0
+	    tNode(tn).nodeKind := NodeKinds.ExpressionLeaf
+	    tNode(tn).leaf := newId
+	    tNode(tn).operand := nil(tNode)
+	    tNode(tn).transformed := true
+	    tNode(tn).lineNumber := 0
+
+	    new tNode, tNode(tn).sibling
+	    tn := tNode(tn).sibling
+	    tNode(tn).operatorNumber := 0
+	    tNode(tn).nodeKind := NodeKinds.ExpressionLeaf
+	    Expression.Copy(eNode(e).sibling, tNode(tn).leaf)
+	    tNode(tn).operand := nil(tNode)
+	    tNode(tn).sibling := nil(tNode)
+	    tNode(tn).transformed := true
+	    tNode(tn).lineNumber := 0
+	end if
+
+	/* replace the expression with the new id */
+	e := eNode(e).sibling
+	eNode(e).u := eNode(newId).u
+
+	/* create the new id */
+	const register EP := FindOperand(ep)
+
+	e := eNode(eNode(EP).u.operand).sibling
+	Expression.CreateUniqueIdentifier(eNode(e).sibling)
+	const newerId := eNode(e).sibling
+	e := eNode(e).sibling
+	eNode(e).sibling := nil(eNode)
+	Types.SetType(newerId, eNode(eNode(EP).u.operand).u.expnType)
+	Types.EnterTypeInfo(newerId)
+	SetIndirection(newerId, Types.GetKind(newerId),
+	    eNode(eNode(EP).u.operand).u.expnType)
+    end TransformTypeCheat
+
+
+    procedure TransformMinMax (t : TreePointer, ep, subExpn : ExpressionPointer)
+	var register e := eNode(ep).u.operand
+	const firstOperand := e
+
+	/* use a macro if possible, else a function call */
+	TransExpn(t, e, subExpn)
+	TransExpn(t, eNode(e).sibling, subExpn)
+
+	if SimpleExpression(e) and
+		SimpleExpression(eNode(e).sibling) then
+	    /* can use macro */
+	    return
+	end if
+
+	/* mark this as a more complex min/max */
+	e := eNode(e).sibling
+	new eNode, eNode(e).sibling
+	e := eNode(e).sibling
+
+	eNode(e).sibling := nil(eNode)
+	tag eNode(e).u, aPredefinedId
+	if ExpnType(firstOperand) = tReal or
+		ExpnType(eNode(firstOperand).sibling) = tReal then
+	    /* must use double function */
+	    eNode(e).u.funcOrProcNumber := pRealMin
+	else
+	    /* use int function */
+	    eNode(e).u.funcOrProcNumber := pIntMin
+	end if
+    end TransformMinMax
+
+
+    procedure TransformAbs (t : TreePointer, ep, subExpn : ExpressionPointer)
+	var register e := eNode(ep).u.operand
+	const firstOperand := e
+
+	/* use a macro if possible, else a function call */
+	TransExpn(t, e, subExpn)
+
+	const isSimple := SimpleExpression(e)
+
+	/* create a node giving the type of abs */
+	new eNode, eNode(e).sibling
+	e := eNode(e).sibling
+	eNode(e).sibling := nil(eNode)
+	tag eNode(e).u, aPredefinedId
+
+	if isSimple then
+	    eNode(e).u.funcOrProcNumber := pAbs
+	elsif ExpnType(firstOperand) = tReal then
+	    /* must use double function */
+	    eNode(e).u.funcOrProcNumber := pRealAbs
+	else
+	    /* use int function */
+	    eNode(e).u.funcOrProcNumber := pIntAbs
+	end if
+    end TransformAbs
+
+
+    /*
+     * walk through expression e, and do whatever fixups are necessary to
+     * transform it
+     *
+     * subExpn, if not nil, is where any new expressions must be added.
+     *		otherwise, they go at 't'
+     */
+    body procedure TransExpn %(t : TreePointer, e, subExpn : ExpressionPointer)
+#if DEBUG then
+	handler (quitCode)
+	    if quitCode not= excpSIGINT then
+		put :0, "TransExpn Abort:"
+		Expression.Dump(e, 0, 0)
+		put :0, ""
+	    end if
+	    quit >
+	end handler
+#end if
+	var register ep := e
+
+	case eNode(ep).u.operatorNumber of
+	    label aIntegerLit, aRealLit, aStringLit, aCharLit,
+		    aTrue, aFalse, aAll, aBoolean, aInt, aAddressint,
+		    aNat, aStar, aString, aChar, aPredefinedId,
+		    aEndSubstring, aIdent, aType:
+
+	    label aBits:
+		TransformBitsExpression(t, ep, subExpn)
+
+	    label aCall, aCallVariable:
+		TransformCall(t, ep, subExpn)
+
+	    label aInfixImply:
+		TransformImplication(t, ep, subExpn)
+
+	    label aSetDifference, aSetIntersection, aSetUnion, aSetXor:
+		TransformSetOperation(t, ep, subExpn)
+
+	    label aInfixCompare:
+		TransformComparison(t, ep, subExpn)
+
+	    label aSubstring:
+		TransformSubstring(t, ep, subExpn)
+
+	    label aSet:
+		TransformSetConstructor(t, ep, subExpn)
+
+	    label aDiv, aMod:
+		TransformModDiv(t, ep, subExpn)
+
+	    label aExponentiate:
+		TransformExponential(t, ep, subExpn)
+
+	    label aConcatenate:
+		TransformConcatenate(t, ep, subExpn)
+
+	    label aRangeCheck:
+		TransformRangeCheck(t, ep, subExpn)
+
+	    label aHash:
+		TransformHash(t, ep, subExpn)
+
+	    label aTypeCheat:
+		TransformTypeCheat(t, ep, subExpn)
+
+	    label aMin, aMax:
+		TransformMinMax(t, ep, subExpn)
+
+	    label aAbs:
+		TransformAbs(t, ep, subExpn)
+
+	    label aInfixAnd, aInfixOr:
+		/* handle the short circuit evaluations */
+		TransExpn(t, eNode(ep).u.operand, subExpn)
+		TransExpn(t, eNode(eNode(ep).u.operand).sibling,
+		    eNode(eNode(ep).u.operand).sibling)
+
+	    label :
+		if eNode(ep).u.operand not= nil(eNode) then
+		    TransExpnList(t, eNode(ep).u.operand, subExpn)
+		end if
+	end case
+    end TransExpn
+
+
+    body procedure ToString % (t : TreePointer, e : ExpressionPointer)
+	TransformToString(t, e, ExpnType(e), nil(eNode))
+    end ToString
+
+
+    body procedure ToCharString % (t : TreePointer, e : ExpressionPointer)
+	TransformToCharString(t, e, ExpnType(e), nil(eNode))
+    end ToCharString
+
+
+    body procedure ToChar % (t : TreePointer, e : ExpressionPointer)
+	TransformToChar(t, e, ExpnType(e), nil(eNode))
+    end ToChar
+
+end TransExpn

@@ -1,0 +1,1124 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+% 
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+% 
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+body "parser.st" module Parser
+    /*
+     * Computer Systems Research Group
+     * University of Toronto
+     * Module:  Turing Plus Parser  V1.00
+     * Author:  Stephen Perelgut & M.P. Mendell
+     * Date:    26 June 1985 
+     */
+
+    /* Copyright (C) 1985 The University of Toronto */
+
+    /* Primitive S/SL Table Operations:
+     * These will remain the same independent of the
+     * pass and form the fundamental table operations.
+     */
+    const *firstTableOperation := 0
+    const *firstPrimitiveOperation := 0
+    const *oCall := 0
+    const *oReturn := 1
+    const *oRuleEnd := 2
+    const *oJump:= 3
+    const *oInput := 4
+    const *oInputAny := 5
+    const *oInputChoice := 6
+    const *oEmit := 7
+    const *oError := 8
+    const *oChoice := 9
+    const *oChoiceEnd := 10
+    const *oSetParameter := 11
+    const *oSetResult := 12
+    const *oSetResultFromInput := 13
+    const *lastPrimitiveOperation := 13
+
+    include "parser.def.t"
+
+    /* The S/SL Table */
+    include "parser.sst.t"
+
+    /* Table Walker State */
+    var sslPointer: int := 0
+    var operation: nat2
+
+    /* Tracing Control */
+    const traceArg := 4
+
+#if DEBUG then
+    var tracing := false
+#else
+    const tracing := false
+#end if
+
+    var traceFile : int
+    const traceFileName := "parse.trace"
+
+    var echoInput := false
+
+	var printWarnings := true
+
+    /*
+     * The S/SL Rule Call Stack:
+     * The Rule Call Stack implements Syntax/Semantic
+     * Language rule call and return.
+     * Each time an oCall operation is executed,
+     * the table return address is pushed onto the
+     * Rule Call Stack.  When an oReturn is executed,
+     * the return address is popped from the stack.
+     * An oReturn executed when the Rule Call Stack is
+     * empty terminates table execution.
+     */
+    const *sslStackSize := 127
+    var sslStack: array 1 .. sslStackSize of int
+
+    /* Choice Match Flag:
+     * Set by the Choice Handler to indicate whether
+     * a match was made or the otherwise path was taken.
+     * Set to true if a match was made and false otherwise.
+     * This flag is used in input choices to indicate
+     * whether the choice input token should be accepted or
+     * not.
+     */
+    var choiceTagMatched: boolean
+
+    /* Parameterized And Choice Semantic Operation Values:
+     * These are used to hold the decoded parameter value to
+     * a parameterized semantic operation and the result
+     * value returned by a choice semantic operation
+     * or rule respectively.
+     */
+    var parameterValue: int2
+    var resultValue: int2
+
+    /* S/SL System Failure Codes */
+    const *firstFailureCode := 0
+    const *fSemanticChoiceFailed := 0
+    const *fChoiceRuleFailed := 1
+    const *lastFailureCode := 1
+
+    type FailureCodes : firstFailureCode..lastFailureCode
+
+    /* Fatal errors */
+    const *firstFatalErrorCode := lastNonFatalErrorCode + 1
+    const *eSslStackOverflow := firstFatalErrorCode
+    const *lastErrorCode := eSslStackOverflow
+
+    type ErrorCodes : firstErrorCode .. lastErrorCode
+
+    /* The last token accepted by the Parser - used in error recovery */
+    var acceptedToken: InputTokens
+
+    /* The Compound Token Buffer
+     * When a compound token is accepted by the Parser,
+     * the token and its associated text and value are 
+     * saved for later access by the semantic operations.
+     */
+
+    var compoundToken: InputTokens
+    var compoundTokenText: char(maxstr+1)
+    var compoundTokenTextLen : 0..maxstr+1
+    var compoundTokenValue: TokenValue
+
+    /* external subprogram overide names */
+    var externalOveride := false
+    var externalNameText: string
+
+    /* The Identifier Token Buffer
+     * When an identifier or predefined identifier token is accepted
+     * by the Parser, the token and its associated text and value are 
+     * saved for later access by the semantic operations
+     */
+
+    var lastIdentAccepted:		InputTokens
+    var lastIdentTokenTextLen:		0..maxstr+1
+    var lastIdentTokenText:		char(maxstr+1)
+    var lastIdentTokenValue:		TokenValue
+    var savedToken:			InputTokens
+    var savedIdentValue:		int2
+    var savedPredefinedIdValue:		int2
+
+    /* Line Counters */
+    var nextLineNumber, lastLineNumber: nat := 0
+    var lineNumber: nat
+    var newInputLine := false
+
+    /* Current Input File */
+    var sourceFileName: string
+    var newSourceFile := false
+
+    type OutputTokens : firstOutputToken .. lastOutputToken
+
+    /* Output Interface */
+    const outStream := 2
+
+    /* Variable Used in Syntax Error Recovery */
+    var savedInputToken: InputTokens
+
+    /* Character Constants */
+    const *blank := ' '
+    const *quote := '\"'
+    const *tab := '\t'
+    const *formFeed := '\f'
+    const *backslash := '\\'
+    const *newLine := '\n'
+
+    /* Text of Tokens (for printing in syntax error messages) */
+    const tokenText:
+	array firstCompoundToken .. lastInputToken of string(20) :=
+	    include "token.tbl"
+
+
+    procedure PutCompoundTokenText
+	assert nextToken >= firstCompoundToken and
+	    nextToken <= lastKeywordToken
+
+	for i : 1..nextTokenTextLen
+	    case nextTokenText(i) of
+		label quote : 
+		    put "\\\"" ..
+		label tab :
+		    put "\\t" ..
+		label backslash :
+		    put "\\\\" ..
+		label formFeed :
+		    put "\\f" ..
+		label newLine :
+		    put "\\n" ..
+		label '\d' :
+		    put "\\d" ..
+		label '\0' :
+		    put "\\0" ..
+		label :
+#if not EBCDIC then
+		    if #nextTokenText(i) < 32 then
+			put "\^", chr(#nextTokenText(i) + 64) ..
+		    else
+#end if
+			put nextTokenText(i) ..
+#if not EBCDIC then
+		    end if
+#end if
+	    end case
+	end for
+    end PutCompoundTokenText
+
+
+
+    procedure PutErroneousToken
+	if nextToken >= firstCompoundToken and
+		nextToken <= lastCompoundToken then
+	    case nextToken of
+		label tStringLit :
+		    put "\"" ..
+		    PutCompoundTokenText
+		    put "\"" ..
+		label tCharLit :
+		    put "'" ..
+		    PutCompoundTokenText
+		    put "'" ..
+		 label :
+		    PutCompoundTokenText
+	    end case
+	else
+	    put tokenText(nextToken) ..
+	end if
+    end PutErroneousToken
+
+
+    procedure PutExpectedToken
+	put tokenText(sslTable(sslPointer)) ..
+    end PutExpectedToken
+
+
+    var startOfLine : boolean := true
+
+    procedure PutProgramToken
+	case nextToken of
+	    label tIdent, tPredefinedId, tIntegerLit, tRealLit:
+		PutCompoundTokenText
+		put " " ..
+	    label tStringLit:
+		put "\"" ..
+		PutCompoundTokenText
+		put "\" " ..
+	    label tCharLit:
+		put "'" ..
+		PutCompoundTokenText
+		put "' " ..
+	    label tNewLine:
+		put ""
+	    label tNewFile:
+		if not startOfLine then
+		    put ""
+		end if
+		put "## file \"", scannerFileName, "\"" ..
+	    label tEndCompilationUnit, tEndOfFile, tDummyTokenForStart:
+	    label :
+		put tokenText(nextToken), " " ..
+	end case
+	startOfLine := nextToken = tNewLine
+    end PutProgramToken
+
+
+    /* This procedure emits the error message associated with errCode */
+    procedure Error (errCode: ErrorCodes)
+	assert errCode not = eNoError
+
+	if (errCode = eMissingForwardImport or errCode = eSyntaxErrorInsert or errCode = eSyntaxErrorReplace)
+		and not printWarnings then
+	    return
+	end if
+
+	put "Line " ..
+
+	if errCode <= lastPreviousLineErrorCode then
+	    put lineNumber ..
+	else
+	    put nextLineNumber ..
+	end if
+
+	put " of ", sourceFileName, ": " ..
+
+	case errCode of
+	    label eMissingForwardImport :
+		put "(Warning) Syntax error - 'import' list required for forward subprogram"
+
+	    label eSyntaxErrorInsert :
+		put "(Warning) Syntax error - missing '" ..
+		PutExpectedToken 
+
+		if not newInputLine then
+		    put "' inserted before '" ..
+		    PutErroneousToken
+		    put "'"
+		else
+		    put "' inserted at end of line"
+		end if
+
+	    label eSyntaxErrorReplace :
+		put "(Warning) Syntax error - '" ..
+		PutErroneousToken 
+		put "' replaced by "
+		PutExpectedToken 
+
+	    label eSyntaxError :
+		put "Syntax error at '" ..
+		PutErroneousToken 
+		put "'" ..
+
+		if not (sslTable (sslPointer) = tIdent and
+			newInputLine) then
+		    put "  -  '" ..
+		    PutExpectedToken 
+		    put "' expected"
+		else
+		    put ""
+		end if
+
+	    label eStubSyntaxError :
+		put "Syntax error at '" ..
+		PutErroneousToken 
+		put "'  -  'body' expected"
+
+	    label eSyntaxErrorMismatchedEnd :
+		put "Syntax error at '" ..
+
+		if newInputLine then
+		    put "end" ..
+		else
+		    put "end " ..
+		    PutErroneousToken 
+		end if
+
+		put "'  -  'end " ..
+		PutExpectedToken
+		put "' expected"
+
+	    label ePrematureEndOfFile :
+		put "Syntax error - program incomplete  -  '" ..
+		PutExpectedToken 
+		put "' expected"
+
+	    label eChildMismatchParent :
+		put "Child does not refer to parent that invoked it"
+
+	    label eNoProgramAfterParent :
+		put "Parent directive must be followed by 'stub'"
+
+	    label eParentDoesNotIncludeChild :
+		var dummy : string
+		put "Parent does not include child file \"" ..
+		Scanner.ChildName(dummy)
+		put dummy, "\""
+
+	    label eNullOverideName :
+		put "External subprogram overide name must not be null"
+
+	    label eExtraneousProgramText :
+		put "Syntax error - extra program text"
+
+	    label eOnlyCollectionVarsInStub:
+		put "The only 'var' declarations allowed in stubs are collection declarations"
+
+	    label eSslStackOverflow :
+		put "Nesting too deep"
+	end case
+
+	if errCode > lastWarningCode then
+	    noErrors += 1
+	end if
+
+	if errCode >= firstFatalErrorCode or noErrors = maxErrors then
+	    put "*** Processing aborted"
+	    sysexit(1)
+	end if
+    end Error
+
+    var outputEnabled := true
+
+    /* Emit an output token to the output stream */
+    procedure EmitOutputToken (emittedToken: OutputTokens)
+	if outputEnabled then
+	    var i : nat1 := emittedToken
+	    write : outStream, i
+
+#if DEBUG then
+	    if tracing then
+		put :traceFile, "Output token emitted ", emittedToken
+	    end if
+#end if
+	end if
+    end EmitOutputToken
+
+
+    /* Emit an integer value to the output stream */
+    procedure EmitInt (value: int2)
+	if outputEnabled then
+	    write :outStream, value
+
+#if DEBUG then
+	    if tracing then
+		put :traceFile, "Output int emitted ", value
+	    end if
+#end if
+	end if
+    end EmitInt
+
+
+    /* Emit an integer value to the output stream */
+    procedure EmitLong (value: nat4)
+	if outputEnabled then
+	    write :outStream, value
+
+#if DEBUG then
+	    if tracing then
+		put :traceFile, "Output long emitted ", value
+	    end if
+#end if
+	end if
+    end EmitLong
+
+
+    /* Emit a byte value to the output stream */
+    procedure EmitByte (value: int1)
+	if outputEnabled then
+	    write :outStream, value
+
+#if DEBUG then
+	    if tracing then
+		put :traceFile, "Output char emitted \"", value, "\""
+	    end if
+#end if
+	end if
+    end EmitByte
+
+
+    /* Emit a char value to the output stream */
+    procedure EmitChar (value: char)
+	if outputEnabled then
+	    write :outStream, value
+
+#if DEBUG then
+	    if tracing then
+		put :traceFile, "Output char emitted \"", value, "\""
+	    end if
+#end if
+	end if
+    end EmitChar
+
+
+    /* Emit a string value to the output stream */
+    procedure EmitString (slen : nat2, svalue: char(*))
+	if outputEnabled then
+	    write :outStream, slen, svalue : slen
+
+#if DEBUG then
+	    if tracing then
+		put : traceFile, "Output string emitted \"",
+			svalue(1..slen), "\""
+	    end if
+#end if
+	end if
+    end EmitString
+
+
+    /* used to synchronize with scanner for file manipulation */
+    var disableLookahead := false
+
+    procedure AcceptInputToken
+	/* Accept the token */
+	acceptedToken := nextToken
+	lineNumber := nextLineNumber
+
+	if acceptedToken <= lastCompoundToken then
+	    assert acceptedToken >= firstCompoundToken
+	    compoundToken := acceptedToken
+	    compoundTokenText := nextTokenText
+	    compoundTokenTextLen := nextTokenTextLen
+	    compoundTokenValue := nextTokenValue
+	end if
+
+	if acceptedToken = tIdent or acceptedToken = tPredefinedId then
+	    lastIdentAccepted := acceptedToken
+	    lastIdentTokenTextLen := nextTokenTextLen
+	    lastIdentTokenText := nextTokenText
+	    lastIdentTokenValue := nextTokenValue
+	end if
+
+	if disableLookahead then
+	    disableLookahead := false
+
+#if DEBUG then
+	    /* Trace Input */
+	    if tracing then
+		put :traceFile, "Input token accepted ", acceptedToken,
+		    ";  Line ", lineNumber, " of ", sourceFileName,
+		    ";  Next input token ", nextToken, "Scanner.Scan not called"
+	    end if
+#end if
+	else
+	    /* Get Next Input Token */
+	    newInputLine := false
+	    loop
+		Scanner.Scan
+
+		if echoInput then
+		    PutProgramToken
+		end if
+
+		if nextToken = tNewLine then
+		    newInputLine := true
+		    assert nextTokenValue.kind = vIntNat
+		    nextLineNumber := nextTokenValue.value
+		elsif nextToken = tNewFile then
+		    newSourceFile := true
+		    sourceFileName := scannerFileName
+		else
+		    exit
+		end if
+	    end loop
+
+#if DEBUG then
+	    /* Trace Input */
+	    if tracing then
+		put :traceFile, "Input token accepted ", acceptedToken,
+		    ";  Line ", lineNumber, " of ", sourceFileName,
+		    ";  Next input token ", nextToken
+	    end if
+#end if
+	end if
+    end AcceptInputToken
+
+
+    /*
+     * The constants, variables, types, modules and procedures 
+     * used in implementing the Semantic Mechanisms of the pass
+     * go here.  These implement the facilities used in the semantic
+     * operations.
+     */
+
+
+    /* Syntax Error Handling */
+    procedure SslGenerateCompoundInputToken (expectedToken: InputTokens)
+	compoundToken := expectedToken
+	compoundTokenTextLen := 1
+	compoundTokenText(1) := '?'
+	compoundTokenValue.kind := vIntNat
+	compoundTokenValue.value := 0
+
+	if expectedToken = tIdent then
+	    lastIdentAccepted := expectedToken
+	    lastIdentTokenTextLen := 1
+	    lastIdentTokenText(1) := '?'
+	    lastIdentTokenValue.kind := vIntNat
+	    lastIdentTokenValue.value := dummyIdentIndex
+	end if
+    end SslGenerateCompoundInputToken
+
+
+    procedure SslSyntaxError
+	/*
+	 * This procedure handles syntax errors in the input
+	 * to the Parser pass; for Semantic passes this procedure
+	 * will simply assert false since a syntax error in
+	 * input would indicate an error in the previous pass.
+
+	 * Syntax error recovery:
+	 * When a mismatch occurs between the the next input 
+	 * token and the syntax table, the following recovery
+	 * is employed.
+
+	 * If the expected token is tNewLine then if there
+	 * has been no previous syntax error on the line,
+	 * ignore the error.  (A missing logical new line
+	 * is not a real error.)
+
+	 * If the expected token is tNewLine or tSemiColon and
+	 * a syntax error has already been detected on the
+	 * current logical line (flagged by nextToken =
+	 * tSyntaxError), then flush the input until a
+	 * new line or end of file is found.
+
+	 * Otherwise, if this is the first syntax error
+	 * detected on the line (flagged by nextToken
+	 * not = tSyntaxError), then if the input token
+	 * is tEndOfFile then emit the ePrematureEndOfFile
+	 * error code and terminate execution.  Otherwise,
+	 * emit the eSyntaxError error code and set
+	 * the nextToken to tSyntaxError to prevent
+	 * further input until the expected input is
+	 * tSemiColon or tNewLine.
+
+	 * If the expected token is not tSemiColon nor
+	 * tNewLine and a syntax error has already been
+	 * detected on the current line (flagged by
+	 * nextToken = tSyntaxError), then do nothing
+	 * and continue as if the expected token had
+	 * been matched.
+	 */
+	const expectedToken := sslTable (sslPointer)
+	assert operation = oInput or operation = oInputAny
+
+	if nextToken = tSyntaxError then
+	    /* Currently recovering from syntax error */
+	    if expectedToken = tNewLine or expectedToken = tSemiColon then
+		/*
+		 * Complete recovery by synchronizing input to a new line
+		 */
+		nextToken := savedInputToken
+		newInputLine := false
+		loop
+		    exit when nextToken = tSemiColon or
+			nextToken = tEndOfFile or
+			nextToken = tEndCompilationUnit or newInputLine
+		    AcceptInputToken
+		end loop
+
+		/* Avoid looping on semicolon syntax errors */
+		if (expectedToken = tNewLine or expectedToken = tSemiColon)
+			and nextToken = tSemiColon then
+		    AcceptInputToken
+		end if
+	    end if
+	else
+	    /* First syntax error on the line */
+	    if nextToken = tDummyTokenForStart then
+		/* ignore the token */
+		AcceptInputToken 
+	    elsif expectedToken = tNewLine or expectedToken = tSemiColon then
+		/*
+		 * Ignore missing logical newlines for Turing, ignore
+		 * missing semicolons as well
+		 */
+	    elsif nextToken = tEndOfFile then
+		/* Flag error and terminate processing */
+		Error (ePrematureEndOfFile)
+		sysexit(1)
+	    elsif acceptedToken = tEnd then
+		/*
+		 * Botched 'end' label - probably structural error
+		 * flag error and abort
+		 */
+		Error (eSyntaxErrorMismatchedEnd)
+		sysexit(1)
+	    else
+		case expectedToken of
+		    label tThen, tOf, tEndParen, tTo,
+			tDotDot, tColon, tAssign :
+			/* Insert recovery; flag error and continue */
+			Error (eSyntaxErrorInsert)
+		    label :
+			/*
+			 * Statement level recovery; flag error and
+			 * enter recovery state
+			 */
+			Error (eSyntaxError)
+			savedInputToken := nextToken
+			nextToken := tSyntaxError
+			lineNumber := nextLineNumber
+		end case
+	    end if
+	end if
+
+	/*
+	 * If the expected input token is a compound token,
+	 * generate a dummy one.
+	 */
+	if sslTable(sslPointer) >= firstCompoundToken
+		and sslTable(sslPointer) <= lastCompoundToken then
+	    SslGenerateCompoundInputToken (sslTable(sslPointer))
+	end if
+    end SslSyntaxError
+
+
+#if DEBUG then
+    procedure SslTrace
+	put :traceFile, ":", sslPointer, " ", operation, " ",
+	    sslTable(sslPointer), " ", nextToken
+    end SslTrace
+
+
+    procedure SslFailure (failCode: FailureCodes)
+	put "### Parser S/SL program failure:  " ..
+
+	case failCode of
+	    label fSemanticChoiceFailed :
+		put "Semantic or lookahead choice failed"
+	    label fChoiceRuleFailed :
+		put "Choice rule returned without a value"
+	end case
+
+	put "while processing line ", lineNumber
+	SslTrace
+	assert false
+    end SslFailure
+#end if
+
+
+    procedure SslWalker
+	var register localSslPointer:	int
+	var register numberOfChoices:	int
+	var register choiceTag:		int4
+	var register sslTop:		0 .. sslStackSize := 0
+
+	/* Walk the S/SL Table */
+	localSslPointer := 0
+
+	loop
+	    operation := sslTable(localSslPointer)
+	    localSslPointer := localSslPointer + 1
+
+#if DEBUG then
+	    /* Trace Execution */
+	    if tracing then
+		sslPointer := localSslPointer
+		SslTrace
+	    end if
+#end if
+
+	    case operation of
+		label oCall :
+		    if sslTop < sslStackSize then
+			sslTop += 1
+			sslStack(sslTop) := localSslPointer + 1
+			localSslPointer := sslTable(localSslPointer)
+		    else
+			Error (eSslStackOverflow)
+			exit
+		    end if
+
+		label oReturn :
+		    if sslTop = 0 then
+			/* Return from main S/SL procedure */
+			exit
+		    else
+			localSslPointer := sslStack(sslTop)
+			sslTop -= 1
+		    end if
+
+#if DEBUG then
+		label oRuleEnd :
+		    sslPointer := localSslPointer
+		    SslFailure (fChoiceRuleFailed)
+#end if
+
+		label oJump :
+		    localSslPointer := sslTable(localSslPointer)
+
+		label oInput :
+		    if sslTable(localSslPointer) = nextToken or
+			    (nextToken = tPredefinedId and
+			     sslTable(localSslPointer) = tIdent) then
+			AcceptInputToken
+		    else
+			/* Syntax error in input */
+			sslPointer := localSslPointer
+			SslSyntaxError
+		    end if
+		    localSslPointer += 1
+
+		label oInputAny :
+		    if nextToken not = tEndOfFile then
+			AcceptInputToken
+		    else
+			/* Premature end of file */
+			sslPointer := localSslPointer
+			SslSyntaxError
+		    end if
+
+		label oInputChoice :
+		    if nextToken = tPredefinedId then
+			choiceTag := tIdent
+		    else
+			choiceTag := nextToken
+		    end if
+		    localSslPointer := sslTable(localSslPointer)
+		    numberOfChoices := sslTable(localSslPointer)
+		    localSslPointer += 1
+	
+		    for i : 1..numberOfChoices
+			if sslTable(localSslPointer) = choiceTag then
+			    localSslPointer := sslTable(localSslPointer+1)
+			    AcceptInputToken
+			    exit
+			else
+			    localSslPointer += 2
+			end if
+		    end for
+
+		label oEmit :
+		    EmitOutputToken (sslTable(localSslPointer))
+		    localSslPointer += 1
+
+		label oError :
+		    if nextToken not = tSyntaxError then
+			Error (sslTable(localSslPointer))
+			localSslPointer += 1
+		    end if
+
+		label oChoice :
+		    localSslPointer := sslTable(localSslPointer)
+		    numberOfChoices := sslTable(localSslPointer)
+		    localSslPointer += 1
+	
+		    for i : 1..numberOfChoices
+			if sslTable(localSslPointer) = resultValue then
+			    localSslPointer := sslTable(localSslPointer+1)
+			    exit
+			else
+			    localSslPointer += 2
+			end if
+		    end for
+
+#if DEBUG then
+		label oChoiceEnd :
+		    sslPointer := localSslPointer
+		    SslFailure (fSemanticChoiceFailed)
+#end if
+
+		label oSetParameter :
+		    parameterValue := sslTable(localSslPointer)
+		    localSslPointer += 1
+
+		label oSetResult :
+		    resultValue := sslTable(localSslPointer)
+		    localSslPointer += 1
+
+		label oSetResultFromInput :
+		    resultValue := nextToken
+
+		label oSaveIdent :
+		    savedToken := lastIdentAccepted
+		    savedIdentValue := compoundTokenValue.value
+		    savedPredefinedIdValue := compoundTokenValue.pred
+
+		label oEmitSavedIdent :
+		    EmitOutputToken(savedToken)
+		    EmitInt(savedIdentValue)
+		    if savedToken = aPredefinedId then
+			EmitInt(savedPredefinedIdValue)
+		    end if
+
+		label oEmitIdent :
+		    EmitOutputToken(lastIdentAccepted)
+		    EmitInt(lastIdentTokenValue.value)
+		    if lastIdentAccepted = aPredefinedId then
+			EmitInt(lastIdentTokenValue.pred)
+		    end if
+
+		label oEmitIntegerLit :
+		    EmitOutputToken(aIntegerLit)
+		    EmitByte (compoundTokenValue.kind)
+		    EmitLong (compoundTokenValue.value)
+
+		label oEmitRealLit :
+		    EmitOutputToken(aRealLit)
+		    EmitString(compoundTokenTextLen, compoundTokenText)
+
+		label oEmitCharLit :
+		    EmitOutputToken(aCharLit)
+		    EmitString (compoundTokenTextLen, compoundTokenText)
+
+		label oEmitStringLit :
+		    EmitOutputToken(aStringLit)
+		    EmitString (compoundTokenTextLen, compoundTokenText)
+
+		label oEmitLine :
+		    if newSourceFile then
+			newSourceFile := false
+			EmitOutputToken(aNewFile)
+			EmitString (length(sourceFileName), sourceFileName)
+		    end if
+		    if nextLineNumber not= lastLineNumber then
+			lastLineNumber := nextLineNumber
+			EmitOutputToken(aNewLine)
+			EmitInt(nextLineNumber)
+		    end if
+
+		label oEmitIdentText :
+		    assert compoundToken = tIdent or
+			  compoundToken = tPredefinedId or noErrors > 0
+		    EmitOutputToken(aIdentText)
+		    EmitString (compoundTokenTextLen, compoundTokenText)
+
+		label oEmitTypeSizeAsIntegerLit :
+		    EmitOutputToken(aIntegerLit)
+		    EmitByte (vIntNat)
+		    case acceptedToken of
+			label tInt1, tNat1:
+			    EmitLong (1)
+			label tInt2, tNat2:
+			    EmitLong (2)
+			label tInt4, tNat4, tReal4:
+			    EmitLong (4)
+			label tReal8:
+			    EmitLong (8)
+		    end case
+
+		label oEmitFakeParent:
+		    EmitOutputToken(aStringLit)
+		    EmitString (12, 'dummy parent')
+
+		label oSeparateCompilationEnterAlternateFileAndMark :
+		    assert compoundToken = tStringLit or noErrors > 0
+		    Scanner.EnterAlternate (
+			compoundTokenText(1..compoundTokenTextLen))
+		    AcceptInputToken
+
+		label oSeparateCompilationIsAlternateFile :
+		    if Scanner.IsAlternate then
+			resultValue := yes
+		    else
+			resultValue := no
+		    end if
+
+		label oSeparateCompilationSwitchToAlternateFile :
+		    Scanner.SwitchToAlternate
+		    AcceptInputToken    % accept endCompilationUnit
+		    AcceptInputToken    % bump scanner
+
+		label oSeparateCompilationExitProgram :
+		    Scanner.Finalize
+
+		    if nextToken not = tEndOfFile and not aborted then
+			Error (eExtraneousProgramText)
+		    end if
+
+		    if noErrors > 0 or aborted then
+			sysexit (1)
+		    else
+			sysexit (0)
+		    end if
+
+		label oSeparateCompilationEnterParent :
+		    assert compoundToken = tStringLit or noErrors > 0
+		    Scanner.EnterParent (
+			compoundTokenText(1..compoundTokenTextLen))
+		    AcceptInputToken
+
+		label oSeparateCompilationExitParent :
+		    Scanner.ExitParent
+		    AcceptInputToken    % accept endCompilationUnit
+		    AcceptInputToken    % bump scanner
+
+		label oSeparateCompilationEnterChild :
+		    assert compoundToken = tStringLit or noErrors > 0
+		    Scanner.EnterChild (
+			compoundTokenText(1..compoundTokenTextLen))
+		    AcceptInputToken
+
+		label oSeparateCompilationExitChild :
+		    Scanner.ExitChild
+		    AcceptInputToken    % accept endCompilationUnit
+		    AcceptInputToken    % bump scanner
+
+		label oSeparateCompilationChildMatchesParent :
+		    if Scanner.ChildMatchesParent (
+			    compoundTokenText(1..compoundTokenTextLen)) then
+			resultValue := yes
+		    else
+			resultValue := no
+		    end if
+
+		label oSeparateCompilationSetOriginalFile :
+		    Scanner.SetOriginalFile
+
+		label oSeparateCompilationIsOriginalFile :
+		    if Scanner.IsOriginalFile then
+			resultValue := yes
+		    else
+			resultValue := no
+		    end if
+
+		label oSeparateCompilationIsParent :
+		    if Scanner.IsParent then
+			resultValue := yes
+		    else
+			resultValue := no
+		    end if
+
+		label oSeparateCompilationIsChildThatCalledMe :
+		    assert compoundToken = tStringLit or noErrors > 0
+		    if Scanner.ChildThatCalledMe (
+			    compoundTokenText(1..compoundTokenTextLen)) then
+			resultValue := yes
+		    else
+			resultValue := no
+		    end if
+
+		label oSeparateCompilationDisableScannerLookahead :
+		    disableLookahead := true
+
+		label oSeparateCompilationMarkModuleStub :
+		    assert compoundToken = tIdent
+		    Scanner.MarkModuleStub(lastIdentTokenValue.value)
+
+		label oSeparateCompilationIsMarkedModuleStub :
+		    if Scanner.IsMarkedStub then
+			resultValue := yes
+		    else
+			resultValue := no
+		    end if
+
+		label oSeparateCompilationEmitMarkedStubIdent :
+		    EmitInt(Scanner.MarkedStubIdent)
+
+		label oSeparateCompilationDisableOutput :
+		    outputEnabled := false
+
+		label oSeparateCompilationEnableOutput :
+		    outputEnabled := true
+
+		/* External Mechanism */
+		label oExternalSetOverideName :
+		    assert compoundToken = tStringLit or noErrors > 0
+		    if compoundTokenTextLen = 0 then
+			Error(eNullOverideName)
+		    else
+			externalOveride := true
+			externalNameText :=
+			    compoundTokenText(1..compoundTokenTextLen)
+		    end if
+
+		label oExternalSetNoOveride :
+		    externalOveride := false
+
+		label oExternalOverideName :
+		    if externalOveride then
+			resultValue := yes
+		    else
+			resultValue := no
+		    end if
+
+		label oExternalEmitOverideName :
+		    assert externalOveride
+		    externalOveride := false
+		    EmitOutputToken(aStringLit)
+		    EmitString (length(externalNameText), externalNameText)
+	    end case
+	end loop
+    end SslWalker
+
+
+    /* initially */
+
+    /* Trace Execution if Required */
+#if DEBUG then
+    if nargs >= traceArg then
+	var argString := fetcharg(traceArg)
+	if length(argString) >= 2 and argString(1..2) = "-t" then
+	    tracing := true
+	    if length(argString) > 2 and argString(3) = "t" then
+		traceFile := 0
+	    else
+		open (traceFile, traceFileName, "w")
+	    end if
+	end if
+    end if
+#end if
+
+
+    /* check for include directories, preprocessor symbols and options */
+    for i : traceArg .. nargs
+	var argString := fetcharg(i)
+	if length(argString) > 2 then
+	    if argString(1..2) = "-D" then
+		const eqPosn : int := index(argString, "=")
+		if eqPosn = 0 then
+		    Scanner.EnterPreprocessorSymbol (argString(3..*))
+		else
+		    const name : string := argString(3..eqPosn-1)
+		    const text : string := argString(eqPosn+1..*)
+		    Scanner.EnterMacroSymbol (name, text, length(text))
+		end if
+	    elsif argString(1..2) = "-I" then
+		Scanner.EnterIncludeDirectory (argString(3..*))
+	    end if
+	elsif argString = "-." then
+	    dotOption := true
+	elsif argString = "-E" then
+	    echoInput := true
+	elsif argString = "-w" then
+		printWarnings := false
+	end if
+    end for
+
+    /* Initialize Input/Output */
+    AcceptInputToken
+
+    /* Walk the table... */
+    SslWalker
+
+    if nextToken not = tEndOfFile and not aborted then
+	Error (eExtraneousProgramText)
+    else
+	EmitOutputToken(aEndOfFile)
+    end if
+
+    /* Finish up I/O */
+    Scanner.Finalize
+
+    /* Don't Check Semantics if Syntax Errors are Present */
+    if noErrors > 0 or aborted then
+	sysexit (1)
+    else
+	sysexit (0)
+    end if
+end Parser

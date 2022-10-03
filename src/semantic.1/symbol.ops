@@ -1,0 +1,177 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+%
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+%
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+label oSymbolPushLocalScope :
+    assert compoundToken = aIdent or compoundToken = aPredefinedId
+    Scope.LookupLocalSymbol (compoundTokenValue.identIndex)
+    Symbol.PushSymbol (compoundTokenValue.identIndex, Scope.ScopeSymbolIndex)
+    Symbol.ChangeKind (Scope.ScopeSymbolKind)
+
+label oSymbolPushEnclosingLocalScope :
+    assert compoundToken = aIdent or compoundToken = aPredefinedId
+    Scope.LookupEnclosingLocalSymbol (compoundTokenValue.identIndex)
+    Symbol.PushSymbol (compoundTokenValue.identIndex, Scope.ScopeSymbolIndex)
+    Symbol.ChangeKind (Scope.ScopeSymbolKind)
+
+label oSymbolPushEnclosingEnclosingLocalScope :
+    assert compoundToken = aIdent or compoundToken = aPredefinedId
+    Scope.LookupEnclosingEnclosingLocalSymbol (compoundTokenValue.identIndex)
+    Symbol.PushSymbol (compoundTokenValue.identIndex, Scope.ScopeSymbolIndex)
+    Symbol.ChangeKind (Scope.ScopeSymbolKind)
+
+label oSymbolPushClosedScope :
+    assert compoundToken = aIdent or compoundToken = aPredefinedId
+    Scope.LookupSymbol (compoundTokenValue.identIndex, Scope.ClosedScope)
+    Symbol.PushSymbol (compoundTokenValue.identIndex, Scope.ScopeSymbolIndex)
+    Symbol.ChangeKind (Scope.ScopeSymbolKind)
+
+label oSymbolPushEnclosingClosedScope :
+    assert compoundToken = aIdent or compoundToken = aPredefinedId
+    Scope.LookupSymbol (compoundTokenValue.identIndex, Scope.EnclosingClosedScope)
+    Symbol.PushSymbol (compoundTokenValue.identIndex, Scope.ScopeSymbolIndex)
+    Symbol.ChangeKind (Scope.ScopeSymbolKind)
+
+label oSymbolPushGlobalScope :
+    assert compoundToken = aIdent or compoundToken = aPredefinedId
+    Scope.LookupSymbol (compoundTokenValue.identIndex, Scope.GlobalScope)
+    Symbol.PushSymbol (compoundTokenValue.identIndex, Scope.ScopeSymbolIndex)
+    Symbol.ChangeKind (Scope.ScopeSymbolKind)
+
+label oSymbolPushNew :
+    assert compoundToken = aIdent or compoundToken = aPredefinedId
+    Symbol.PushNewSymbol (compoundTokenValue.identIndex, sNotFound)
+
+label oSymbolPushDummy:
+    if compoundToken = aPredefinedId then
+	Symbol.PushDummySymbol(compoundTokenValue.identIndex)
+    else
+	Symbol.PushDummySymbol(0)
+    end if
+
+label oSymbolPushDummyCopy:
+    Symbol.PushCopyDummySymbol
+
+label oSymbolMakeUpNameAndPushNew :
+    SslGeneratedCompoundToken(aIdent)
+    Symbol.PushNewSymbol(compoundTokenValue.identIndex, sNotFound)
+
+label oSymbolPushCopy :
+    Symbol.PushSymbol(Symbol.SymbolIdent, Symbol.SymbolIndexx)
+
+label oSymbolPushCountScope :
+    Scope.LookupCountSymbol (Count.CountValue)
+    Symbol.PushSymbol (Scope.ScopeSymbolIdent, Scope.ScopeSymbolIndex)
+    Symbol.ChangeKind (Scope.ScopeSymbolKind)
+
+label oSymbolPushCountClosedScope :
+    Scope.LookupCountClosedSymbol (Count.CountValue)
+    Symbol.PushSymbol (Scope.ScopeSymbolIdent, Scope.ScopeSymbolIndex)
+    Symbol.ChangeKind (Scope.ScopeSymbolKind)
+
+label oSymbolPushTypeSymbol :
+    Symbol.PushSymbol (0, Types.TypeSymbol)
+
+label oSymbolPushBoundSymbol :
+    Symbol.PushSymbol (Symbol.BoundSymbolIdent, Symbol.SymbolBoundTo)
+
+label oSymbolEnterType :
+    Symbol.EnterType (Types.TypeIndexx)
+
+label oSymbolEnterAttribute :
+    Symbol.EnterAttribute (parameterValue)
+
+label oSymbolEnterLeftSymbolBoundTo :
+    Symbol.EnterLeftSymbolBoundTo
+
+label oSymbolEnterLeftResultSymbolScope :
+    Symbol.EnterLeftResultSymbolScope (Scope.SavedScopeIndex)
+
+label oSymbolEnterKind :
+    Symbol.EnterKind (parameterValue)
+
+label oSymbolEnterScopeLevel :
+    Symbol.EnterScopeLevel(Scope.ReturnScopeLevel)
+
+label oSymbolEnterScopeLevelPlus1 :
+    Symbol.EnterScopeLevel(Scope.ReturnScopeLevel+1)
+
+label oSymbolEnterScopeLevelPlus2 :
+    Symbol.EnterScopeLevel(Scope.ReturnScopeLevel+2)
+
+label oSymbolChangeKind :
+    Symbol.ChangeKind (parameterValue)
+
+label oSymbolClearAttribute :
+    Symbol.ClearAttribute (parameterValue)
+
+label oSymbolPop :
+    Symbol.PopSymbol
+
+label oSymbolPopAndChooseKind :
+    resultValue := Symbol.SymbolKind
+    Symbol.PopSymbol
+
+label oSymbolChooseKind :
+    resultValue := Symbol.SymbolKind
+
+label oSymbolChooseAttribute :
+    if Symbol.SymbolHasAttribute (parameterValue) then
+	resultValue := trueResult
+    else
+	resultValue := falseResult
+    end if
+
+label oSymbolChooseSameSymbols :
+    if Symbol.SameSymbols then
+	resultValue := trueResult
+    else
+	resultValue := falseResult
+    end if
+
+label oSymbolResolveKind :
+    Symbol.ResolveKind
+
+label oSymbolSwapSymbols :
+    Symbol.SwapSymbols
+
+label oSymbolBodyDeclaredAtSameScopeLevel :
+    if Symbol.ReturnScopeLevel = Scope.ReturnScopeLevel then
+	resultValue := yes
+    else
+	resultValue := no
+    end if
+
+label oSymbolBodyDeclaredAtSameScopeLevelMinus1 :
+    if Symbol.ReturnScopeLevel = Scope.ReturnScopeLevel-1 then
+	resultValue := yes
+    else
+	resultValue := no
+    end if
+
+label oSymbolChooseUnqualifiedExport:
+    if Symbol.UnqualifiedExportLevel > 0 then
+	resultValue := yes
+    else
+	resultValue := no
+    end if
+
+label oSymbolIncrementUnqualifiedExport:
+    Symbol.IncrementUnqualifiedExportLevel
+
+label oSymbolDecrementUnqualifiedExport:
+    Symbol.DecrementUnqualifiedExportLevel

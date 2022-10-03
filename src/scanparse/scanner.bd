@@ -1,0 +1,1457 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+% 
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+% 
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+body "scanner.st" module Scanner
+    /*  Computer Systems Research Group
+     *  University of Toronto
+     *  Module:  Turing Plus Scanner/Screener  V1.00
+     *	Author:  M. Mendell
+     *	From:
+     *  	Module:  Turing Scanner/Screener  V1.04
+     *		Author:  S. Perelgut and M. Mendell
+     *		Date:    26 june 1985
+     */
+
+    /* Copyright (C) 1985 The University of Toronto */
+
+
+    /*  This module is the Scanner/Screener for Turing 
+     * The Scanner/Screener is implemented using S/SL and
+     * is run as a coroutine with the Parser.  The Scanner/
+     * Screener's state is entirely contained in this module
+     * and hence is preserved between calls.  The Parser
+     * calls the exported routine "Scanner.Scan" whenever
+     * it requires the next input token.  The Scanner/Screener
+     * will resume execution where it left off after the last
+     * call and will return when it emits the next input token.
+     * The scanned token will be left in the global imported
+     * variable "nextToken".  The text and text length for
+     * identifiers, strings and character literals will be
+     * left in "nextTokenText" and "nextTokenTextLen".
+     * The value of integer literals and identifier indices
+     * will be left in "nextTokenValue".
+     */
+
+    /* Primitive S/SL Table Operations:
+     * These will remain the same independent of the
+     * pass and form the fundamental table operations.
+     */
+    const *firstTableOperation := 0
+    const *firstPrimitiveOperation := 0
+    const *oCall := 0
+    const *oReturn := 1
+    const *oRuleEnd := 2
+    const *oJump:= 3
+    const *oInput := 4
+    const *oInputAny := 5
+    const *oInputChoice := 6
+    const *oEmit := 7
+    const *oError := 8
+    const *oChoice := 9
+    const *oChoiceEnd := 10
+    const *oSetParameter := 11
+    const *oSetResult := 12
+    const *oSetResultFromInput := 13
+    const *lastPrimitiveOperation := 13
+
+    include "scanner.def.t"
+
+    /* The S/SL Table */
+    include "scanner.sst.t"
+
+    /* Table Walker State */
+    var sslPointer: int := 0
+    var operation: nat2
+
+    /* Tracing Control */
+    const traceArg := 5
+#if DEBUG then
+    var tracing := false
+    var traceFile : int
+#else
+    const tracing := false
+    const traceFile := 0
+#end if
+    const traceFileName := "scan.trace"
+
+    /* The S/SL Rule Call Stack:
+     * The Rule Call Stack implements Syntax/Semantic
+     * Language rule call and return.
+     * Each time an oCall operation is executed,
+     * the table return address is pushed onto the
+     * Rule Call Stack.  When an oReturn is executed,
+     * the return address is popped from the stack.
+     * An oReturn executed when the Rule Call Stack is
+     * empty terminates table execution.
+     */
+
+    const *sslStackSize := 100
+    var sslStack: array 1 .. sslStackSize of int
+    var sslTop: 0 .. sslStackSize := 0
+
+    /* Choice Match Flag:
+     * Set by the Choice Handler to indicate whether
+     * a match was made or the otherwise path was taken.
+     * Set to true if a match was made and false otherwise.
+     * This flag is used in input choices to indicate
+     * whether the choice input token should be accepted or
+     * not.						
+     */
+
+    var choiceTagMatched: boolean
+
+    /* Parameterized And Choice Semantic Operation Values:
+     * These are used to hold the decoded parameter value to
+     * a parameterized semantic operation and the result
+     * value returned by a choice semantic operation
+     * or rule respectively.
+     */
+
+    var parameterValue: int2
+    var resultValue: int2
+
+    /* S/SL System Failure Codes */
+    const *firstFailureCode := 0
+    const *fSemanticChoiceFailed := 0
+    const *fChoiceRuleFailed := 1
+    const *lastFailureCode := 1
+
+    type FailureCodes : firstFailureCode..lastFailureCode
+
+    /* Error Signal Codes */
+    const *firstErrorCode := 0;	
+    const *eNoError := 0
+    const *eTokenTooLong := 1
+    const *eIdentifierTooLong := 2
+
+    assert eIdentifierTooLong < eFirstWarning
+
+    /* Source File and Line Number */
+    var includeFileName: string := ""
+    var lineNumber: nat := 0
+
+    /* new source file */
+    var newSourceFile := false
+
+    var savedToken := false
+
+    var savedNextToken: InputTokens
+    var savedNextTokenTextLen: 0..maxstr+1
+    var savedNextTokenText: char(maxstr+1)
+    var savedNextTokenValue: TokenValue
+
+    var currentMacroIndex : 0 .. maxMacros := 0
+    var currentMacroIdentTextLen : 0 .. maxstr+1
+    var currentMacroIdentText : char(maxstr+1)
+
+    type ErrorCodes : firstErrorCode .. lastErrorCode
+
+    /*
+     * This procedure emits the error message associated with
+     * errCode and terminates execution if the error is fatal.
+     */
+    procedure Error (errCode: ErrorCodes)
+	assert errCode not = eNoError
+
+	if errCode >= eFirstError then
+	    noErrors += 1
+	end if
+
+	put "Line " ..
+	if errCode not= eEOLInStringLiteral or
+		errCode not= eEOLInCharLiteral then
+	    put lineNumber ..
+	else
+	    put lineNumber-1 ..
+	end if
+	put " of ", scannerFileName, ": " ..
+
+	case errCode of
+	    label eIllegalChar:
+		put "Illegal character in source ignored"
+
+	    label eEndCase:
+		put "'endcase' found, 'end case' assumed"
+
+	    label eEndFor:
+		put "'endfor' found, 'end for' assumed"
+
+	    label eEndIf:
+		put "'endif' found, 'end if' assumed"
+
+	    label eEndLoop:
+		put "'endloop' found, 'end loop' assumed"
+
+	    label eBadExponentInRealLiteral:
+		put "Bad real literal"
+
+	    label eBadEscapeInStringLiteral:
+		put "Illegal extended character in a string literal"
+
+	    label eEOLInStringLiteral:
+		put "String literal ends at end of line"
+
+	    label eEOFTerminatesStringLiteral:
+		put "String literal terminated by end of file"
+
+	    label eEOSInStringLiteral:
+		put "String literal contains end-of-string character"
+
+	    label eUninitCharInStringLiteral:
+		put "String literal contains uninitialized character"
+
+	    label eNullCharacterLiteral:
+		put "Char literal must contain at least one character"
+
+	    label eBadEscapeInCharLiteral:
+		put "Illegal extended character in a char literal"
+
+	    label eEOLInCharLiteral:
+		put "Char literal ends at end of line"
+
+	    label eEOFTerminatesCharLiteral:
+		put "Char literal terminated by end of file"
+
+	    label eEOFTerminatesComment:
+		put "Comment ends at end of file"
+
+	    label eCommentBracketInsideComment:
+		put "Warning: /* found in a bracketed comment - ignored"
+
+	    label eIllegalInclude:
+		put "Syntax error in include statement"
+
+	    label eNumberTooLarge:
+		put "Integer literal too large"
+
+	    label eBaseTooLarge:
+		put "Based integer literal base too large"
+
+	    label eDigitNotInBase:
+		put "Based integer literal contains illegal digit"
+
+	    label eIllegalBasedNumber:
+		put "Value of based integer literal must immediately follow '#'"
+
+	    label eIllegalOperatorAssumeNotEqual:
+		put "<> is not a legal operator.  not= assumed"
+
+	    label eTokenTooLong:
+		put "Token too long (greater than 127 characters)"
+
+	    label eIdentifierTooLong:
+		put "Identifer too long (greater than 50 characters)"
+
+	    label eIllegalPreProcSyntax:
+		put "Illegal preprocessor statement"
+
+	    label eTooFewEndifs:
+		put "Too few '#end if's in file"
+
+	    label eMissingIf:
+		put "Missing 'if' in '#end if'"
+
+	    label eMissingThen:
+		put "Missing 'then' in preprocessor statement"
+
+	    label eMissingEndParen:
+		put "Missing ')' in preprocessor statement"
+
+	    label eExtraneousTextOnPreprocLine:
+		put "Program text on preprocessor directive line"
+
+	    label eNestedIfs:
+		put "'#if' statements nested too deep"
+
+	    label eRecursiveMacro:
+		put "Attempt to recursively expand macro '",
+			currentMacroIdentText(1..currentMacroIdentTextLen), "'"
+
+	    label eMacroNeedsBracket:
+		put "Missing ')' in invocation of macro '",
+			currentMacroIdentText(1..currentMacroIdentTextLen), "'"
+
+	    label eMacroHasParameters:
+		put "Missing arguments to macro '",
+			currentMacroIdentText(1..currentMacroIdentTextLen), "'"
+
+	    label eTooManyMacroArguments:
+		put "Too many arguments to macro '",
+			currentMacroIdentText(1..currentMacroIdentTextLen), "'"
+
+	    label eTooFewMacroArguments:
+		put "Too few arguments to macro '",
+			currentMacroIdentText(1..currentMacroIdentTextLen), "'"
+
+	    label eMacroNestingTooDeep:
+		put "Macro nesting is too deep expanding macro '",
+			currentMacroIdentText(1..currentMacroIdentTextLen), "'"
+
+	    label eMacroTextTooBig:
+		put "Macro replacement text is too large for macro '",
+			currentMacroIdentText(1..currentMacroIdentTextLen), "'"
+
+	    label eTooManyMacros:
+		put "Too many macros defined"
+
+	    label eTooManyMacroParameters:
+		put "Too many parameters to macro"
+
+	    label eExpnStackOverflow:
+		put "Preprocessor expression too complex"
+
+	    label eTooManyIncludeDirs:
+		put "Too many -I include directories"
+
+	    label eTooManySymbols:
+		put "Too many preprocessor symbols"
+
+	    label eElsIfWithoutIf:
+		put "'#elsif' without matching '#if'"
+
+	    label eElseWithoutIf:
+		put "'#else' without matching '#if'"
+
+	    label eTooManyElses:
+		put "too many '#else' statements"
+
+	    label eSslStackOverflow:
+		put "Fatal compiler error (Scanner S/SL stack overflow)"
+
+	    label eIncludesTooDeep:
+		put "Include file nesting too deep"
+
+	    label eCannotFindIncludeFile:
+		put "Cannot find include file \"",
+			nextTokenText(1..nextTokenTextLen), "\""
+
+	    label eCannotOpenFileForInput:
+		put "Cannot open file \"", includeFileName, "\""
+
+	    label eTooManyIdents:
+		put "Too many identifiers"
+
+	    label eTooManyIdentChars:
+		put "Too many identifiers (characters)"
+
+	    label eTooManyModuleStubs:
+		put "Too many module stubs"
+
+	end case
+
+	if errCode >= firstFatalErrorCode or noErrors = maxErrors then
+	    sysexit(1)
+	end if
+    end Error
+
+    /* Character Range */
+    const *ordFirstChar := 0
+    const *ordLastChar := 255
+    const *firstChar := chr(ordFirstChar)
+    const *lastChar := chr(ordLastChar)
+
+    type CharClasses : cFirstChar..cLastChar
+
+    /* Character Class Map */
+#if CMS then
+    include "scanner.ebcdic"
+#else
+    include "scanner.ascii"
+#end if
+
+    /* Scanner Input Interface */
+    const *endOfFile := chr(0)
+
+    var nextChar: char := '\n'
+    var inputChar: char := '\n'
+    var startOfLine := true
+
+
+    procedure SaveCharacter (c: char)
+	if nextTokenTextLen < maxTokenLength then
+	    nextTokenTextLen += 1
+	    nextTokenText(nextTokenTextLen) := c
+	elsif nextTokenTextLen = maxTokenLength then
+	    Error (eTokenTooLong)
+	end if
+    end SaveCharacter
+
+
+    procedure AssignNextToken (s : string)
+	nextTokenTextLen := length(s)
+	for i : 1 .. nextTokenTextLen
+	    nextTokenText(i) := s(i)
+	end for
+    end AssignNextToken
+
+    module Ident
+	import (var nextTokenText, var nextTokenTextLen, var nextTokenValue,
+		var dummyIdentIndex, AssignNextToken, Error, tracing, traceFile)
+	export (IdentLookup, IdentToken, PreprocToken, SetPreprocToken,
+		MacroIndex, SetMacroIndex, WriteIdentTable)
+
+	/* The Ident Table
+	 * Used to resolve identifiers to indices and
+	 * keyword tokens.
+	 */
+
+	/* Ident Table File */
+	const identTableFile := 3
+
+	/* Keywords and predefined routines */
+	include "scanner.kwds"
+
+	/* Ident Characters */
+	var identChars : char(maxIdentChars)
+	var identCharsTop : 1..maxIdentChars+1 := 1
+
+	/* The Ident Table */
+	assert maxTokenLength <= 32767
+
+	type IdentTableEntry :
+	    packed record
+		charsIndex:		0..maxIdentChars
+		len:			0..maxTokenLength
+		token:			firstCompoundToken..lastKeywordToken
+		predefinedIdNum:	firstPredefinedId..lastPredefinedId
+		preprocToken:		firstPreprocToken..lastPreprocToken
+		macroIndex:		0..maxMacros
+	    end record
+
+	var identTable: array 0..maxIdents-1 of IdentTableEntry
+	var identTop: 0..maxIdents := 0
+
+	/* Index of Last Ident Looked For */
+	var identIndex: 0..maxIdents-1
+
+	procedure IdentLookup
+	    var register i: 0..maxIdents*2+1
+	    var register hash: 0..maxHash
+
+	    if nextTokenTextLen > maxIdentifierLength then
+		nextTokenTextLen := maxIdentifierLength
+	    end if
+
+	    const register len := nextTokenTextLen
+	    const identSlop := 10
+
+	    if identTop = maxIdents - identSlop then
+		Error (eTooManyIdents)
+		i := 0
+	    else
+		/* Starting hash: first char * 503 + last char */
+		/* maxHash == 2**n - 1			       */
+		hash := (#nextTokenText(1) * 503 + 
+			 #nextTokenText(len)) and maxHash
+		i := hash
+		if hash = 0 then
+		    hash := 1
+		end if
+		loop
+		    bind var register id to identTable(i)
+
+		    exit when id.len = len and
+			nextTokenText(1..len) =
+			identChars(id.charsIndex..id.charsIndex+len-1)
+
+		    if id.len = 0 then
+			/* enter the name */
+			if identCharsTop + len <= maxIdentChars then
+			    id.charsIndex := identCharsTop + 1
+
+			    /* copy the name */
+			    var register k := identCharsTop + 1
+			    for j : 1..len
+				identChars(k) := nextTokenText(j)
+				k += 1
+			    end for
+
+			    id.len := len
+			    identTop += 1
+			    identCharsTop += len
+			    exit
+			else
+			    Error (eTooManyIdentChars)
+			end if
+		    end if
+
+		    i += hash
+
+		    if i >= maxIdents then
+			i -= maxIdents
+		    end if
+		end loop
+	    end if
+
+	    identIndex := i
+	    nextTokenValue.kind := ivIntNat
+	    nextTokenValue.value := i
+	    nextTokenValue.pred := identTable(i).predefinedIdNum
+
+#if DEBUG then
+	    if tracing then
+		put : traceFile, "Ident.IdentLookup \"",
+			nextTokenText(1..nextTokenTextLen), "\" = ", identIndex
+	    end if
+#end if
+	end IdentLookup
+
+
+	function IdentToken : firstCompoundToken .. lastKeywordToken
+	    result identTable(identIndex).token
+	end IdentToken
+
+
+	procedure SetPreprocToken (tok : firstPreprocToken .. lastPreprocToken)
+	    identTable(identIndex).preprocToken := tok
+	end SetPreprocToken
+
+
+	function PreprocToken : firstPreprocToken .. lastPreprocToken
+	    result identTable(identIndex).preprocToken
+	end PreprocToken
+
+
+	procedure SetMacroIndex (macroIndex : 0 .. maxMacros)
+	    assert identTable(identIndex).token = tIdent
+	    identTable(identIndex).macroIndex := macroIndex
+#if DEBUG then
+	    if tracing then
+		put : traceFile, "Ident.SetMacroIndex = ", macroIndex
+	    end if
+#end if
+	end SetMacroIndex
+
+
+	function MacroIndex : 0 .. maxMacros
+	    result identTable(identIndex).macroIndex
+	end MacroIndex
+
+
+	procedure WriteIdentTable
+	    var nl := "\n"
+	    for i : 0..maxIdents-1
+		const register l := identTable(i).len
+		if l not= 0 then
+		    write :identTableFile,
+			identChars(identTable(i).charsIndex) : l, nl: 1
+		else
+		    write :identTableFile, nl:1
+		end if
+	    end for
+	    close :identTableFile
+	end WriteIdentTable
+
+
+	/* Initialize ident table with null entries */
+	for i : 0..maxIdents-1
+	    bind var register id to identTable(i)
+
+	    id.charsIndex := 0
+	    id.len := 0
+	    id.token := tIdent
+	    id.predefinedIdNum := 0
+	    id.preprocToken := ppUndefinedIdent
+	    id.macroIndex := 0
+	end for
+
+
+	/* Enter keywords in table */
+	for keyword : firstKeywordToken..lastKeywordToken
+	    AssignNextToken (keywordTokens(keyword))
+	    IdentLookup
+	    identTable(identIndex).token := keyword
+	end for
+
+
+	/* Enter predefined identifiers in table */
+	for predefinedId : firstPredefinedId..lastPredefinedId
+	    AssignNextToken (predefinedIdTokens(predefinedId))
+	    IdentLookup
+	    identTable(identIndex).token := tPredefinedId
+	    identTable(identIndex).predefinedIdNum := predefinedId
+	end for
+
+
+	/* Enter preprocessor keywords in table */
+	for preprocToken : firstPreprocToken .. lastRealPreprocToken 
+	    AssignNextToken (preprocTokens(preprocToken))
+	    IdentLookup
+	    identTable(identIndex).preprocToken := preprocToken
+	end for
+
+
+	/* Enter dummy identifier in ident table */
+	AssignNextToken ("Identifier")
+	IdentLookup
+	dummyIdentIndex := identIndex
+    end Ident
+
+
+    module Value
+	import var nextTokenValue, nextTokenText, ValueKinds,
+	       nextTokenTextLen, maxnat, maxint
+	export ValueEvaluate, ValueReplaceDefault, ValueKind,
+	       conversionStatus
+
+	/*
+	 * The Literal Evaluator
+	 * Used to evaluate and validate integer
+	 * literals.
+	 */
+
+	var conversionStatusVar := csNormal
+
+
+	procedure ValueReplaceDefault
+	    nextTokenValue.kind := ivIntNat
+	    nextTokenValue.value := 1
+	end ValueReplaceDefault
+
+
+	/*
+	 * This procedure evaluates an integer literal of the 
+	 * specified base.
+	 */
+
+	const maxValueDiv10 : nat := maxnat div 10
+	const maxValueMod10 : nat := maxnat mod 10
+
+	procedure ValueEvaluate
+	    var register i:	0..maxTokenLength+1
+	    var register digit:	int2
+	    var register value:	nat4
+	    var base : 		nat4
+	    var temp :		string
+	    var overflo		:= false
+    
+	    nextTokenValue.value := 0
+	    conversionStatusVar := csNormal
+	    value := 0
+	    i := index(nextTokenText(1..nextTokenTextLen), "#")
+	    if i = 0 then
+		base := 10
+		temp := nextTokenText(1..nextTokenTextLen)
+	    else
+		base := 10
+		temp := nextTokenText(i+1..nextTokenTextLen)
+		for j : 1..i-1
+		    digit := ord(nextTokenText(j)) - #'0'
+
+		    if value > maxValueDiv10 or
+			(value = maxValueDiv10 and
+			 digit > maxValueMod10) then
+			% overflow occurred
+			conversionStatusVar := csNumberTooLarge
+			overflo := true
+		    else
+			value := value * 10 + digit
+		    end if
+		    exit when overflo
+		end for
+		base := value
+	    end if
+	    if base = 0 then
+		conversionStatusVar := csBaseZero
+		overflo := true	% signal error
+	    elsif base > 36 then
+		conversionStatusVar := csBaseTooLarge
+		overflo := true	% signal error
+	    else
+		const maxValueDivBase : nat := maxnat div base
+		const maxValueModBase : nat := maxnat mod base
+
+		value := 0
+		for j : 1..length(temp)
+		    var register ch : char := temp(j)
+
+		    if ch >= 'A' and ch <= 'I' then
+			digit := 10 + ord(ch) - #'A'
+		    elsif ch >= 'a' and ch <= 'i' then
+			digit := 10 + ord(ch) - #'a'
+		    elsif ch >= 'J' and ch <= 'R' then
+			digit := 19 + ord(ch) - #'J'
+		    elsif ch >= 'j' and ch <= 'r' then
+			digit := 19 + ord(ch) - #'j'
+		    elsif ch >= 'S' and ch <= 'Z' then
+			digit := 28 + ord(ch) - #'S'
+		    elsif ch >= 's' and ch <= 'z' then
+			digit := 28 + ord(ch) - #'s'
+		    elsif ch >= '0' and ch <= '9' then
+			digit := ord(ch) - #'0'
+		    else
+			conversionStatusVar := csDigitNotInBase
+			overflo := true	% signal error
+			exit
+		    end if
+		    if digit >= base then
+			conversionStatusVar := csDigitNotInBase
+			overflo := true	% signal error
+		    end if
+
+		    if value > maxValueDivBase or
+			    (value = maxValueDivBase and
+			     digit > maxValueModBase) then
+			% overflow occurred
+			conversionStatusVar := csNumberTooLarge
+			overflo := true
+		    else
+			value := value * base + digit
+		    end if
+		    exit when overflo
+		end for
+	    end if
+
+	    if not overflo then
+		nextTokenValue.value := value
+		if value <= maxint then
+		    nextTokenValue.kind := ivIntNat
+		else
+		    nextTokenValue.kind := ivNat
+		end if
+	    end if
+	end ValueEvaluate
+
+
+	function ValueKind : ValueKinds
+	    result nextTokenValue.kind
+	end ValueKind
+
+
+	function conversionStatus : int
+	    result conversionStatusVar
+	end conversionStatus
+    end Value
+
+
+    /* Macro module */
+    include "scanner.mac"
+
+    /* PreProcessor module */
+    include "scanner.pp"
+
+    /* Includer module */
+    include "scanner.inc"
+
+    procedure AcceptInputChar
+	if charClass(ord(inputChar)) = cEOL then
+	    startOfLine := true
+	elsif charClass(ord(inputChar)) not= cWhiteSpace then
+	    startOfLine := false
+	end if
+
+	inputChar := nextChar
+	Includer.GetNextChar
+
+#if DEBUG then
+	/* Trace Input */
+	if tracing then
+	    put :traceFile, "Input char accepted \"", inputChar,
+		"\";  Next input char \"", nextChar, "\""
+	end if
+#end if
+    end AcceptInputChar
+
+#if TOEBCDIC then
+    const AsciiToEbcdic: array 0..127 of nat1 := init
+	/* ASCII LF changed to map to EBCDIC NL */
+	(0, 1, 2, 3, 55, 45, 46, 47,
+	22, 5, 21, 11, 12, 13, 14, 15,
+	16, 17, 18, 19, 60, 61, 50, 38,
+	24, 25, 63, 39, 28, 29, 30, 31,
+	64, 90, 127, 123, 91, 108, 80, 125,
+	77, 93, 92, 78, 107, 96, 75, 97,
+	240, 241, 242, 243, 244, 245, 246, 247,
+	248, 249, 122, 94, 76, 126, 110, 111,
+	124, 193, 194, 195, 196, 197, 198, 199,
+	200, 201, 209, 210, 211, 212, 213, 214,
+	215, 216, 217, 226, 227, 228, 229, 230,
+	231, 232, 233, 173, 224, 189, 95, 109,
+	121, 129, 130, 131, 132, 133, 134, 135,
+	136, 137, 145, 146, 147, 148, 149, 150,
+	151, 152, 153, 162, 163, 164, 165, 166,
+	167, 168, 169, 192, 79, 208, 161, 7,
+	32, 33, 34, 35, 36, 21, 6, 23,
+	40, 41, 42, 43, 44, 9, 10, 27,
+	48, 49, 26, 51, 52, 53, 54, 8,
+	56, 57, 58, 59, 4, 20, 62, 225,
+	65, 66, 67, 68, 69, 70, 71, 72,
+	73, 81, 82, 83, 84, 85, 86, 87,
+	88, 89, 98, 99, 100, 101, 102, 103,
+	104, 105, 112, 113, 114, 115, 116, 117,
+	118, 119, 120, 128, 138, 139, 140, 141,
+	142, 143, 144, 154, 155, 156, 157, 158,
+	159, 160, 170, 171, 172, 173, 174, 175,
+	176, 177, 178, 179, 180, 181, 182, 183,
+	184, 185, 186, 187, 188, 189, 190, 191,
+	202, 203, 204, 205, 206, 207, 218, 219,
+	220, 221, 222, 223, 234, 235, 236, 237,
+	238, 239, 250, 251, 252, 253, 254, 255)
+
+
+
+    procedure TranslateToEbcdic
+	var t := nextTokenText
+	for i : 1..nextTokenTextLen
+	    #t(i) := AsciiToEbcdic(#nextTokenText(i))
+	end for
+	nextTokenText := t
+    end TranslateToEbcdic
+
+
+#end if
+#if TOEBCDIC then
+    /* this is used to properly handle filenames for separate compilation */
+    var lastTokenWasSpecial := false
+#end if
+
+
+    procedure EmitToken (emittedToken: InputTokens)
+	if emittedToken = tKeyword then
+	    nextToken := Ident.IdentToken
+#if TOEBCDIC then
+	    case nextToken of
+		label tChild, tParent, tBody, tExternal :
+		    lastTokenWasSpecial := true
+		label :
+		    lastTokenWasSpecial := false
+	    end case
+#end if
+	elsif emittedToken = tNewLine then
+	    nextToken := emittedToken
+	    nextTokenValue.kind := ivIntNat
+	    nextTokenValue.value := lineNumber
+#if TOEBCDIC then
+	elsif emittedToken = tNewFile then
+	    nextToken := emittedToken
+	elsif emittedToken = tStringLit or emittedToken = tCharLit and
+		not lastTokenWasSpecial then
+	    TranslateToEbcdic
+	    nextToken := emittedToken
+	    lastTokenWasSpecial := false
+#end if
+	else
+	    nextToken := emittedToken
+#if TOEBCDIC then
+	    lastTokenWasSpecial := false
+#end if
+	end if
+
+
+#if DEBUG then
+	/* Trace Output */
+	if tracing then
+	    put :traceFile, "Scan token emitted: ", nextToken
+	end if
+#end if
+    end EmitToken
+
+
+#if DEBUG then
+    procedure SslTrace
+	put :traceFile, ":", sslPointer-1, " ", operation, " ",
+		sslTable(sslPointer)
+    end SslTrace
+
+
+    procedure SslFailure (failCode: FailureCodes)
+	put "### Scanner S/SL program failure:  " ..
+
+	case failCode of
+	    label fSemanticChoiceFailed :
+		put "Semantic choice failed" ..
+	    label fChoiceRuleFailed :
+		put "Choice rule returned without a value" ..
+	end case
+
+	put "while processing line ", lineNumber
+	SslTrace
+	assert false
+    end SslFailure
+#end if
+
+
+    body procedure Scan
+	var register localSslPointer: int := sslPointer
+	var register numberOfChoices: int
+	var register choiceTag: int2
+	var preprocSavedIdent : InputTokens
+
+
+	/* Resume Walking the S/SL Table */
+	loop
+	    operation := sslTable(localSslPointer)
+	    localSslPointer += 1
+
+	    /* Trace Execution */
+#if DEBUG then
+	    if tracing then
+		sslPointer := localSslPointer
+		SslTrace
+	    end if
+#end if
+
+	    case operation of
+		label oCall :
+		    if sslTop < sslStackSize then
+			sslTop += 1
+			sslStack(sslTop) := localSslPointer + 1
+			localSslPointer := sslTable(localSslPointer)
+		    else
+			Error (eSslStackOverflow)
+			nextToken := tEndOfFile
+			exit
+		    end if
+
+		label oReturn :
+		    if sslTop > 0 then
+			localSslPointer := sslStack(sslTop)
+			sslTop -= 1
+		    else
+			nextToken := tEndOfFile
+			exit
+		    end if
+
+		label oRuleEnd :
+#if DEBUG then
+		    sslPointer := localSslPointer
+		    SslFailure (fChoiceRuleFailed)
+#end if
+
+		label oJump :
+		    localSslPointer := sslTable(localSslPointer)
+
+		label oInput :
+#if DEBUG then
+		    assert charClass(ord(nextChar)) = sslTable(localSslPointer)
+#end if
+		    localSslPointer += 1
+		    AcceptInputChar
+
+		label oInputAny :
+		    AcceptInputChar
+
+		label oInputChoice :
+		    choiceTag := charClass(ord(nextChar))
+		    localSslPointer := sslTable(localSslPointer)
+		    numberOfChoices := sslTable(localSslPointer)
+		    localSslPointer += 1
+	
+		    for : 1..numberOfChoices
+			if sslTable(localSslPointer) = choiceTag then
+			    localSslPointer := sslTable(localSslPointer+1)
+			    AcceptInputChar
+			    exit
+			else
+			    localSslPointer += 2
+			end if
+		    end for
+
+		label oEmit :
+		    EmitToken (sslTable(localSslPointer))
+		    sslPointer := localSslPointer + 1
+		    return
+
+		label oError :
+		    Error (sslTable(localSslPointer))
+		    localSslPointer += 1
+
+		label oChoice :
+		    localSslPointer := sslTable(localSslPointer)
+		    numberOfChoices := sslTable(localSslPointer)
+		    localSslPointer += 1
+	
+		    for : 1..numberOfChoices
+			if sslTable(localSslPointer) = resultValue then
+			    localSslPointer := sslTable(localSslPointer+1)
+			    exit
+			else
+			    localSslPointer += 2
+			end if
+		    end for
+
+		label oChoiceEnd :
+#if DEBUG then
+		    sslPointer := localSslPointer
+		    SslFailure (fSemanticChoiceFailed)
+#end if
+
+		label oSetParameter :
+		    parameterValue := sslTable(localSslPointer)
+		    localSslPointer += 1
+
+		label oSetResult :
+		    resultValue := sslTable(localSslPointer)
+		    localSslPointer += 1
+
+		label oSetResultFromInput :
+		    resultValue := charClass(ord(nextChar))
+
+		/* Semantic Operations of the Scanner/Screener */
+
+		/* The Save and Skip Mechanisms */
+		label oSaveCharacter :
+		    SaveCharacter (inputChar)
+
+		label oSaveWhile :
+		    loop
+			SaveCharacter (inputChar)
+			exit when charClass(ord(nextChar)) not= parameterValue
+			AcceptInputChar
+		    end loop
+
+		label oSaveDefaultCharacter :
+		    SaveCharacter ('?')
+
+		label oSaveExtendedCharacter :
+#if CMS then
+		    const backspaceChar	:= chr(22)
+		    const returnChar	:= chr(13)
+		    const escapeChar	:= chr(39)
+		    const deleteChar	:= chr(7)
+#else
+		    const backspaceChar	:= chr(8)
+		    const returnChar	:= chr(13)
+		    const escapeChar	:= chr(27)
+		    const deleteChar	:= chr(127)
+#end if
+		    const cc := charClass(ord(inputChar))
+		    
+		    case cc of
+			label cQuote, cBackslash, cSingleQuote, cCaret :
+			    SaveCharacter(inputChar)
+			label cLetter :
+			    case inputChar of
+				label 'b', 'B' :
+				    SaveCharacter(backspaceChar)
+				label 'd', 'D' :
+				    SaveCharacter(deleteChar)
+				label 'e', 'E' :
+				    SaveCharacter(escapeChar)
+				label 'f', 'F' :
+				    SaveCharacter('\f')
+				label 'n', 'N' :
+				    SaveCharacter('\n')
+				label 'r', 'R' :
+				    SaveCharacter(returnChar)
+				label 't', 'T' :
+				    SaveCharacter('\t')
+
+				/* No other case is possible.  Extended */
+				/* characters are verified before saved */
+			    end case
+			label cDigit:
+			    assert inputChar = '0'
+			    SaveCharacter ('\0')
+
+			/* No other case is possible.  Extended */
+			/* characters are verified before saved */
+		    end case
+
+		label oSaveCaretCharacter :
+		    /* replace the next character with it as a control */
+		    /* assumes ascii !! */
+		    const c := ord(inputChar)
+		    if inputChar = '?' then
+			/** ^? == delete **/
+			SaveCharacter('\d')
+		    else
+			SaveCharacter(chr(c and 16#1f))
+		    end if
+
+		label oSaveWhiteSpace :
+		    SaveCharacter (' ')
+
+		label oSaveReplaceWithDefaultReal :
+		    /*Replace the token text buffer with "1.0E0"*/
+		    const t := "1.0e0"
+		    nextTokenTextLen := length(t)
+		    for i : 1..nextTokenTextLen
+			nextTokenText(i) := t(i)
+		    end for
+
+		label oSaveReset :
+		    nextTokenTextLen := 0
+
+		label oSkipWhile :
+		    loop
+			exit when charClass(ord(nextChar)) not= parameterValue
+			AcceptInputChar
+		    end loop
+
+		/* Validate Mechanism */
+		label oLookaheadForExponentChar :
+		    /* Verify that the next input character is */
+		    /* an acceptable exponent delimiter.	      */
+		    if nextChar = 'e' or nextChar = 'E' then
+			resultValue := valid
+		    else
+			resultValue := invalid
+		    end if
+
+		label oLookaheadForExtendedChar :
+		    /* Verify that the next input character is */
+		    /* an acceptable extended character.  Valid*/
+		    /* characters are b,B, n,N,t,T,f,F,r,R,", ', ^, 0 and \ */
+
+		    if index("bBdDeEfFnNtTrT\"\\'\^0", nextChar) not= 0 then
+			resultValue := valid
+		    else
+			resultValue := invalid
+		    end if
+
+		/* The Includer */
+		label oIncludePush :
+		    Includer.PushIncludeFile(false, "")
+
+		label oIncludePop :
+		    Includer.PopIncludeFile(false, false)
+
+		label oIncludeDepth :
+		    resultValue := Includer.IncludeDepth
+
+		label oIncludeNewSourceFile :
+		    if newSourceFile then
+			resultValue := yes
+			newSourceFile := false
+		    else
+			resultValue := no
+		    end if
+
+		label oIncludeRestoreSavedToken :
+		    if savedToken then
+			savedToken := false
+			nextToken := savedNextToken
+			nextTokenValue := savedNextTokenValue
+			nextTokenTextLen := savedNextTokenTextLen
+			nextTokenText := savedNextTokenText
+			sslPointer := localSslPointer
+			return
+		    end if
+
+		label oIncludeIsThisACompilationUnit :
+		    if Includer.IsCompilationUnit then
+			resultValue := yes
+		    else
+			resultValue := no
+		    end if
+
+		/* The Ident Table */
+		label oIdentLookup :
+		    if nextTokenTextLen > maxIdentifierLength then
+			Error(eIdentifierTooLong)
+		    end if
+		    Ident.IdentLookup
+
+		label oIdentChoose :
+		    resultValue := Ident.IdentToken
+
+		label oIdentChoosePreprocToken :
+		    resultValue := Ident.PreprocToken
+#if DEBUG then
+		    if tracing then
+			put : traceFile, "PreprocToken = ", resultValue
+		    end if
+#end if
+
+		label oIdentDefinePreprocIdent :
+		    Ident.SetPreprocToken (ppDefinedIdent)
+
+		label oIdentUndefPreprocIdent :
+		    Ident.SetPreprocToken (ppUndefinedIdent)
+
+		label oIdentIsMacro :
+		    currentMacroIndex := Ident.MacroIndex
+		    if currentMacroIndex = 0 then
+			resultValue := no
+		    else
+			currentMacroIdentTextLen := nextTokenTextLen
+			currentMacroIdentText := nextTokenText
+			resultValue := yes
+		    end if
+#if DEBUG then
+		    if tracing then
+			put : traceFile, "Ident.MacroIndex = ",
+				currentMacroIndex
+		    end if
+#end if
+
+		/* The Literal Evaluator */
+		label oValueEvaluate :
+		    Value.ValueEvaluate
+
+		label oValueReplaceDefault :
+		    Value.ValueReplaceDefault
+
+		label oValueChooseConversionStatus :
+		    resultValue := Value.conversionStatus
+
+		/* Macro operations */
+		label oMacroStartNewDefinition :
+		    var macroIndex : 1 .. maxMacros
+		    Macro.StartNewDefinition (macroIndex)
+		    assert macroIndex not= 0
+		    Ident.SetMacroIndex (macroIndex)
+
+		label oMacroEnterParameterName :
+		    Macro.EnterParameterName (
+			    nextTokenText(1..nextTokenTextLen))
+
+		label oMacroSaveText :
+		    Macro.SaveText (nextTokenText, nextTokenTextLen)
+
+		label oMacroSavePossibleParameter :
+		    Macro.SavePossibleParameter (
+			    nextTokenText(1..nextTokenTextLen),
+			    nextTokenTextLen)
+
+		label oMacroIsBusy :
+		    if Macro.BeingExpanded then
+			resultValue := yes
+		    else
+			resultValue := no
+		    end if
+
+		label oMacroHasParameters :
+		    if Macro.HasParameters then
+			resultValue := yes
+		    else
+			resultValue := no
+		    end if
+
+		label oMacroEnterArgument :
+		    Macro.EnterArgument (nextTokenText(1..nextTokenTextLen))
+
+		label oMacroPushReplacementText :
+		    Macro.PushReplacementText
+		    Includer.EnterMacro
+
+		label oMacroUndefineMacro :
+		    currentMacroIndex := Ident.MacroIndex
+		    if currentMacroIndex not= 0 then
+			Ident.SetMacroIndex (0)
+			Macro.Undefine
+		    end if
+
+		/* Preprocessor operations */
+		label oPreProcStartOfLine :
+		    if startOfLine then
+			resultValue := yes
+		    else
+			resultValue := no
+		    end if
+
+		label oPreProcPushLevel :
+		    PreProcessor.PushLevel
+
+		label oPreProcPopLevel :
+		    PreProcessor.PopLevel
+
+		label oPreProcAnd :
+		    PreProcessor.DoAnd
+
+		label oPreProcNot :
+		    PreProcessor.DoNot
+
+		label oPreProcOr :
+		    PreProcessor.DoOr
+
+		label oPreProcPushValue :
+		    if parameterValue = yes then
+			PreProcessor.PushValue (true)
+		    else
+			PreProcessor.PushValue (false)
+		    end if
+
+		label oPreProcSetIfExpn :
+		    PreProcessor.DoIf
+
+		label oPreProcSetElsifExpn :
+		    PreProcessor.DoElsIf
+
+		label oPreProcSetElse :
+		    PreProcessor.DoElse
+
+		label oPreProcDisableInput :
+		    if PreProcessor.DisableInput then
+			resultValue := yes
+		    else
+			resultValue := no
+		    end if
+
+		label oPreProcSaveToken :
+		    preprocSavedIdent := Ident.PreprocToken
+#if DEBUG then
+		    if tracing then
+			put :traceFile, "saved token = ", preprocSavedIdent
+		    end if
+#end if
+
+		label oPreProcResetToken :
+		    preprocSavedIdent := ppUnknownToken
+
+		label oPreProcChooseToken :
+		    resultValue := preprocSavedIdent
+#if DEBUG then
+		    if tracing then
+			put :traceFile, "chosen token = ", preprocSavedIdent
+		    end if
+#end if
+
+	    end case
+	end loop
+    end Scan
+
+
+    body proc EnterAlternate % (name:string)
+	Includer.EnterAlternate(name)
+    end EnterAlternate
+
+
+    body function IsAlternate
+	result Includer.IsAlternate
+    end IsAlternate
+
+
+    body proc SwitchToAlternate
+	Includer.SwitchToAlternate
+    end SwitchToAlternate
+
+
+    body proc EnterParent % (name : string)
+	Includer.EnterParent(name)
+    end EnterParent 
+
+
+    body proc ExitParent
+	Includer.ExitParent
+    end ExitParent
+
+
+    body proc EnterChild % (name:string)
+	Includer.EnterChild(name)
+    end EnterChild 
+
+
+    body proc ExitChild
+	Includer.ExitChild
+    end ExitChild
+
+
+    body function ChildMatchesParent % (name : string) : Boolean
+	result Includer.ChildMatchesParent(name)
+    end ChildMatchesParent
+
+
+    body proc SetOriginalFile 
+	Includer.SetOriginalFile
+    end SetOriginalFile
+
+
+    body function IsOriginalFile % : Boolean
+	result Includer.IsOriginalFile
+    end IsOriginalFile
+
+
+    body function IsParent % : Boolean =
+	result Includer.IsParent
+    end IsParent
+
+
+    body function ChildThatCalledMe % (name : string) : Boolean
+	result Includer.ChildThatCalledMe(name)
+    end ChildThatCalledMe
+
+
+    body proc ChildName % (var name : string)
+	name := Includer.ChildName
+    end ChildName
+
+
+    body proc EnterIncludeDirectory % (dir : string)
+	Includer.EnterDirectory (dir)
+    end EnterIncludeDirectory
+
+
+    body proc EnterPreprocessorSymbol % (name : string)
+	AssignNextToken (name)
+	Ident.IdentLookup
+	Ident.SetPreprocToken (ppDefinedIdent)
+    end EnterPreprocessorSymbol
+
+
+    body proc EnterMacroSymbol % (name : string, text : char(*), textLen : int)
+	AssignNextToken (name)
+	Ident.IdentLookup
+	var macroIndex : 1 .. maxMacros
+	Macro.StartNewDefinition (macroIndex)
+	assert macroIndex not= 0
+	Ident.SetMacroIndex (macroIndex)
+	Macro.SaveText (text, textLen)
+    end EnterMacroSymbol
+
+
+    body proc MarkModuleStub % (v : int)
+	Includer.MarkModuleStub (v)
+    end MarkModuleStub
+
+
+    body fcn IsMarkedStub % : boolean
+	result Includer.IsMarkedStub
+    end IsMarkedStub
+
+
+    body fcn MarkedStubIdent % : int
+	result Includer.MarkedStubIdent
+    end MarkedStubIdent
+
+
+    body proc Finalize
+	loop
+	    exit when Includer.IncludeDepth = 0
+	    Includer.PopIncludeFile(false, false)
+	end loop
+
+	Ident.WriteIdentTable
+	Macro.Finally
+	PreProcessor.Finally
+#if DEBUG then
+	if tracing then
+	    close(traceFile)
+	end if
+#end if
+    end Finalize
+
+
+    /* Trace Execution if Required */
+#if DEBUG then
+    if nargs >= traceArg then
+	var argString := fetcharg(traceArg)
+     
+	if length(argString) > 1 and argString(1..2) = "-t" then
+	    tracing := true
+	    if length(argString) > 2 and argString(3) = "t" then
+		traceFile := 0
+	    else
+		open (traceFile, traceFileName, "w")
+	    end if
+	end if
+    end if
+#end if
+
+end Scanner

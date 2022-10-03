@@ -1,0 +1,8593 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+%
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+%
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+%	Computer Systems Research Group
+%	University of Toronto
+%
+%	File:	Turing Plus Pass 1 Semantic S/SL Definitions and Rules	V1.0
+%	Author:	Mark Mendell and Steve Perelgut
+%	Date:	March 6, 1986
+
+% Revised v6.2 
+% Restored import checking for modules - JRC 8.8.22
+% Restored readonly checking - JRC 19.8.22
+
+input output:
+    % Compound Tokens
+    firstOutputToken
+
+    aIdent = firstOutputToken
+    firstCompoundToken = aIdent
+    aPredefinedId
+    aIntegerLit
+    aStringLit
+    aCharLit
+    aRealLit
+    aDataDescriptor		% used in the allocator and coder passes
+    aRoutineIndex		% used by the allocator and coder passes
+    aIdentText
+    aStabInformation		% used in the allocator and coder passes
+    aEndSubstring		% output from the semantic pass
+    lastCompoundToken = aEndSubstring
+
+    % Other Tokens
+    firstNonCompoundToken = 20
+    aAdd	= firstNonCompoundToken	% leave room for more compound tokens
+    aAddressint
+    aAbs			% output from the semantic pass
+    aAliasCheck			% output from the semantic pass
+    aAll
+    aAllocate
+    aAnd
+    aAndEqual
+    aArray
+    aAsm
+    aAssert
+    aAssign
+    aAssignInverted		% added by the allocator
+    aAt
+    aBegin
+    aBeginAsm
+    aBind
+    aBits
+    aBody
+    aBoolean
+    aBooleanAndEqual
+    aBooleanOrEqual
+    aByReference		% used by the allocator and coder passes
+    aCall			% output from the semantic pass
+    aCallVariable		% output from the allocator pass
+    aCase
+    aCaseBody
+    aChar
+    aChild
+    aChecked
+    aClose
+    aCollection
+    aColon
+    aCompile			% compile the following code
+    aConcatenate		% output from the semantic pass
+    aConcatenateAssign		% output from the semantic pass
+    aCondition
+    aConst
+    aDeallocate			% output from the allocator pass
+    aDecreasing
+    aDeferred
+    aDiv
+    aDivEqual
+    aDivideReal
+    aElse
+    aElsif
+    aEndAsm
+    aEndAliasCheck		% output from the semantic pass
+    aEndArrayIndexList
+    aEndBegin
+    aEndBind
+    aEndCase
+    aEndCaseBody
+    aEndEnum
+    aEndExport
+    aEndExpression
+    aEndExpressionList
+    aEndFor
+    aEndGet
+    aEndGrant
+    aEndIf
+    aEndImport
+    aEndInit
+    aEndLoop
+    aEndModule
+    aEndMonitor
+    aEndOpen
+    aEndPut
+    aEndRead
+    aEndRecord
+    aEndResult
+    aEndSubprogramBody
+    aEndSubs
+    aEndUnion
+    aEndUnionLabelBody
+    aEndWrite
+    aEnum
+    aEqual
+    aExit
+    aExitWhen
+    aExponentiate
+    aExponentiateEqual
+    aExport
+    aExternal
+    aExternalAddress
+    aFalse
+    aField
+    aFor
+    aFork
+    aForkAddress
+    aForkStackSize
+    aForkStatus
+    aForRange
+    aForward
+    aFree
+    aFunction
+    aGet
+    aGrant
+    aGreater
+    aGreaterEqual
+    aHandler
+    aHash
+    aIf
+    aImply
+    aImport
+    aIn
+    aInfixAnd
+    aInfixBooleanCompare	% output from the semantic pass
+    aInfixCompare
+    aInfixImply
+    aInfixOr
+    aInit
+    aInt
+    aInterruptNumber
+    aInvariant
+    aIs
+    aLabel
+    aLess
+    aLessEqual
+    aLogicalAnd
+    aLogicalOr
+    aLogicalXor
+    aLoop
+    aMax			% output from the semantic pass
+    aMin			% output from the semantic pass
+    aMinus
+    aMinusEqual
+    aMissingStub
+    aMod
+    aModEqual
+    aModule
+    aMonitor
+    aMonitorPriority
+    aMultiply
+    aNat
+    aNew
+    aNil			% output from the allocator pass
+    aNoAlias			% output from the semantic pass
+    aNoEnclosure		% output from the semantic pass
+    aNonManifest		% output from the semantic pass
+    aNonScalar			% output from the semantic pass
+    aNot
+    aNotEqual
+    aNotIn
+    aOpaque
+    aOpen
+    aOr
+    aOrEqual
+    aOtherwise
+    aPacked
+    aParent
+    aPause
+    aPervasive
+    aPlus
+    aPlusEqual
+    aPointer
+    aPost
+    aPre
+    aPriority
+    aProcedure
+    aProcess
+    aProcessStackSize
+    aPut
+    aPutContinue
+    aQuit
+    aQuitReason
+    aRangeCheck			% output from the semantic pass
+    aRangeCheck2		% output from the semantic pass
+    aRead
+    aReadWriteSize
+    aReadWriteSizeResult
+    aReadWriteStatus
+    aReal
+    aRealDivEqual
+    aRecord
+    aRecordElementType
+    aRegister
+    aResult
+    aReturn
+    aSeek
+    aSet
+    aSetDifference		% output from the semantic pass
+    aSetDifferenceAssign	% output from the semantic pass
+    aSetGreaterEqual		% output from the semantic pass
+    aSetIntersection		% output from the semantic pass
+    aSetIntersectionAssign	% output from the semantic pass
+    aSetLessEqual		% output from the semantic pass
+    aSetUnion			% output from the semantic pass
+    aSetUnionAssign		% output from the semantic pass
+    aSetXor
+    aSetXorAssign
+    aShiftLeft
+    aShiftLeftEqual
+    aShiftRight
+    aShiftRightEqual
+    aSignal
+    aSkip
+    aStar
+    aStarEqual
+    aStorageSize
+    aStreamNumber
+    aString
+    aStringSizeBound
+    aStub
+    aSubrange
+    aSubs
+    aSubstring
+    aSubtract
+    aTag
+    aTagCheck			% output from the semantic pass
+    aTell
+    aTimeout
+    aTrue
+    aType
+    aTypeCheat
+    aTypeCheatSize
+    aUnchecked
+    aUninitialize
+    aUnion
+    aUnionLabelBody
+    aUnqualified
+    aVar
+    aVarInit
+    aVaryingParameter
+    aWait
+    aWaitPriorityOrTimeout
+    aWrite
+    aXor
+    aXorEqual
+
+    % Meta Tokens
+    aFileName	= 252	% leave room for more tokens
+    aNewLine
+    aNewFile
+    aEndOfFile
+
+    tSyntaxError = -1	% for error recovery
+
+    lastOutputToken = aEndOfFile;
+
+
+error:
+    firstErrorCode		= 0
+    eNoError			= firstErrorCode
+
+    % Warnings
+    firstWarningCode		= 10
+    eIOIllegalInFunction	= firstWarningCode
+    ePredefinedMisused
+    eBodyIdentDoesNotMatch
+    eProcedureEndIdentDoesNotMatch
+    eEndNameNotModuleName
+    eEndNameNotMonitorName
+    eSymbolPreviouslyImported
+    eBoundVariablesOverlap
+    eReferenceActualsOverlap
+    eReferenceActualOverlapsImports
+    eFunctionTransitivelyImportsSpecialVar
+    ePotentialAliasDueToParaImportActualOverlap
+    eParametricImportOverlapsImports
+    eRecursivePassesGlobalVarByRef
+    eAutoImportPassesItself
+    eModuleInvariantNotLegal
+    eCannotImportVar
+    eDeviceMonitorCallsStubModule
+
+    firstNonSeriousErrorCode
+    eInvisibleSymbol			= firstNonSeriousErrorCode
+    eAssignmentToReadOnly
+    eReadOnlyVarImport
+    eVarBindToReadOnly
+    eReadOnlyModuleProcedureCall
+    eInvisibleImportedSymbol
+    eReadOnlyCollectionNewOrFree
+    eReadOnlyOrConstantNewOrFree
+    eReadOnlyPassedToVarFormal
+    eFunctionImportsVar
+    eCannotExportVariable
+    eFunctionTransitivelyImportsVar
+    eVarFormalIllegalInFunction
+    eVarImportReadOnlyInCurrentContext
+    eInvisibleImportByParametric
+    eVarParametricImportReadOnlyHere
+    eCollectionsNotAllowedInSubprograms
+    eFunctionCannotImportAForwardProcedure
+    eMonitorEntryInvokedWithinMonitor
+    eDeviceMonitorCallsMonitor
+    eDeviceMonitorCallsDangerousRoutine
+    eUnimportedSymbol 
+
+    % Severe
+    firstSeriousErrorCode
+    eNamedTypeNotAType		= firstSeriousErrorCode
+    eUndeclaredSymbol
+    eSymbolPreviouslyDeclared
+    eModuleFieldNotFound
+    eUndeclaredRecordField
+    eNonRecordField
+    eNonExpressionSubprogram
+    eNonExpressionVariable
+    eSymbolNotInEnumeratedRange
+    eCallToNonProcedure
+    eConstantPassedToVarFormal
+    eAssignmentToTag
+    eBodyNotProcedure
+    eBodyNotFunction
+    eIllegalSubprogramBodyname
+    eIllegalUseOfPredefined
+    eForwardMustBeResolvedAtSameScope
+    eNonVariableBind
+    eForwardTypeInCollectionPreviouslyDefined
+    eForwardTypeNameReused
+    eUndeclaredUnionField
+    eNonCollectionPointer
+    eMissingActuals
+    eIllegalSubscripts
+    eTooManySubscripts
+    eTooFewSubscripts
+    eIllegalUseOfAll
+    eIllegalUseOfSubstring
+    eIllegalAssignment
+    eNonCollectionNewOrFree
+    eNonPointerNewOrFree
+    eNonVariableNewOrFree
+    eNonTagInTagStmt
+    eReadOnlyTag
+    eValuelessFunctionReturn
+    eReturnValueInNonFunction
+    eReturnInModule
+    eExitNotInLoop
+    eIllegalPutGetOperandType
+    eIllegalTypeCheat
+    eTooManyActuals
+    eTooFewActuals
+    eNonVariablePassedToVarFormal
+    eNonVariablePassedToReferenceParameter
+    eExpressionPassedByReference
+    eIllegalVarImport
+    eForwardInImportImproperlyUsed
+    eUnresolvedExportedSymbol
+    eExportedModule
+    eExportedMonitor
+    eInitOnlyInPostAssertOrInvariant
+    eUnresolvedForwardSubprogram
+    eUnresolvedExternalSubprogram
+    eForwardInImportsNotRefined
+    eIllegalUseOfForwardType
+    eFormalImported
+    eUnresolvedForwardType
+    eUnresolvedForwardInCollection
+    eResultOnlyUsedInPost
+    eMissingValue
+
+    eImportConflictsWithLocalDeclaration
+    eUnqualifiedNameConflicts
+    eBodyModuleMustBeStubModule
+    eBodyMonitorMustBeStubMonitor
+    eCantGrant
+    eCantGrantVar
+    eMoreThanOneModuleBody
+    eMoreThanOneMonitorBody
+    eReadOnlyVarGrant
+    eUnresolvedGrantSymbol
+    eSymbolNotGrantedVar
+    eSymbolNotGrantedOrPervasive
+    eStubConstantMustBeCompileTime
+    eUnqualifiedBodyNotFound
+    eRedeclarationOfStubSubprogramHasDifferentFormals
+
+
+    eConditionsMustBeDeferredInDeviceMonitor
+    eInterruptProcedureCannotBeExported
+    eInterruptProcedureOnlyInDeviceMonitor
+    eReadOnlyOpenVariable
+    eOpenNotVariable
+    eIOStatusNotVariable
+    eReadOnlyIOStatusVariable
+    eReadOnlyTellResultVariable
+    eTellResultNotVariable
+    eReadOnlyReadWriteSizeResult
+    eReadWriteSizeResultNotVariable
+    eReadWriteItemNotVariable
+    eReadOnlyReadItem
+    eForkOfNonProcess
+    eReadOnlyForkStatusOrAddress
+    eForkStatusOrAddressNotVariable
+    eSignalWaitReadOnlyCondition
+    eSignalWaitNotCondition
+    eBitsTypeMustNotHaveDotDot
+    eReferenceToInterruptProcedure
+
+    % errors generated by the compiler
+    eOrdOnlyAppliesToSingleCharacterStrings
+
+
+    firstFatalErrorCode
+    eSymbolStackOverflow		= firstFatalErrorCode
+    eCountValueOverflow
+    eCountOverflow
+    eSymbolTableOverflow
+    eNoFreeDummySymbols
+    eTypeStackOverflow
+    eTypeTableOverflow
+    eScopeDisplayOverflow
+    eScopeSymbolOverflow
+    eScopeTableSymbolOverflow
+    eScopeTableOverflow
+    eActualsDisplayOverflow
+    eActualsOverflow
+    eActualsSymbolOverflow
+    eSslStackOverflow
+    eLoopOverflow
+    eEmitBufferOverflow
+
+    lastErrorCode = eEmitBufferOverflow;
+
+mechanism FirstSemantic:
+    firstSemanticOperation;
+
+
+type FailureCodes:
+    firstFailureCode
+
+    fSemanticChoiceFailed = firstFailureCode
+
+    fChoiceRuleFailed
+    fInputStreamSyntaxError
+    fUnimplementedOperation
+    lastFailureCode = fUnimplementedOperation;
+
+type Boolean:
+    no = 0
+    yes = 1
+    maybe = 2;
+
+
+
+type Integer:
+    zero = 0;
+
+mechanism Scope:
+
+    % The Scope Mechanism.
+    % The Scope Stack is used to keep track of visible symbols in
+    % a scope, and other lists of symbols such as import lists and
+    % formals lists.  It is a displayed stack structure since
+    % scopes may nest.
+    % Each stack frame is a list of symbol entries which each have
+    % an ident, a symbol kind and a Symbol Table index.
+    % The kind is not necessarily kept the same as the entry kind
+    % in the Symbol Table, but rather reflects the symbol's status
+    % in the Scope.
+    % The Scope mechanism also maintains a permanent Scope Table
+    % of scopes which are formals lists, fields lists, etc. and hence
+    % must be kept.  The oSaveScope operation copies a scope to the
+    % permanent Scope Table and assigns it a table index.
+
+    oScopePush			% push a new scope
+
+    oScopePushCopyScope		% push a complete copy of the top scope
+
+    oScopePushTypeFormals	% push the formals list scope of the
+				% top type
+
+    oScopePushTypeGrants	% push the grant list scope of the
+				% top type.  This field is also used for
+				% local scope until the body is declared.
+
+    oScopePushTypeImports	% push the imports list scope of the
+				% top type
+
+    oScopePushTypeExports	% push the exports list scope of the
+				% top type
+
+    oScopePushTypeFields	% push the fields list scope of the
+				% top type
+
+    oScopePushResultSymbolScope	% push the result symbol list scope of the
+				% top symbol.
+
+    oScopePop			% pop top scope from the stack
+
+    oScopeEnterSymbol		% enter the top symbol in the
+				% Symbol Stack in the current scope
+				% MARK the top symbol with this index
+
+    oScopeAutoImportEnterSymbol	% enter the symbol into the enclosing
+				% closed scope
+				% MARK the top symbol with this index
+
+    oScopeReplaceCountSymbol	% replace the "i"th entry in the top
+				% scope with the top entry in the
+				% Symbol Stack, where "i" is the value of
+				% the top count in the Count Stack
+
+    oScopeClose			% close the present scope.  lookups by
+				% oSymbolPushClosedScope end at the nearest
+				% enclosing closed scope
+
+    oScopeMergeScopes		% merge the top scope with the second
+				% from top scope;  used in calculating
+				% transitive imports lists for overlap
+				% checking and for checking against name
+				% conflicts in unions
+
+    oScopeSave			% save the top scope in the permanent
+				% Scope Tale
+
+    oScopeStrip			% remove non-variables from the top
+				% scope;  used only in calculating
+				% transitive imports lists for overlap checking
+
+    oScopeChooseContainsSymbol >> Boolean
+				% returns yes if the top symbol in
+				% the Symbol Stack is also in the top
+				% scope
+
+    oScopeChooseContainsSymbolIdent >> Boolean;
+				% returns yes if the top ident index in
+				% the Symbol Stack is also in the top
+				% scope.  This is used only for checking
+				% import lists the second time we see them;
+				% i.e. separate compilation
+
+type PredefinedKinds:
+    firstPredefinedId
+    pAbs	= firstPredefinedId
+    pAddr
+    pArctan
+    pArctand
+    pCeil
+    pChr
+    pCos
+    pCosd
+    pEmpty
+    pEof
+    pErealstr
+    pExp
+    pFloor
+    pFrealstr
+    pGetpriority
+    pIndex
+    pIntreal
+    pIntstr
+    pLength
+    pLn
+    pLower
+    pMax
+    pMin
+    pNatreal
+    pNatstr
+    pNil
+    pOrd
+    pPred
+    pRand
+    pRandInt
+    pRandNext
+    pRandSeed
+    pRandomize
+    pRealstr
+    pRepeat
+    pRound
+    pSetpriority
+    pSign
+    pSin
+    pSind
+    pSize
+    pSqrt
+    pStrint
+    pStrnat
+    pStrdelete
+    pStrmove
+    pStrreal
+    pStrreplace
+    pSucc
+    pUpper
+    lastPredefinedId = pUpper;
+
+
+mechanism Predefined:
+    oPredefinedChoose >> PredefinedKinds
+
+    oPredefinedChooseFunction >> Boolean
+				% returns yes if the predefined symbol is
+				% a function.
+
+    oPredefinedChooseStringResult >> Boolean;
+				% return yes if the predefined fcn returns
+				% a string
+
+type SymbolKinds:
+
+    % Kinds of symbols in the Symbol Table.
+    firstSymbolKind
+
+    sVariable = firstSymbolKind
+    sReadOnlyVariable
+    sConstant
+    sType
+    sCollection
+    sReadOnlyCollection
+    sProcedure
+    sProcedureCall
+    sFunction
+    sFunctionCall
+    sModule
+    sReadOnlyModule
+    sMonitor
+    sReadOnlyMonitor
+    sProcess
+    sProcessCall
+    sEnumeratedElement
+    sResult
+    sInit
+    sTag
+    sExport
+    sForward
+    sInvisible
+    sUndefined			% used to flag undeclared variable
+    sNotFound
+
+    lastSymbolKind = sNotFound;
+
+
+
+type SymbolAttributes:
+
+    % Attributes of symbols
+    firstSymbolAttribute
+
+    saPervasive = firstSymbolAttribute
+    saUnqualified
+    saExternal
+    saImported
+    saAutoImportedVar
+    saForwardAutoImports
+    saFormal
+    saBinds
+    saBound
+    saGrant
+    saGrantVar
+    saChild
+    saProcedureImportsSpecialVar
+    saCannotImportVar
+    saForward
+    saPredefined
+    saMonitorEntry
+    saTypeCheat
+    saExport
+    saDangerousToCallFromDeviceMonitor
+    saInterruptProcedure
+    saBoundVar
+    saDeferredForward
+    saWasExternal
+    saUnqualBody
+    saWasUnqualBody
+
+    lastSymbolAttribute = saWasUnqualBody;
+
+mechanism Symbol:
+
+    % The Symbol Mechanism.
+    % This mechanism is used in all handling of declared symbols.
+    % It consists of a permanent Symbol Table and a Symbol Stack
+    % which is used to access currently active entries in the table.
+    % Each entry in the Symbol Stack consists of a symbol kind and
+    % the symbol's Symbol Table index.  The kind is not necessarily
+    % the same as the entry kind in the Symbol Table, but rather
+    % reflects the symbol's status for the current reference.
+
+    oSymbolPushLocalScope	% lookup the input identifier in the current
+				% scope and push the corresponding
+				% symbol if found.  if not found, push an
+				% entry with kind sNotFound
+
+    oSymbolPushEnclosingLocalScope
+				% lookup the input identifier in the next to
+				% current scope and push the corresponding
+				% symbol if found.  if not found, push an
+				% entry with kind sNotFound
+
+    oSymbolPushEnclosingEnclosingLocalScope
+				% lookup the input identifier in the 3rd to
+				% current scope and push the corresponding
+				% symbol if found.  if not found, push an
+				% entry with kind sNotFound
+
+    oSymbolPushClosedScope	% lookup the input identifier in the current
+				% closed scope and push the corresponding
+				% symbol if found.  if not found, push an
+				% entry with kind sNotFound
+
+    oSymbolPushEnclosingClosedScope
+				% lookup the input identifier in the enclosing
+				% closed scope and push the corresponding
+				% symbol if found.  if not found, push an
+				% entry with kind sNotFound
+
+    oSymbolPushGlobalScope	% lookup the input identifier in the entire
+				% of all enclosing scopes and push the
+				% corresponding symbol if found.  If not
+				% found, push an entry with kind sNotFound
+
+    oSymbolPushDummy		% push a new symbol table entry out of a
+				% number of dummy symbols.
+
+    oSymbolPushDummyCopy	% push a new symbol table entry out of a
+				% number of dummy symbols.  Copy the
+				% top symbol's information to the dummy
+
+    oSymbolPushNew		% push a new symbol table entry with
+				% kind sNotFound and with the ident in the
+				% input token buffer
+
+    oSymbolPushCopy		% push a copy of the top symbol
+
+    oSymbolPushCountClosedScope	% push the "i"th symbol in the top scope
+				% in the Scope Stack where "i" is given
+				% by the top count in the Count Stack.
+				% "i" will never be too large
+
+    oSymbolPushCountScope	% push the "i"th symbol in the top scope
+				% in the Scope Stack where "i" is given
+				% by the top count in the Count Stack.
+				% if "i" is too large, pushes sNotFound
+
+    oSymbolPushTypeSymbol	% push the symbol pointed at by the
+				% top type in the Type Stack
+
+    oSymbolPushBoundSymbol	% push the symbol that the top symbol
+				% is bound to
+
+    oSymbolMakeUpNameAndPushNew	% a new name is generated by the compiler
+				% for use by the allocator and coder passes.
+				% The new name is entered into the symbol
+				% table like an oSymbolPushNew
+
+    oSymbolEnterType		% enter the top type in the Type
+				% Stack as the type of the top symbol
+
+    oSymbolEnterAttribute(SymbolAttributes)
+				% add the specified attribute to the
+				% top entry
+
+    oSymbolEnterLeftResultSymbolScope
+				% enter the top scope as the result
+				% symbol of the second from top symbol
+
+    oSymbolEnterLeftSymbolBoundTo
+				% enter the top symbol as the bound
+				% to symbol of the second from top symbol
+
+    oSymbolEnterKind(SymbolKinds)
+				% change the kind of the top entry in the
+				% Symbol Stack to the specified kind and
+				% enter the new kind in the permanent table
+
+    oSymbolEnterScopeLevel	% enter the current scope level in the
+				% symbol entry, to be used to ensure that
+				% forward subprograms are declared at the
+				% same level as the forward declaration
+
+    oSymbolEnterScopeLevelPlus1	% enter the current scope level +1 in the
+				% symbol entry, to be used to ensure that
+				% granted symbols are handled correctly
+
+    oSymbolEnterScopeLevelPlus2	% enter the current scope level +2 in the
+				% symbol entry, to be used to ensure that
+				% exported symbols are handled correctly
+
+    oSymbolChangeKind(SymbolKinds)
+				% change the kind of the top entry
+				% in the Symbol Stack to the specified
+				% kind but do not enter the new kind in
+				% the permanent table.
+
+    oSymbolClearAttribute(SymbolAttributes)
+				% remove the specified attribute from the
+				% top entry and its table entry.
+
+    oSymbolPop			% pop the top symbol from the stack
+
+    oSymbolPopAndChooseKind >> SymbolKinds
+				% pop the top entry and choose
+				% on its kind
+
+    oSymbolChooseKind >> SymbolKinds
+				% choose on the kind of the top entry
+
+    oSymbolChooseAttribute(SymbolAttributes) >> Boolean
+				% returns yes if the top entry has
+				% the specified attribute
+
+    oSymbolChooseSameSymbols >> Boolean
+				% returns yes if the top two symbols in the
+				% stack are the identical table entry
+
+    oSymbolResolveKind		% get the kind and attribute of the top symbol
+				% from its table entry and update the
+				% stack entry
+
+    oSymbolSwapSymbols		% swap the top two entries
+
+    oSymbolBodyDeclaredAtSameScopeLevel >> Boolean
+				% Return yes if the current scope level is
+				% the same as the saved scope level for
+				% a forward subprogram
+
+    oSymbolBodyDeclaredAtSameScopeLevelMinus1 >> Boolean
+				% Return yes if the current scope level is
+				% the one more than the saved scope level for
+				% an export/grant subprogram
+    
+    oSymbolChooseUnqualifiedExport >> Boolean
+				% Return yes if the number of levels of
+				% unqualifed export is greater than 0
+
+    oSymbolIncrementUnqualifiedExport
+				% Increment the count of the levels of
+				% unqualifed export
+
+    oSymbolDecrementUnqualifiedExport
+				% Decrement the count of the levels of
+				% unqualifed export
+
+    ;
+
+type TypeKinds:
+
+    % Kinds of types in the Type Table.
+
+    firstTypeKind
+
+    tProcedure = firstTypeKind
+    tFunction
+    tProcess
+    tModule
+    tMonitor
+    tArray
+    tCollection
+    tRecord
+    tUnion
+    tEnumeratedRange
+    tSet
+    tString
+    tChar
+    tCondition
+    tEnumeratedElement
+    tPointer
+    tScalar
+    tVaryingParameter
+    tNotFound
+    tError
+
+    lastTypeKind = tError;
+
+
+
+type TypeAttributes:
+
+    % Attributes of types
+
+    firstTypeAttribute
+
+    taUnresolvedImports = firstTypeAttribute
+    taRecursive
+    taReference
+    taCompile
+    taForward
+    taTypeCheat
+    taStub
+
+    lastTypeAttribute = taStub;
+
+mechanism Types:
+
+    % The Type Mechanism.
+    % This mechanism is used to handle type definitions.
+    % It consists of a permanent Type Table plus a Type Stack
+    % of currently active entries.
+    % The stack entries consist of pointers to the Type Table
+    % only and hence never differ from the table entry.
+
+    oTypePushBuiltIn(TypeKinds)	% push the built-in type entry specified
+
+    oTypePushNew(TypeKinds)	% push a new type table entry of
+				% the specified kind
+
+    oTypePushComponentType	% push the component type of the top type
+
+    oTypePushResultType		% push the result type of the top type
+
+    oTypePushSymbolType		% push the type of the top symbol in
+				% the Symbol Stack
+
+    oTypeReplaceBuiltIn(TypeKinds)
+				% replace the top entry in the stack
+				% with the specified built-in type
+
+    oTypeReplaceComponentType	% replace the top type in the stack
+				% with its component type
+
+    oTypeReplaceResultType	% replace the top type in the stack with
+				% its result type
+
+    oTypeEnterSymbol		% enter the top symbol in the Symbol
+				% Stack as the symbol of the top type
+
+    oTypeEnterFieldsScope	% enter the top scope in the Scope Stack
+				% as the fields list of the top type
+
+    oTypeEnterFormalsScope	% enter the top scope in the Scope Stack
+				% as the formals list of the top type
+
+    oTypeEnterGrantScope	% enter the top scope in the Scope Stack
+				% as the grant list of the top type.  This
+				% field is also used for local scope until
+				% the body is declared.
+
+    oTypeEnterImportsScope	% enter the top scope in the Scope Stack
+				% as the imports list of the top type
+
+    oTypeEnterLeftComponentType	% enter the top type in the stack
+				% as the component type of the second
+				% from top type
+
+    oTypeEnterLeftResultType	% enter the top type as the result type of
+				% the second from top type
+
+    oTypeEnterLeftRootType	% enter the top type as the root type of
+				% the second from top type
+
+    oTypeEnterAttribute(TypeAttributes)
+				% add the specified attribute to the
+				% top entry
+
+    oTypeEnterKind(TypeKinds)	% enter the specified kind as the kind
+				% of the top type table entry in the stack
+
+    oTypeEnterSetBase		% enter the base type and range for a set
+
+    oTypeClearAttribute(TypeAttributes)
+				% remove the specified attribute from the
+				% top entry
+
+    oTypePop			% pop the top entry
+
+    oTypePopAndChooseKind >> TypeKinds
+				% pop the top entry and choose on
+				% its kind
+
+    oTypeChooseKind >> TypeKinds
+				% choose on the kind of the top entry
+
+    oTypeChooseLeftKind >> TypeKinds
+				% choose on the kind of the second from top
+				% entry
+
+    oTypeChooseAttribute(TypeAttributes) >> Boolean
+				% returns yes if the top type has the
+				% specified attribute and no otherwise
+
+    oTypeCopy			% Replicate the current top of the type
+				% stack as the new top of the type stack
+
+    oTypeCopyLeftType		% copy the top type stack entry to
+				% the second from top
+
+    oTypeSwapTypes		% swap the top two entries
+    ;
+
+mechanism Count:
+
+    % The Count Mechanism.
+    % This mechanism is used to count items in actual parameter lists,
+    % etc.  It is a stack since function calls (and other counted things)
+    % may nest.
+
+    oCountPushZero		% push a zero count onto the stack
+
+    oCountPushScopeNumberOfEntries
+				% push the count of the number of entries
+				% in the top scope in the Scope Stack
+
+    oCountPushClosedScopeNumberOfEntries
+				% push the count of the number of entries
+				% in the top scope in the Scope Stack
+
+    oCountDecrement		% decrement the top count in the stack
+
+    oCountIncrement		% increment the top count in the stack
+
+    oCountCopy			% copy the current top of stack to the top
+				% of the count stack.
+
+    oCountPop			% pop the top entry from the stack
+
+    oCountChooseZero >> Boolean % Return yes is the count is zero
+
+    oCountTopTwoValuesSame >> Boolean; % Return yes if counts are equal
+
+mechanism Loop:
+
+    % The Loop Mechanism.
+    % This mechanism is used to verify that exit statements
+    % only appear within a loop.
+    % It is a stack structure since loops may nest.
+    % Since there is no data associated with an entry,
+    % the entire stack can be implemented using a depth counter only.
+
+    oLoopPush			% push a new entry
+
+    oLoopPop			% pop the stack
+
+    oLoopChooseDepth >> Integer;
+				% choose on the current depth
+				% of the stack
+
+type ActualsAttributes:
+
+    % Attributes of an actual reference
+
+    aaVar		% Actual is a variable reference
+    aaSubscript		% Actual contains a subscript as part of the reference
+    ;
+
+
+mechanism Actuals:
+
+    % The Actuals List Mechanism.
+    % This mechanism is used to keep a list of reference
+    % actuals in a procedure or function call in order to
+    % facilitate checking of overlap between actuals.
+    % It is a stack of lists since function calls may nest.
+
+    oActualsPush		% push a new actuals list
+
+    oActualsBeginActual		% begin accumulating the symbols in
+				% the next actual in the top list
+
+    oActualsEndActual		% finish accumulating the symbols in
+				% the next actual in the top list
+
+    oActualsRemoveActual	% remove all symbols associated with the
+				% next actual in the top list
+
+    oActualsSetAttribute(ActualsAttributes)
+				% set the attribute of the current actual in
+				% the top actuals list
+
+    oActualsEnterDummy		% add a new list of actuals that consists of
+				% no symbols.  This is used to preserve the
+				% count of actuals to properly generate
+				% runtime alias checking
+
+    oActualsEnterSymbol		% add the top symbol in the Symbol
+				% Stack to the current actual in the
+				% top actuals list
+
+    oActualsPop			% pop the top actuals list from the stack
+
+    oActualsFlush		% Flush the alias check stack
+
+    oActualsChooseActualOverlaps >> Boolean
+				% returns yes if the last actual in the
+				% top actuals list overlaps any of the previous
+				% actuals in the top actuals list
+
+    oActualsChooseInActual >> Boolean;
+				% returns yes if currently accumulating
+				% symbols in an actual
+
+type ContextType:
+    firstContext
+
+    cPervasive = firstContext
+    cAliasChecked
+    cPost
+    cAssert
+    cFunction
+    cAutoImport
+    cCompile
+    cForwardFound
+    cProcessingParameters
+    cProcessingPredefined
+    cProcedureImports
+    cSubprogramStubBody
+    cDeviceMonitor
+    cChild
+    cPrintedErrorMsg
+    cDontEnterUnimportedSymbols
+    lastNonStackContext = cDontEnterUnimportedSymbols
+
+    firstStackContext
+    cProcessChildImports = firstStackContext
+    cInBody
+    cModuleInvariantOK
+    cPredefinedReturnsString
+
+    lastContext = cPredefinedReturnsString;
+
+
+mechanism Context:
+    % this mechanism is used to remember information about certain tokens
+    % that have been seen, etc
+    oContextSet(ContextType)		% mark the given context as set
+
+    oContextClear(ContextType)		% mark the given context as reset
+
+    oContextPush(ContextType)		% Push a new context of the given kind
+
+    oContextPop(ContextType)		% Pop a new context of the given kind
+
+    oContextChoose(ContextType) >> Boolean
+					% return yes if the given context is set
+    ;
+
+mechanism Emit:
+
+    % The Emit Mechanism.
+    % This mechanism is used to output values associated with
+    % tokens to the output stream.
+
+    oEmitInteger		% emit the value of the input integer literal
+
+    oEmitString			% emit the value of the input string literal
+
+    oEmitChar			% emit the value of the input char literal
+
+    oEmitReal			% emit the value of the input real literal
+
+    oEmitSymbol			% emit the Symbol Table index of the top
+				% symbol in the Symbol Stack
+
+    oEmitExtraIdentSymbol	% the top of the symbol stack is a tag.  Emit
+				% the Symbol Table index +1 for the top symbol
+
+    oEmitPredefined		% emit the predefined index of the current
+				% input token
+
+    oEmitAliasCheck		% emit the correct token stream for the alias
+				% check.  The correct values will be in
+				% Actuals.FirstCheck and Actuals.SecondCheck
+				% and these imply the noAlias or noEnclosure
+				% check
+
+    oEmitLine			% emit a new line token (and possible a
+				% new file token as well
+
+    %
+    % Emit Buffering:
+    %	very limited, only for condition variables
+    %
+
+    oEmitBufferPush		% push a new emit buffer
+
+    oEmitBufferEmit		% emit the pushed buffer
+
+    oEmitBufferPop		% pop the emit buffer
+
+    oEmitBufferPushDirect	% start emitting "under" the buffer
+
+    oEmitBufferPopDirect	% stop emitting "under" the buffer
+
+    ;
+
+mechanism Debug:
+
+    % The Debug Mechanism
+    % This mechanism is used to explicitly request debugging cut in
+    % at certain points during the progress through the S/SL
+
+    oCheckDump
+    ;
+
+
+mechanism LastSemantic:
+    lastSemanticOperation;
+
+
+rules
+
+Program:
+
+    % all stacks empty, tables filled with predefineds
+    %
+    % a program is:
+    %	[PARENT 'StringLiteral']*
+    %	program
+    %	    [[CHILD 'StringLit' [PARENT 'StringLit'] ] STUB moduleOrMonitor
+    %		[ BODY moduleOrMonitor] ]*
+    %	  | [[CHILD 'StringLit' [PARENT 'StringLit'] ] STUB subprogramHeader]*
+    %		[ IS subprogramImplementation]
+
+    oEmitLine			% Get main file name.
+    aFileName .aFileName	% sync on a new line to start
+    oEmitLine			% entry for global scope
+    oSymbolMakeUpNameAndPushNew	% symstk: pgm
+    oTypePushNew(tModule)	% typstk: module
+    oSymbolEnterType
+    oSymbolEnterKind(sModule)
+    oContextSet(cProcessChildImports)
+    oContextSet(cInBody)
+
+    % [PARENT 'stringlit']*
+    {[
+	| aParent:
+	    .aParent
+	| *:
+	    >
+    ]}
+
+    [
+	| aCompile:
+	    .aCompile
+	    oTypeEnterAttribute(taCompile)
+	    oContextSet(cCompile)
+	| *:
+	    oContextClear(cCompile)
+    ]
+    oScopePush			% grant
+    @OptGrant
+    oScopeSave
+    oTypeEnterGrantScope
+    oScopePush			% grant, global program
+    @DclsAndStmts
+    oScopeSave
+    oTypeEnterImportsScope	% typstk: module
+    @EndDclsScope		% grant
+    oScopePop			%
+    @ResolveGrants		% ensure all the granted symbols exist
+    oTypePop
+    oSymbolPop
+    .aEndOfFile;
+
+DclsAndStmts:
+    {[ @DclOrStmt
+	| no:	>	% not a true dcl or stmt (probably
+			    % an end delimiter).
+	| *:
+    ]}
+    ;
+
+DclOrStmt >>Boolean:		% return yes iff a true declaration or
+				% statement was parsed.
+    [
+	| aConst:	@ConstDcl
+	| aVar:		@VarDcl
+	| aType:	@TypeDcl
+	| aBind:	@BindDcl
+	| aExternal:
+	    [
+		| aProcedure:	@ExternalProcDcl
+		| aFunction:	@ExternalFcnDcl
+		| aVar:
+		    .aExternal
+		    @VarDcl
+		| aExternalAddress:
+		    .aExternal
+		    .aExternalAddress
+		    @Expn
+		    oTypePop
+		    aVar
+		    @VarDcl
+	    ]
+	| aForward:
+	    [
+		| aProcedure:	@ForwardProcDcl
+		| aFunction:	@ForwardFcnDcl
+	    ]
+	| aProcedure:	@ProcDcl
+	| aFunction:	@FcnDcl
+	| aBody:
+	    [
+		| aModule:
+		    @ModuleBody
+		| aMonitor:
+		    @MonitorBody
+		| *:
+		    @BodyDcl
+	    ]
+	| aModule:	@ModuleDcl
+	| aMonitor:	@MonitorDcl
+	| aProcess:
+	    @ProcessDcl
+	| aChild:
+	    [ oContextChoose(cInBody)
+		| no:
+		    oContextPush(cProcessChildImports)
+		    oContextClear(cProcessChildImports)
+		    @ChildDcl
+		    oContextPop(cProcessChildImports)
+		| *:
+		    @ChildDcl
+	    ]
+	| aStub:
+	    @StubDcl
+	| *:
+	    [ @Stmt
+		| no:	>> no
+		| *:
+	    ]
+    ]
+    oEmitLine
+    >> yes
+    ;
+
+DclsInStub:
+    {
+	[
+	    | aConst:
+		@ConstDcl
+	    | aType:
+		@TypeDcl
+	    | aExternal:
+		[
+		    | aProcedure:
+			@ExternalProcDcl
+		    | aFunction:
+			@ExternalFcnDcl
+		]
+	    | aProcedure:
+		@ProcedureStub
+	    | aFunction:
+		@FunctionStub
+	    | aVar:
+		@VarDcl
+	    | aChild:
+		[ oContextChoose(cInBody)
+		    | no:
+			oContextPush(cProcessChildImports)
+			oContextClear(cProcessChildImports)
+			@ChildDcl
+			oContextPop(cProcessChildImports)
+		    | *:
+			@ChildDcl
+		]
+	    | *:
+		>
+	]
+	oEmitLine
+    };
+
+ChildDcl:
+    .aChild
+    [
+	| aParent:
+	    .aParent
+	| *:
+    ]
+    [
+	| aCompile:
+	    .aCompile
+	    oContextSet(cCompile)
+	| *:
+	    oContextClear(cCompile)
+    ]
+    [
+	| aStub:
+	    .aStub
+	    [
+		| aModule:
+		    oContextPush(cInBody)
+		    oContextClear(cInBody)
+		    @ModuleStub
+		    oContextPop(cInBody)
+		| aMonitor:
+		    oContextPush(cInBody)
+		    oContextClear(cInBody)
+		    @MonitorStub
+		    oContextPop(cInBody)
+		| aProcedure:
+		    oContextSet(cChild)
+		    @ProcedureStub
+		    oContextClear(cChild)
+		| aFunction:
+		    oContextSet(cChild)
+		    @FunctionStub
+		    oContextClear(cChild)
+	    ]
+	| aMissingStub:
+	    .aMissingStub
+	    aIdent
+	    @VerifyAndPushSymbol
+	    .aIdent oEmitSymbol
+	    @ModuleOrMonitorStubProcessImportsOnly
+	    oSymbolPop
+    ]
+    oContextClear(cCompile);
+
+
+%
+% Module stub, or subprogram stub
+%
+StubDcl:
+    .aStub
+    [
+	| aModule:
+	    oContextPush(cInBody)
+	    oContextClear(cInBody)
+	    @ModuleStub
+	    oContextPop(cInBody)
+	| aMonitor:
+	    oContextPush(cInBody)
+	    oContextClear(cInBody)
+	    @MonitorStub
+	    oContextPop(cInBody)
+	| aProcedure:
+	    @ProcedureStub
+	| aFunction:
+	    @FunctionStub
+    ];
+
+ModuleOrMonitorStubProcessImportsOnly:
+    aStub
+    [
+	| aModule, aMonitor:
+    ]
+    [
+	| aIdent, aPredefinedId:
+    ]
+    aIdentText
+    oTypePushSymbolType
+    [ oContextChoose(cCompile)
+	| yes:
+	    oTypeEnterAttribute(taCompile)
+	| *:
+    ]
+    oScopePush			% imports
+    @OptStubImportSecondTime
+    oScopeClose
+    oScopePushTypeGrants	% imports, localScope
+    @IgnoreRestOfModuleOrMonitorStub
+    oScopePop
+    @CalculateTransitiveImportsNoStrip
+    oScopeSave
+    oTypeEnterImportsScope
+    oTypePop
+    oScopePop;
+
+
+IgnoreRestOfModuleOrMonitorStub:
+    {[
+	| aMissingStub:
+	    aIdent
+	    @VerifyAndPushSymbol
+	    @ModuleOrMonitorStubProcessImportsOnly
+	    oSymbolPop
+	| aModule, aMonitor:
+	    @IgnoreRestOfModuleOrMonitorStub
+	| aEndModule, aEndMonitor:
+	    [
+		| aIdent, aPredefinedId:
+	    ]
+	    >
+	| *:
+	    ?
+    ]};
+
+
+IgnoreModuleOrMonitorStubImport:
+    [
+	| aImport:
+	    % process the import list just a bit;  don't complain about
+	    % symbols that aren't there!
+	    {
+		[
+		    | aEndImport:
+			>
+		    | aVar:
+			[
+			    | aPredefinedId:
+				oSymbolPushDummy
+				oSymbolEnterKind(sUndefined)
+			    | aIdent:
+				@VerifyAndPushIgnoredImportSymbol
+			]
+		    | *:
+			[
+			    | aPredefinedId:
+				oSymbolPushDummy
+				oSymbolEnterKind(sUndefined)
+			    | aIdent:
+				@VerifyAndPushIgnoredImportSymbol
+			]
+			@ChangeKindToReadOnly
+		]
+		[ oSymbolChooseKind
+		    | sUndefined:
+		    | *:
+			oScopeEnterSymbol
+		]
+		oSymbolPop
+	    }
+	| *:
+	    [ oTypeChooseKind
+		| tProcedure, tFunction, tProcess:
+		    oContextSet(cAutoImport)
+		| *:
+		    oContextClear(cAutoImport)
+	    ]
+    ];
+
+MonitorStub:
+    .aMonitor
+    [
+	| aIdent:
+	| aPredefinedId:
+	    #ePredefinedMisused
+    ]
+    @VerifyAndPushNewSymbol
+    [ oSymbolChooseKind
+	| sExport:
+	    [ oSymbolChooseAttribute(saGrant)
+		| no:
+		    #eExportedMonitor
+		    oSymbolEnterKind(sUndefined)
+		    oSymbolPop
+		    oSymbolPushNew
+		| *:
+	    ]
+	| *:
+    ]
+    oSymbolEnterKind(sMonitor)
+    oSymbolEnterAttribute(saExternal)
+    oTypePushNew(tMonitor)
+    oTypeEnterAttribute(taStub)
+    [ oContextChoose(cCompile)
+	| yes:
+	    oTypeEnterAttribute(taCompile)
+	| *:
+    ]
+    oSymbolEnterType
+    .aIdent	oEmitSymbol
+    aIdentText
+    .aIdentText oEmitString
+    oScopePush			% imports
+    [ oContextChoose(cProcessChildImports)
+	| yes:
+	    @OptStubImport
+	| *:
+	    @IgnoreModuleOrMonitorStubImport
+    ]
+    oScopeClose
+    oScopePush			% dummy scope to match ModuleBody
+    oScopePush			% imports, dummy, exports
+    @OptStubExport
+    oScopePush			% imports, dummy, exports, locals
+    @DclsInStub
+    oScopeSave
+    oTypeEnterGrantScope	% temporary holding place until body is found
+    @EndDclsScope		% imports, dummy, exports
+    @ResolveExports
+    oScopeSave
+    oTypeEnterFieldsScope
+    oScopePop			% imports, dummy
+    oScopePop			% imports
+    [ oContextChoose(cCompile)
+	| no:
+	    % calculate the transitive imports now
+	    @CalculateTransitiveImportsNoStrip
+	| *:
+	    % we will see a body.  We don't need to calculate the transitive
+	    % imports now, because we will do it at the end of the body.
+    ]
+    oScopeSave
+    oTypeEnterImportsScope
+    @EnterModuleImportsAsSubprogramImports
+    oScopePop			%
+    oScopeEnterSymbol		% module name
+    @ExportUnqualifiedNames
+    oTypeClearAttribute(taStub)
+    oTypePop
+    aEndMonitor
+    .aEndMonitor
+    [
+	| aIdent:
+	| aPredefinedId:
+	    #ePredefinedMisused
+    ]
+    @VerifyAndPushSymbol	% module, end ident name
+    [ oSymbolChooseSameSymbols
+	| yes:
+	| *:
+	    #eEndNameNotMonitorName
+    ]
+    oSymbolPop			% module
+    oSymbolPop ;		%
+
+ModuleStub:
+    .aModule
+    [
+	| aIdent:
+	| aPredefinedId:
+	    #ePredefinedMisused
+    ]
+    @VerifyAndPushNewSymbol
+    [ oSymbolChooseKind
+	| sExport:
+	    [ oSymbolChooseAttribute(saGrant)
+		| no:
+		    #eExportedModule
+		    oSymbolEnterKind(sUndefined)
+		    oSymbolPop
+		    oSymbolPushNew
+		| *:
+	    ]
+	| *:
+    ]
+    oSymbolEnterKind(sModule)
+    oSymbolEnterAttribute(saExternal)
+    oTypePushNew(tModule)
+    oTypeEnterAttribute(taStub)
+    [ oContextChoose(cCompile)
+	| yes:
+	    oTypeEnterAttribute(taCompile)
+	| *:
+    ]
+    oSymbolEnterType
+    .aIdent	oEmitSymbol
+    aIdentText
+    .aIdentText oEmitString
+    oScopePush			% imports
+    [ oContextChoose(cProcessChildImports)
+	| yes:
+	    @OptStubImport
+	| *:
+	    @IgnoreModuleOrMonitorStubImport
+    ]
+    oScopeClose
+    oScopePush			% dummy scope to match ModuleBody
+    oScopePush			% imports, dummy, exports
+    @OptStubExport
+    oScopePush			% imports, dummy, exports, locals
+    @DclsInStub
+
+    oScopeSave
+    oTypeEnterGrantScope	% temporary holding place until body is found
+    @EndDclsScope		% imports, dummy, exports
+    @ResolveExports
+    oScopeSave
+    oTypeEnterFieldsScope
+    oScopePop			% imports, dummy
+    oScopePop			% imports
+    [ oContextChoose(cCompile)
+	| no:
+	    % calculate the transitive imports now
+	    @CalculateTransitiveImportsNoStrip
+	| *:
+	    % we will see a body.  We don't need to calculate the transitive
+	    % imports now, because we will do it at the end of the body.
+    ]
+    oScopeSave
+    oTypeEnterImportsScope
+    @EnterModuleImportsAsSubprogramImports
+    oScopePop			%
+    oScopeEnterSymbol		% module name
+    @ExportUnqualifiedNames
+    oTypeClearAttribute(taStub)
+    oTypePop
+    aEndModule
+    .aEndModule
+    [
+	| aIdent:
+	| aPredefinedId:
+	    #ePredefinedMisused
+    ]
+    @VerifyAndPushSymbol	% module, end ident name
+    [ oSymbolChooseSameSymbols
+	| yes:
+	| *:
+	    #eEndNameNotModuleName
+    ]
+    oSymbolPop			% module
+    oSymbolPop ;		%
+
+EnterModuleImportsAsSubprogramImports:
+    oScopePushTypeExports	% imports, exports
+    oCountPushScopeNumberOfEntries
+    {
+	[ oCountChooseZero
+	    | yes:
+		>
+	    | *:
+	]
+	oSymbolPushCountScope
+	[ oSymbolChooseKind
+	    | sProcedure:
+		[ oSymbolChooseAttribute(saExternal)
+		    | yes:
+			oScopePop		% imports
+
+			oTypePushSymbolType
+			oScopePushCopyScope
+			oScopeSave
+			oTypeEnterImportsScope	% enter module imports
+			oScopePop
+			oTypePop
+
+			oScopePushTypeExports	% imports, exports
+		    | *:
+		]
+	    | *:
+	]
+	oSymbolPop
+	oCountDecrement
+    }
+    oCountPop
+    oScopePop			% imports
+    ;
+
+ModuleBody:
+    .aBody
+    .aModule
+    oContextPush(cInBody)
+    oContextSet(cInBody)
+    [
+	| aIdent:
+	| aPredefinedId:
+	    #ePredefinedMisused
+    ]
+    @VerifyAndPushSymbol
+    [ oSymbolChooseKind
+	| sModule:
+	    [ oSymbolChooseAttribute(saExternal)
+		| no:
+		    #eMoreThanOneModuleBody
+		| *:
+	    ]
+	| sNotFound, sUndefined:
+	| *:
+	    #eBodyModuleMustBeStubModule
+    ]
+    .aIdent	oEmitSymbol
+    aIdentText
+    .aIdentText oEmitString
+    oSymbolEnterKind(sModule)
+    oTypePushSymbolType
+    oScopePushTypeImports	% imports
+    oScopeClose			% close the imports scope
+    oScopePushTypeGrants	% saved local scope
+    oScopePush			% imports, old locals, grants
+    @OptGrant
+    oScopeSave
+    oTypeEnterGrantScope
+    oScopePush			% imports, old locals, grants, locals
+    oContextPush(cModuleInvariantOK)
+    oContextSet(cModuleInvariantOK)
+    @OptPre
+    @DclsAndStmts
+    @OptModuleInvariant
+    @DclsAndStmts
+    @OptPost
+    [
+	| aEndModule:
+	    @EndDclsScope		% imports, old locals, grants
+	    oScopePop			% imports, old locals
+	    @EndDclsScope		% imports
+	    @ResolveGrants
+	    @CheckBodyModuleExports
+	    % now do the transitive imports
+	    @CalculateTransitiveImports
+	    oScopeSave
+	    oTypeEnterImportsScope
+	    oScopePop			%
+	    [
+		| aIdent:
+		| aPredefinedId:
+		    #ePredefinedMisused
+	    ]
+	    @VerifyAndPushSymbol
+	    [ oSymbolChooseSameSymbols
+		| yes:
+		| *:
+		    #eEndNameNotModuleName
+	    ]
+	    oSymbolPop
+	| aEndOfFile:
+	    % ended in the middle of the module
+	    oScopePop			% imports, old locals, grant
+	    oScopePop			% imports, grant
+	    oScopePop			% imports
+	    oScopePop			%
+    ]
+    oTypePop
+    .aEndModule
+    oSymbolPop
+    oContextPop(cInBody)
+    oContextPop(cModuleInvariantOK);
+
+MonitorBody:
+    .aBody
+    .aMonitor
+    oContextPush(cInBody)
+    oContextSet(cInBody)
+    [
+	| aIdent:
+	| aPredefinedId:
+	    #ePredefinedMisused
+    ]
+    @VerifyAndPushSymbol
+    [ oSymbolChooseKind
+	| sMonitor:
+	    [ oSymbolChooseAttribute(saExternal)
+		| no:
+		    #eMoreThanOneMonitorBody
+		| *:
+	    ]
+	| sNotFound, sUndefined:
+	| *:
+	    #eBodyMonitorMustBeStubMonitor
+    ]
+    .aIdent	oEmitSymbol
+    aIdentText
+    .aIdentText oEmitString
+    oSymbolEnterKind(sMonitor)
+    [
+	| aMonitorPriority:
+	    .aMonitorPriority
+	    @Expn
+	    oTypePop
+	    oContextSet(cDeviceMonitor)
+	| *:
+	    oContextClear(cDeviceMonitor)
+    ]
+    oTypePushSymbolType
+    oScopePushTypeImports	% imports
+    oScopeClose			% close the imports scope
+    oScopePushTypeGrants	% saved local scope
+    oScopePush			% imports, old locals, grants
+    @OptGrant
+    oScopeSave
+    oTypeEnterGrantScope
+    oScopePush			% imports, old locals, grants, locals
+    oContextPush(cModuleInvariantOK)
+    oContextSet(cModuleInvariantOK)
+    @OptPre
+    @DclsAndStmts
+    @OptModuleInvariant
+    @DclsAndStmts
+    @OptPost
+    oContextClear(cDeviceMonitor)
+    [
+	| aEndMonitor:
+	    @EndDclsScope		% imports, old locals, grants
+	    oScopePop			% imports, old locals
+	    @EndDclsScope		% imports
+	    @ResolveGrants
+	    @CheckBodyModuleExports
+	    % now do the transitive imports
+	    @CalculateTransitiveImports
+	    oScopeSave
+	    oTypeEnterImportsScope
+	    oScopePop			%
+	    [
+		| aIdent:
+		| aPredefinedId:
+		    #ePredefinedMisused
+	    ]
+	    @VerifyAndPushSymbol
+	    [ oSymbolChooseSameSymbols
+		| yes:
+		| *:
+		    #eEndNameNotMonitorName
+	    ]
+	    oSymbolPop
+	| aEndOfFile:
+	    % ended in the middle of the module
+	    oScopePop			% imports, old locals, grant
+	    oScopePop			% imports, grant
+	    oScopePop			% imports
+	    oScopePop			%
+    ]
+    oTypePop
+    .aEndMonitor
+    oSymbolPop
+    oContextPop(cInBody)
+    oContextPop(cModuleInvariantOK);
+
+ProcedureStub:
+    .aProcedure
+    oContextClear(cProcedureImports)
+    [
+	| aIdent:
+	| aPredefinedId:
+	    #ePredefinedMisused
+    ]
+    @VerifyAndPushNewSubprogramSymbolForStub
+    oSymbolEnterKind(sProcedure)
+    oSymbolEnterAttribute(saExternal)
+    oSymbolEnterAttribute(saDangerousToCallFromDeviceMonitor)
+    @MightBeMonitorEntry
+    oSymbolEnterScopeLevel
+    [ oContextChoose(cChild)
+	| yes:
+	    oSymbolEnterAttribute(saChild)
+	| *:
+    ]
+    .aIdent	oEmitSymbol
+    aIdentText
+    .aIdentText oEmitString
+    oEmitLine
+    [ oSymbolChooseAttribute(saUnqualBody)
+	| no:
+	    % usual case; this is a brand new stub
+	    oTypePushNew(tProcedure)
+	    oTypeEnterAttribute(taRecursive)
+	    oSymbolEnterType
+	    @SubprogramParameters
+	| *:
+	    % this is a re-declaration of a higher level unqualified routine.
+	    % Check that the parameters are equivalent;  hard to do in general,
+	    % because we don't know about types here.
+	    oTypePushSymbolType
+	    oScopePushTypeFormals		% old formals
+	    oTypePop
+	    oTypePushNew(tProcedure)
+	    oTypeEnterAttribute(taRecursive)
+	    @SubprogramParameters
+	    oSymbolEnterType
+	    [ @OldAndNewFormalsSame
+		| yes:
+		| *:
+		    #eRedeclarationOfStubSubprogramHasDifferentFormals
+	    ]
+	    oScopePop
+    ]
+    oEmitLine
+    oScopeEnterSymbol			% procedure; enable recursion
+    oScopePushTypeFormals		% formals
+    oScopePush				% formals, imports
+    [ oContextChoose(cProcessChildImports)
+	| yes:
+	    @OptStubImport
+	| *:
+	    @IgnoreModuleOrMonitorStubImport
+    ]
+    oEmitLine
+    oScopeClose
+    oScopePushTypeFormals		% formals, imports(C), formals
+    oScopeEnterSymbol			% procedure name
+
+    oScopePush				% formals, imports(C), formals, locals
+    oEmitLine
+    [
+	| aIs:
+	    % This is the implementation of a procedure stub
+	    .aIs
+	    [
+		| aProcedure:
+		| aFunction:
+		    #eBodyNotProcedure
+	    ]
+	    [
+		| aIdent, aPredefinedId:
+	    ]
+	    oSymbolPushGlobalScope
+	    [ oSymbolChooseSameSymbols
+		| yes:
+		| *:
+		    #eBodyIdentDoesNotMatch
+	    ]
+	    oSymbolPop
+	    oSymbolClearAttribute(saExternal)	% mark the body as declared
+	    oContextSet(cSubprogramStubBody)
+	    @OptPre
+	    @OptInit
+	    @OptPost
+	    @OptHandler
+	    @DclsAndStmts
+	    @EndDclsScope			% formals, imports(C), formals
+	    @EndSubprogramBody
+	    oContextClear(cSubprogramStubBody)
+	    oScopePop				% formals, imports(C)
+	    [ oContextChoose(cAutoImport)
+		| yes:
+		    @ExamineAutoImportScope
+		    oContextClear(cAutoImport)
+		| *:
+	    ]
+	| *:
+	    % no implementation, this is just the stub.
+	    @EndDclsScope			% formals, imports(C), formals
+	    oScopePop				% formals, imports(C)
+	    [ oContextChoose(cAutoImport)
+		| yes:
+		    oSymbolEnterAttribute(saForwardAutoImports)
+		    oContextClear(cAutoImport)
+		| *:
+	    ]
+    ]
+    @CalculateTransitiveImports
+    oScopeSave
+    oTypeEnterImportsScope
+    oScopePop				% formals
+    oScopePop				%
+    oTypeClearAttribute(taRecursive)
+    oTypePop
+    [ oContextChoose(cProcedureImports)
+	| yes:
+	    oSymbolEnterAttribute(saProcedureImportsSpecialVar)
+	| *:
+    ]
+    oSymbolPop;
+
+OldAndNewFormalsSame >> Boolean:
+    % top scope:  old formals
+    % top type:   pointer to new formals
+    oCountPushScopeNumberOfEntries
+    oScopePushTypeFormals
+    oCountPushScopeNumberOfEntries
+    oScopePop
+    [ oCountTopTwoValuesSame
+	| no:
+	    oCountPop
+	    oCountPop
+	    >> no
+	| *:
+	    oCountPop
+	    [ oCountChooseZero
+		| yes:
+		    oCountPop
+		    >> yes
+		| *:
+	    ]
+    ]
+    {
+	oSymbolPushCountScope		% oldSym
+	oScopePushTypeFormals
+	oSymbolPushCountScope		% oldSym, newSymb
+	oScopePop
+	[ oSymbolPopAndChooseKind
+	    | sVariable:
+		[ oSymbolPopAndChooseKind
+		    | sVariable:
+		    | *:
+			oCountPop
+			>> no
+		]
+	    | sConstant:
+		[ oSymbolPopAndChooseKind
+		    | sConstant:
+		    | *:
+			oCountPop
+			>> no
+		]
+	    | sProcedure:
+		[ oSymbolPopAndChooseKind
+		    | sProcedure:
+		    | *:
+			oCountPop
+			>> no
+		]
+	    | sFunction:
+		[ oSymbolPopAndChooseKind
+		    | sFunction:
+		    | *:
+			oCountPop
+			>> no
+		]
+	    | *:
+	]
+	oCountDecrement
+	[ oCountChooseZero
+	    | yes:
+		>
+	    | *:
+	]
+    }
+    oCountPop
+    >> yes;
+
+MightBeMonitorEntry:
+    [ oTypeChooseKind
+	| tMonitor:
+	    [ oSymbolChooseAttribute(saExport)
+		| yes:
+		    oSymbolEnterAttribute(saMonitorEntry)
+		    oSymbolEnterAttribute(saDangerousToCallFromDeviceMonitor)
+		| *:
+	    ]
+	| *:
+    ];
+
+FunctionStub:
+    .aFunction
+    [
+	| aIdent:
+	| aPredefinedId:
+	    #ePredefinedMisused
+    ]
+    @VerifyAndPushNewSubprogramSymbolForStub
+    oSymbolEnterKind(sFunction)
+    oSymbolEnterAttribute(saExternal)
+    oSymbolEnterAttribute(saDangerousToCallFromDeviceMonitor)
+    oSymbolEnterScopeLevel
+    @MightBeMonitorEntry
+    [ oContextChoose(cChild)
+	| yes:
+	    oSymbolEnterAttribute(saChild)
+	| *:
+    ]
+    .aIdent	oEmitSymbol
+    aIdentText
+    .aIdentText oEmitString
+    oEmitLine
+    [ oSymbolChooseAttribute(saUnqualBody)
+	| no:
+	    % usual case; this is a brand new stub
+	    oTypePushNew(tFunction)
+	    oTypeEnterAttribute(taRecursive)
+	    oSymbolEnterType
+	    @SubprogramParameters
+	| *:
+	    % this is a re-declaration of a higher level unqualified routine.
+	    % Check that the parameters are equivalent;  hard to do in general,
+	    % because we don't know about types here.
+	    oTypePushSymbolType
+	    oScopePushTypeFormals		% old formals
+	    oTypePop
+	    oTypePushNew(tFunction)
+	    oTypeEnterAttribute(taRecursive)
+	    @SubprogramParameters
+	    oSymbolEnterType
+	    [ @OldAndNewFormalsSame
+		| yes:
+		| *:
+		    #eRedeclarationOfStubSubprogramHasDifferentFormals
+	    ]
+	    oScopePop
+    ]
+    oScopeEnterSymbol			% procedure; enable recursion
+    oScopePushTypeFormals		% formals
+    @ResultVariable			% leave result symbol on stack
+    oEmitLine
+    oScopePush				% formals, imports
+    oContextSet(cFunction)
+    [ oContextChoose(cProcessChildImports)
+	| yes:
+	    @OptStubImport
+	| *:
+	    @IgnoreModuleOrMonitorStubImport
+    ]
+    oEmitLine
+    oScopeClose
+    oScopePushTypeFormals		% formals, imports (C), formals
+    oScopeEnterSymbol			% return symbol
+    oSymbolPop				% return symbol
+    oScopeEnterSymbol			% function name
+    oEmitLine
+    oScopePush				% formals, imports (C), formals, locals
+    [
+	| aIs:
+	    % This is the implementation of a function stub
+	    .aIs
+	    [
+		| aFunction:
+		| aProcedure:
+		    #eBodyNotFunction
+	    ]
+	    [
+		| aIdent, aPredefinedId:
+	    ]
+	    oSymbolPushGlobalScope
+	    [ oSymbolChooseSameSymbols
+		| yes:
+		| *:
+		    #eBodyIdentDoesNotMatch
+	    ]
+	    oSymbolPop
+	    oSymbolClearAttribute(saExternal)	% mark the body as declared
+	    oContextSet(cSubprogramStubBody)
+	    @OptPre
+	    @OptInit
+	    @OptPost
+	    @OptHandler
+	    @DclsAndStmts
+	    @EndDclsScope			% formals, imports(C), formals
+	    @EndSubprogramBody
+	    oContextClear(cSubprogramStubBody)
+	    oScopePop				% formals, imports(C)
+	    [ oContextChoose(cAutoImport)
+		| yes:
+		    @ExamineAutoImportScope
+		    oCountPushScopeNumberOfEntries
+		    {
+			[ oCountChooseZero
+			    | yes:
+				>
+			    | *:
+			]
+			oSymbolPushCountScope
+			[ oSymbolChooseAttribute(saProcedureImportsSpecialVar)
+			    | yes:
+				%% No longer considered an error - JRC 16.2.03
+				%% #eFunctionTransitivelyImportsSpecialVar
+				oSymbolPop
+				>
+			    | *:
+			]
+			oSymbolPop
+			oCountDecrement
+		    }
+		    oCountPop
+		    oContextClear(cAutoImport)
+		| *:
+	    ]
+	| *:
+	    % no implementation, this is just the stub.
+	    @EndDclsScope			% formals, imports(C), formals
+	    oScopePop				% formals, imports(C)
+	    [ oContextChoose(cAutoImport)
+		| yes:
+		    oSymbolEnterAttribute(saForwardAutoImports)
+		    oContextClear(cAutoImport)
+		| *:
+	    ]
+    ]
+    oContextClear(cFunction)
+    @CalculateTransitiveImports
+    oScopeSave
+    oTypeEnterImportsScope
+    oScopePop				% formals
+    oScopePop				%
+    oTypeClearAttribute(taRecursive)
+    oTypePop
+    oSymbolPop;
+
+ConstDcl:
+    % Enters and leaves with the stacks intact and the new const
+    % in the symbol,type,etc. tables
+
+    .aConst
+    @OptPervasiveSpec
+    @OptRegisterSpec
+    [
+	| aIdent:
+	| aPredefinedId:
+	    #ePredefinedMisused
+    ]
+
+    @VerifyAndPushNewSymbol	% symstk: ...,const
+    oSymbolEnterKind(sConstant)
+    .aIdent oEmitSymbol
+    aIdentText
+    .aIdentText oEmitString
+
+    [ oContextChoose(cPervasive)
+	| yes:
+	    oSymbolEnterAttribute(saPervasive)
+	| *:
+    ]
+    [
+	| aType:
+	    .aType
+	    @TypeSpec		% typstk: ...,const
+	    oSymbolEnterType	% symstk: ...,const
+	    [
+		| aInit:
+		    @InitializingValueList	% doesn't affect typstk
+		| *:
+		    @Expn	% typstk: ...,const,expn
+		    oTypePop	% typstk: ...,const
+	    ]
+	| *:
+	    oTypePushBuiltin(tNotFound)	% typstk: ...,notFound
+	    oSymbolEnterType		% symstk: ...,const
+	    oTypePop			% typstk: ...
+
+	    @Expn			% typstk: ...,expn
+	    oSymbolEnterType		% symstk: ...,const
+    ]
+    oScopeEnterSymbol
+    oSymbolPop				% symstk: ...
+    oTypePop;				% typstk: ...
+
+InitializingValueList:
+    % Enter and exit with type of item to be init'ed on top of typstk
+
+    .aInit
+    @InitializingValues
+    .aEndInit;
+
+
+InitializingValues:
+    {[
+	| aEndInit:
+	    >
+	| aInit:
+	    @InitializingValueList
+	| *:
+	    @Expn			% typstk: ...,expn
+	    oTypePop			% typstk: ...
+    ]};
+
+
+OptPervasiveSpec:
+    [
+	| aPervasive:
+	    .aPervasive
+	    oContextSet(cPervasive)
+	| *:
+	    oContextClear(cPervasive)
+    ];
+
+
+OptRegisterSpec:
+    [
+	| aRegister:
+	    .aRegister
+	| *:
+    ];
+
+VarDcl:
+    oEmitBufferPush
+    .aVar
+    @OptRegisterSpec
+    oCountPushZero
+    oScopePush		% Purely local scope for id-lists
+    {
+	[
+	    | aIdent:
+	    | aPredefinedId:
+		#ePredefinedMisused
+	    | *:
+		>
+	]
+	@VerifyAndPushNewVariableSymbol		% symstk: ...,var-list
+	oSymbolEnterKind(sVariable)
+	oScopeEnterSymbol
+	.aIdent	oEmitSymbol
+	aIdentText
+	.aIdentText oEmitString
+	oCountIncrement
+    }
+    oScopePop		% pop id-list scope; they get entered properly later
+    [
+	| aType:
+	    .aType
+	    @TypeSpec			% typstk: ...,var
+	    oEmitBufferEmit
+	    oEmitBufferPop
+	    oSymbolEnterType		% symstk: ...,var-list
+	    [
+		| aVarInit:
+		    .aVarInit
+		    @Expn		% typstk: ...,var,expn
+		    oTypePop		% typstk: ...,var
+		| aInit:
+		    @InitializingValueList
+		| *:
+	    ]
+	| aVarInit:
+	    oTypePushBuiltin(tNotFound)	% typstk: ...,notFound
+	    oSymbolEnterType		% stmstk: ...,var-list
+	    oTypePop			% typstk: ...
+	    oEmitBufferEmit
+	    oEmitBufferPop
+	    .aVarInit
+	    @Expn			% typstk: ...,expn
+	    oSymbolEnterType		% stmstk: ...,var-list
+	| aCollection:
+	    oEmitBufferEmit
+	    oEmitBufferPop
+	    @CollectionType		% typstk: ...,collection
+	    oTypePop			% typstk: ...
+	    oCountPop			% symstk: ...  (all popped by
+	    >>				 %	        CollectionType rule)
+    ]
+    {[ oCountChooseZero		% Enter Type for all Symbols
+	| yes:	>
+	| *:
+	    oSymbolEnterType		% symstk: ...,var-list
+	    oScopeEnterSymbol
+	    oSymbolPop			% symstk: ...,var-list
+	    oCountDecrement
+    ]}					% symstk: ...
+    oCountPop
+    oTypePop;				% typstk: ...
+
+CollectionType:
+    % Collections may not be declared in subprograms.  This can be tested
+    % with the fact that the surrounding scope (module, procedure, etc) is on
+    % the symbol & type stacks.  Since there are one or more symbols on the
+    % symbol stack, use the type stack to test.
+    .aCollection
+    [ oTypeChooseKind
+	| tModule, tMonitor:
+	| *:
+	    #eCollectionsNotAllowedInSubprograms
+    ]
+
+    oTypePushNew(tCollection)		% typstk: ...,collection
+    oCountCopy
+    {					% symstk: ...,var-list
+	[ oCountChooseZero
+	    | yes:
+		>
+	    | *:
+		oSymbolEnterKind(sCollection)
+		oSymbolEnterType
+		oScopeEnterSymbol
+		oSymbolPop
+	]
+	oCountDecrement
+    }					% symstk: ...
+    oCountPop
+    [
+	| aUnchecked:
+	    .aUnchecked
+	| *:
+    ]
+    [
+	| aForward:
+	    .aForward
+	    [
+		| aIdent:
+		| aPredefinedId:
+		    #ePredefinedMisused
+	    ]
+	    @VerifyAndPushNewTypeSymbol		% symstk: ...,fwd_type
+	    .aIdent	oEmitSymbol
+	    [ oSymbolChooseKind
+		| sNotFound, sExport:
+		    oSymbolEnterKind(sType)
+		    oSymbolEnterAttribute(saForward)
+		    oTypePushNew(tNotFound)	% typstk: ...,coll.,fwd_type
+		    oTypeEnterAttribute(taForward)
+		    oSymbolEnterType
+		    oTypePop			% typstk: ...,coll.
+		    oScopeEnterSymbol
+		| sType:
+		    [ oSymbolChooseAttribute(saForward)
+			| yes:
+			    #eForwardTypeNameReused
+			| *:
+			    #eForwardTypeInCollectionPreviouslyDefined
+		    ]
+		| *:
+		    #eForwardTypeInCollectionPreviouslyDefined
+	    ]
+	    oTypePushSymbolType			% typstk: ...,coll.,fwd_type
+	    oSymbolPop				% symstk: ...
+	| *:
+	    @TypeSpec				% typstk: ...,coll.,coll_type
+    ]
+    oTypeEnterLeftComponentType
+    oTypePop;					% typstk: ...,collection
+
+TypeDcl:
+    .aType
+    @OptPervasiveSpec
+    [
+	| aIdent:
+	| aPredefinedId:
+	    #ePredefinedMisused
+    ]
+    @VerifyAndPushNewTypeSymbol		% symstk: ...,type
+    .aIdent	oEmitSymbol
+    oSymbolEnterKind(sType)
+    [ oContextChoose(cPervasive)
+	| yes:
+	    oSymbolEnterAttribute(saPervasive)
+	| *:
+    ]
+    [
+	| aPredefinedId:
+	    #ePredefinedMisused
+	    @NamedType			% typstk: ...,namedType
+	| aIdent:
+	    @NamedType			% typstk: ...,namedType
+	| *:
+	    @TypeSpec			% typstk: ...,Type
+    ]
+    oTypePushSymbolType
+    [ oTypeChooseKind
+	| tNotFound:
+	    [ oTypeChooseAttribute(taForward)
+		| yes:
+		    oTypeClearAttribute(taForward)
+		    % this was a forward type.  We test for Equivalent types
+		    % by testing for exact type indices.  We will copy the
+		    % information to the old type, and then pop the NEW type,
+		    % leaving the old type as the correct type.
+		    oTypeSwapTypes		% old, new
+		    oTypeCopyLeftType		% new, new
+		| *:
+	    ]
+	| *:
+    ]
+    oTypePop
+    oSymbolEnterType
+    oScopeEnterSymbol
+    oSymbolPop				% symstk: ...
+    oTypePop;				% typstk: ...
+
+TypeSpec:
+    [
+	| aInt:
+	    .aInt oTypePushBuiltin(tScalar)
+	    @OptionalStorageSize
+	| aNat:
+	    .aNat oTypePushBuiltin(tScalar)
+	    @OptionalStorageSize
+	| aReal:
+	    .aReal oTypePushBuiltin(tScalar)
+	    @OptionalStorageSize
+	| aBoolean:
+	    .aBoolean oTypePushBuiltin(tScalar)
+	| aString:
+	    @StringType
+	| aChar:
+	    @CharType
+	| aAddressInt:
+	    .aAddressInt oTypePushBuiltin(tScalar)
+	| aEnum:
+	    @EnumType
+	    @OptionalStorageSize
+	| aSet:
+	    @SetType
+	| aRecord:
+	    @RecordType
+	| aUnion:
+	    @UnionType
+	| aPointer:
+	    @PointerType
+	| aSubrange:
+	    @SubrangeType
+	| aPredefinedId:
+	    #ePredefinedMisused
+	    @NamedType
+	| aProcedure:
+	    @ProcedureType
+	| aFunction:
+	    @FunctionType
+	| aIdent:
+	    @NamedType
+	| aArray:
+	    @ArrayType
+	| aPacked:
+	    .aPacked
+	    [
+		| aArray:
+		    @ArrayType
+		| aRecord:
+		    @RecordType
+		| aUnion:
+		    @UnionType
+		| aSubrange:
+		    @SubrangeType
+		| aEnum:
+		    @EnumType
+	    ]
+	| aCondition:
+	    % Help the allocator:
+	    oEmitBufferPushDirect
+	    .aCondition
+	    oEmitBufferPopDirect
+	    @ConditionType
+    ];
+
+OptionalStorageSize:
+    [
+	| aStorageSize:
+	    .aStorageSize
+	    @Expn
+	    oTypePop
+	| *:
+    ];
+
+StringType:
+    .aString
+    [
+	| aStringSizeBound:
+	    .aStringSizeBound
+	    [
+		| aStar:
+		    .aStar
+		| *:
+		    @Expn
+		    oTypePop
+	    ]
+	| *:
+    ]
+    oTypePushBuiltin(tString);
+
+
+CharType:
+    .aChar
+    [
+	| aStringSizeBound:
+	    .aStringSizeBound
+	    [
+		| aStar:
+		    .aStar
+		| *:
+		    @Expn
+		    oTypePop
+	    ]
+	    oTypePushBuiltin(tChar)
+	| *:
+	    oTypePushBuiltin(tScalar)
+    ];
+
+EnumType:
+    .aEnum
+    oTypePushNew(tEnumeratedRange)
+    oScopePush				% Enumerated Elements
+    {
+	[
+	    | aEndEnum:
+		.aEndEnum
+		>
+	    | *:
+		[
+		    | aIdent:
+		    | aPredefinedId:
+		]
+		@VerifyAndPushNewFieldSymbol
+		.aIdent oEmitSymbol
+		oSymbolEnterKind(sEnumeratedElement)
+		oTypePushBuiltin(tScalar)
+		oSymbolEnterType
+		oTypePop
+		oScopeEnterSymbol
+		oSymbolPop
+	]
+    }
+    oScopeSave			% save enumerated elements scope
+    oTypeEnterFieldsScope
+    oScopePop;
+
+
+SetType:
+    .aSet
+    oTypePushNew(tSet)
+    @IndexType
+    oTypePop;
+
+RecordType:
+    .aRecord
+    oTypePushNew(tRecord)
+    oScopePush				%fields
+    {[
+	| aEndRecord:
+	    >
+	| *:
+	    @RecordElement
+    ]}
+    oScopeSave
+    oTypeEnterFieldsScope
+    oScopePop			% fields
+    .aEndRecord;
+
+
+RecordElement:
+    oCountPushZero
+    oScopePush		% Purely local scope for id-lists
+    {
+	[
+	    | aIdent:
+	    | aPredefinedId:
+	    | *:
+		>
+	]
+	@VerifyAndPushNewRecordFieldSymbol
+	oSymbolEnterKind(sVariable)
+	oScopeEnterSymbol
+	.aIdent	oEmitSymbol
+	oCountIncrement
+    }
+    oScopePop		% pop id-list scope; they get entered properly later
+    aRecordElementType
+    .aRecordElementType
+    @TypeSpec
+    {
+	[ oCountChooseZero
+	    | yes:
+		>
+	    | *:
+		oSymbolEnterType
+		oScopeEnterSymbol
+		oSymbolPop
+	]
+	oCountDecrement
+    }
+    oCountPop
+    oTypePop
+    oEmitLine;
+
+UnionType:
+    .aUnion
+    oTypePushNew(tUnion)
+    oScopePush
+    [
+	| aIdent:
+	    @VerifyAndPushNewFieldSymbol
+	| aPredefinedId:
+	    #ePredefinedMisused
+	    @VerifyAndPushNewFieldSymbol
+	| *:
+	    oSymbolMakeUpNameAndPushNew
+    ]
+    .aIdent	oEmitSymbol
+    aType
+    .aType
+    @IndexType
+    oSymbolEnterType
+    oSymbolEnterKind(sTag)
+    oScopeEnterSymbol
+    oTypePop
+    oTypeEnterSymbol
+    oSymbolMakeUpNameAndPushNew	% Reserve the next symbol for the map identifier
+    .aIdent	oEmitSymbol	% used by the allocator and coder
+    oSymbolPop
+    {
+	[
+	    | aEndUnion:
+		>
+	    | aLabel:
+		.aLabel
+		[
+		    | aOtherwise:
+			.aOtherwise
+			@OptUnionLabelBody
+		    | *:
+			{[
+			    | aEndExpressionList:
+				.aEndExpressionList
+				>
+			    | *:
+				@Expn
+				oTypePop
+			]}
+			@OptUnionLabelBody
+		]
+	]
+    }
+    oSymbolPop
+    oScopeSave
+    oTypeEnterFieldsScope
+    oScopePop
+    .aEndUnion;
+
+OptUnionLabelBody:
+    [
+	| aUnionLabelBody:
+	    .aUnionLabelBody
+	    {[
+		| aEndUnionLabelBody:
+		    >
+		| *:
+		    @RecordElement
+	    ]}
+	    .aEndUnionLabelBody
+	| *:
+    ];
+
+PointerType:
+    .aPointer
+    oTypePushNew(tPointer)
+    [
+	| aIdent:
+	| aPredefinedId:
+	    #ePredefinedMisused
+    ]
+    @VerifyAndPushSymbol
+    .aIdent	oEmitSymbol
+    oTypeEnterSymbol
+    [ oSymbolPopAndChooseKind
+	| sCollection, sReadOnlyCollection:
+	| *:
+	    #eNonCollectionPointer
+    ];
+
+
+SubrangeType:
+    oTypePushBuiltin(tScalar)
+    .aSubrange
+    @Expn
+    oTypePop
+    [
+	| aStar:
+	    .aStar
+	| *:
+	    @Expn
+	    oTypePop
+	    @OptionalStorageSize
+    ];
+
+ArrayType:
+    .aArray
+    oTypePushNew(tArray)
+    {[
+	| aEndArrayIndexList:
+	    .aEndArrayIndexList
+	    >
+	| *:
+	    @IndexType
+	    oTypePop
+    ]}
+    @TypeSpec
+    oTypeEnterLeftComponentType
+    oTypePop;
+
+
+ConditionType:
+    .aCondition
+    [
+	| aPriority:
+	    .aPriority
+	    [ oContextChoose(cDeviceMonitor)
+		| yes:
+		    #eConditionsMustBeDeferredInDeviceMonitor
+		| *:
+	    ]
+	| aDeferred:
+	    .aDeferred
+	| aTimeout:
+	    .aTimeout
+	| *:
+	    [ oContextChoose(cDeviceMonitor)
+		| yes:
+		    #eConditionsMustBeDeferredInDeviceMonitor
+		| *:
+	    ]
+    ]
+    oTypePushBuiltin(tCondition);
+
+IndexType:
+    [
+	| aEnum:
+	    @EnumType
+	| aSubrange:
+	    @SubrangeType
+	| aPredefinedId:
+	    #ePredefinedMisused
+	    @NamedType
+	| aIdent:
+	    @NamedType
+    ];
+
+
+BitsType:
+    % this is either expn..expn, type [BAD .. expn], or expn
+    % leave a type on the stack
+    [
+	| aIdent:
+	    @Variable
+	    [
+		| aEndExpression:
+		    [ oSymbolChooseKind
+			| sType:
+			    .aIdent oEmitSymbol	% types aren't emitted
+						% in @Variable
+			    [
+				| aSubrange:
+				    .aSubrange
+				    #eBitsTypeMustNotHaveDotDot
+				    @Expn
+				    oTypePop
+				| *:
+			    ]
+			| *:
+		    ]
+		    .aEndExpression
+		    oSymbolPop
+		    oTypePop
+		    % this catches ident..expn
+		    % and should be harmless for above case
+		    [
+			| aSubrange:
+			    .aSubrange
+			    @Expn
+			    oTypePop
+			| *:
+		    ]
+		| *:
+		    [ oSymbolPopAndChooseKind
+			| sVariable, sReadOnlyVariable, sConstant,
+			  sEnumeratedElement, sTag, sResult, sInit, sProcedure,
+			  sFunction, sFunctionCall, sUndefined:
+			| *:
+			    #eNonExpressionVariable
+			    oTypeReplaceBuiltIn(tError)
+		    ]
+		    @Expn
+		    oTypePop
+		    [
+			| aSubrange:
+			    .aSubrange
+			    @Expn
+			    oTypePop
+			| *:
+		    ]
+	    ]
+	| *:
+	    @Expn
+	    oTypePop
+	    [
+		| aSubrange:
+		    .aSubrange
+		    @Expn
+		    oTypePop
+		| *:
+	    ]
+    ]
+    oTypePushBuiltin(tScalar);
+
+NamedType:
+	% verifies that the current identifier is a type name, and leaves
+	% the associated type on the top of the type stack.  Symbol stack
+	% is left unchanged.
+    @VerifyAndPushSymbol		% symstk: ...,named_type
+    oTypePushSymbolType			% typstk: ...,named_type
+    @SurroundingModule
+    [ oSymbolChooseKind
+	| sType:
+	    [ oSymbolChooseAttribute(saForward)
+		| yes:
+		    #eIllegalUseOfForwardType
+		    oTypeReplaceBuiltin(tScalar)
+		| *:
+	    ]
+	    .aIdent	oEmitSymbol
+	| sUndefined:
+	    .aIdent	oEmitSymbol
+	    oTypeReplaceBuiltin(tError)
+	| *:
+	    #eNamedTypeNotAType
+	    .aIdent	oEmitSymbol
+	    oTypeReplaceBuiltin(tError)
+    ]
+    % Check for a non-module.ident error
+    [
+	| aField:
+	    [
+		| aIdent:
+		| aPredefinedId:
+	    ]
+	| *:
+    ]
+    oSymbolPop;			% symstk: ...
+
+ProcedureType:
+    .aProcedure
+    [
+	| aIdent:
+	| aPredefinedId:
+	    #ePredefinedMisused
+    ]
+    oSymbolPushNew
+    oSymbolEnterKind(sProcedure)
+    .aIdent	oEmitSymbol
+    aIdentText
+    .aIdentText oEmitString
+    oEmitLine
+    oTypePushNew(tProcedure)
+    oSymbolEnterType
+    @SubprogramParameters
+    oEmitLine
+    oSymbolPop;
+
+FunctionType:
+    .aFunction
+    [
+	| aIdent:
+	| aPredefinedId:
+	    #ePredefinedMisused
+    ]
+    oSymbolPushNew
+    oSymbolEnterKind(sFunction)
+    .aIdent	oEmitSymbol
+    aIdentText
+    .aIdentText oEmitString
+    oEmitLine
+    oTypePushNew(tFunction)
+    oSymbolEnterType
+    @SubprogramParameters
+    oScopePushTypeFormals		% formals
+    @ResultVariable			% leave result symbol on stack
+    oSymbolPop
+    oEmitLine
+    oScopePop				%
+    oSymbolPop;
+
+BindDcl:
+    .aBind
+    oScopePush
+    oCountPushZero
+    oActualsPush
+    {
+	[
+	    | aEndBind:
+		>
+	    | *:
+	]
+	[
+	    | aVar:
+		.aVar
+		@OptRegisterSpec
+		[
+		    | aIdent:
+		    | aPredefinedId:
+			#ePredefinedMisused
+		]
+		@VerifyAndPushNewUnexportedSymbol	% symstk: ...,binder
+		oSymbolEnterKind(sVariable)
+	    | *:
+		@OptRegisterSpec
+		[
+		    | aIdent:
+		    | aPredefinedId:
+			#ePredefinedMisused
+		]
+		@VerifyAndPushNewUnexportedSymbol	% symstk: ...,binder
+		oSymbolEnterKind(sReadOnlyVariable)
+	]
+	.aIdent	oEmitSymbol
+	@BindReference
+	oSymbolChangeKind(sInvisible)	% make invisible in bind scope
+	oSymbolEnterAttribute(saBinds)
+	oScopeEnterSymbol
+	oCountIncrement
+	% leaves binder on symbol stack
+    }
+    oScopePop			% get rid of bind scope
+    {
+	% run through list of binders and adjust attributes
+	[ oCountChooseZero
+	    | yes:	>
+	    | *:
+	]
+	oSymbolResolveKind				% fix from sInvisible
+	oSymbolPushBoundSymbol				% binder, bound
+	oSymbolEnterAttribute(saBound)
+	oSymbolSwapSymbols				% bound, binder
+	[ oSymbolChooseKind
+	    | sReadOnlyVariable:
+		oSymbolSwapSymbols			% binder, bound
+	    | *:
+		oSymbolSwapSymbols			% binder, bound
+		oSymbolChangeKind(sInvisible)
+		oSymbolEnterAttribute(saBoundVar)
+		oScopeEnterSymbol	% re-enter the symbol as invisible
+	]
+	oSymbolPop		% binder
+	oScopeEnterSymbol	% Finally, enter binder in the current scope
+	oSymbolPop
+	oCountDecrement
+    }
+    oCountPop
+    oActualsPop
+    .aEndBind;
+
+BindReference:
+	% symstk: ...,binder		- no change
+	% typstk: ...			- no change
+    @BoundVariable			% symstk: ...,binder,bound
+					% typstk: ...,bound
+    [ oSymbolPopAndChooseKind		% root reference kind
+	| sVariable:
+	| sReadOnlyVariable, sConstant:
+	    [ oSymbolChooseKind
+		| sVariable:
+		    #eVarBindToReadOnly
+		| *:
+	    ]
+	| sUndefined:
+	| *:
+	    #eNonVariableBind
+    ]					% symstk: ...,binder
+    [ oSymbolChooseKind
+	| sVariable:
+	    oActualsSetAttribute(aaVar)
+	| *:
+    ]
+    oContextClear(cAliasChecked)
+    [ oActualsChooseActualOverlaps
+	| yes:
+	    %% Alias checking disabled - JRC 16.2.03
+	    %% #eBoundVariablesOverlap
+	    %% .aAliasCheck
+	    %% oContextSet(cAliasChecked)
+	    %% oEmitAliasCheck
+	    %% .aEndAliasCheck
+	| maybe:
+	    %% .aAliasCheck
+	    %% oContextSet(cAliasChecked)
+	    %% oEmitAliasCheck
+	    %% .aEndAliasCheck
+	| *:
+    ]
+    oSymbolEnterType			% typstk: ...,bound
+    oTypePop;				% typstk: ...
+
+BoundVariable:
+    % Can't just call rule "Variable" since part-way through
+    % need to link the binder and the bound.  Also needs
+    % to do alias checking
+    % symstk: ...,binder		- pushes bound
+    % typstk: ...			- pushes bound
+    [
+	| aIdent:
+	    @VerifyAndPushSymbol
+	    oTypePushSymbolType
+	    @CommonBindCheck
+	    @SurroundingModule
+	    @MainVariable
+	| aPredefinedId:
+	    #ePredefinedMisused
+	    @VerifyAndPushSymbol
+	    oTypePushBuiltin(tScalar)
+	    @CommonBindCheck
+	    @SurroundingModule
+	    @MainVariable
+	| aTypeCheat:
+	    @TypeCheatVariable
+	    % Don't call @CommonBindCheck, because TypeCheatVariable may
+	    % return a dummy symbol, and in any case will return the last
+	    % part of the reference, not the root.
+    ]
+    oActualsBeginActual
+    oActualsEnterSymbol
+    @Reference
+    oActualsEndActual;
+
+
+CommonBindCheck:
+    % symstk: ...,binder,bound
+    % typstk: ...,symbolType
+    oSymbolEnterLeftSymbolBoundTo
+
+    % if var bind, and auto-import, mark symbol as autoImportVar
+    oSymbolSwapSymbols			% symstk: ...,bound,binder
+    [ oSymbolChooseKind
+	| sVariable:	% var bind
+	    oSymbolSwapSymbols
+	    @MarkAutoImportVar
+	| *:
+	    oSymbolSwapSymbols
+    ];					% symstk: ...,binder,bound
+
+ProcDcl:
+    .aProcedure
+    oContextClear(cProcedureImports)
+    [
+	| aIdent:
+	| aPredefinedId:
+	    #ePredefinedMisused
+    ]
+    @VerifyAndPushNewSubprogramSymbol
+    oSymbolEnterKind(sProcedure)
+    oSymbolClearAttribute(saForward)	% might have been forward imports
+    @MightBeMonitorEntry
+    .aIdent	oEmitSymbol
+    aIdentText
+    .aIdentText oEmitString
+    oEmitLine
+    oTypePushNew(tProcedure)
+    oTypeEnterAttribute(taRecursive)
+    oSymbolEnterType
+    @SubprogramParameters
+    oEmitLine
+    oScopeEnterSymbol			% procedure; enable recursion
+    oScopePushTypeFormals		% glbl formals for check against imports
+    oScopePush				% imports
+    @OptImport
+    oEmitLine
+    oScopeClose
+    oScopePushTypeFormals		% formals in closed scope
+    oScopeEnterSymbol			% procedure name
+    oEmitLine
+    @SubprogramBody
+    oScopePop				% formals in closed scope
+    [ oContextChoose(cAutoImport)
+	| yes:
+	    @ExamineAutoImportScope
+	    oContextClear(cAutoImport)
+	| *:
+    ]
+    @CalculateTransitiveImports
+    oScopeSave
+    oTypeEnterImportsScope
+    oScopePop				% imports
+    oScopePop				% global formals
+    oTypeClearAttribute(taRecursive)
+    oTypePop
+    @EndSubprogramBody
+    [ oContextChoose(cProcedureImports)
+	| yes:
+	    oSymbolEnterAttribute(saProcedureImportsSpecialVar)
+	| *:
+    ]
+    oSymbolPop;
+
+ProcessDcl:
+    .aProcess
+    oContextClear(cProcedureImports)
+    [
+	| aIdent:
+	| aPredefinedId:
+	    #ePredefinedMisused
+    ]
+    @VerifyAndPushNewSubprogramSymbol
+    oSymbolEnterKind(sProcess)
+    oSymbolClearAttribute(saForward)	% might have been forward imports
+    .aIdent	oEmitSymbol
+    aIdentText
+    .aIdentText oEmitString
+    oEmitLine
+    oTypePushNew(tProcess)
+    oTypeEnterAttribute(taRecursive)
+    oSymbolEnterType
+    @SubprogramParameters
+    oEmitLine
+    [
+	| aProcessStackSize:
+	    .aProcessStackSize
+	    @Expn
+	    oTypePop
+	| *:
+    ]
+    oScopeEnterSymbol			% procedure; enable recursion
+    oScopePushTypeFormals		% glbl formals for check against imports
+    oScopePush				% imports
+    @OptImport
+    oEmitLine
+    oScopeClose
+    oScopePushTypeFormals		% formals in closed scope
+    oScopeEnterSymbol			% procedure name
+    oEmitLine
+    @SubprogramBody
+    oScopePop				% formals in closed scope
+    [ oContextChoose(cAutoImport)
+	| yes:
+	    @ExamineAutoImportScope
+	    oContextClear(cAutoImport)
+	| *:
+    ]
+    @CalculateTransitiveImports
+    oScopeSave
+    oTypeEnterImportsScope
+    oScopePop				% imports
+    oScopePop				% global formals
+    oTypeClearAttribute(taRecursive)
+    oTypePop
+    @EndSubprogramBody
+    [ oContextChoose(cProcedureImports)
+	| yes:
+	    oSymbolEnterAttribute(saProcedureImportsSpecialVar)
+	| *:
+    ]
+    oSymbolPop;
+
+ForwardProcDcl:
+    .aForward
+    .aProcedure
+    [
+	| aIdent:
+	| aPredefinedId:
+	    #ePredefinedMisused
+    ]
+    @VerifyAndPushNewSubprogramSymbol
+    oSymbolEnterKind(sProcedure)
+    oSymbolEnterAttribute(saForward)
+    oSymbolEnterScopeLevel
+    @MightBeMonitorEntry
+    .aIdent	oEmitSymbol
+    aIdentText
+    .aIdentText oEmitString
+    oEmitLine
+    oTypePushNew(tProcedure)
+    oTypeEnterAttribute(taForward)
+    oSymbolEnterType
+    @SubprogramParameters
+    oEmitLine
+    oScopeEnterSymbol			% procedure; enable recursion
+    oScopePushTypeFormals		% glbl formals for check against imports
+    oScopePush				% imports
+    @OptImport
+    oEmitLine
+    oScopeClose
+    [ oContextChoose(cAutoImport)
+	| yes:
+	    oSymbolEnterAttribute(saForwardAutoImports)
+	    oContextClear(cAutoImport)
+	| *:
+    ]
+    oTypeEnterAttribute(taUnresolvedImports)
+    oScopeSave
+    oTypeEnterImportsScope
+    oScopePop
+    oScopePop				% global formals
+    @MakeForwardsGlobal
+    oEmitLine
+    oTypePop
+    oSymbolPop;
+
+ExternalProcDcl:
+    .aExternal
+    .aProcedure
+    [
+	| aIdent:
+	| aPredefinedId:
+	    #ePredefinedMisused
+    ]
+    @VerifyAndPushNewSubprogramSymbol
+    oSymbolEnterKind(sProcedure)
+    oSymbolEnterAttribute(saExternal)
+    oSymbolEnterAttribute(saChild)
+    oSymbolClearAttribute(saForward)	% might have been forward imports
+    .aIdent	oEmitSymbol
+    aIdentText
+    .aIdentText oEmitString
+    [
+	| aExternalAddress:
+	    .aExternalAddress
+	    aStringLit
+	    .aStringLit oEmitString
+	| *:
+    ]
+    oEmitLine
+    oTypePushNew(tProcedure)
+    oSymbolEnterType
+    @SubprogramParameters
+    oEmitLine
+    oScopeEnterSymbol			% procedure; enable recursion
+    oScopePushTypeFormals		% glbl formals for check against imports
+    oScopePush				% imports
+    @OptImport 				% sets cAutoImport
+    oEmitLine
+    oScopeClose
+    @CalculateTransitiveImports
+    oScopeSave
+    oTypeEnterImportsScope
+    oScopePop
+    oScopePop				% global formals
+    oEmitLine
+    oTypePop
+    oSymbolPop;
+
+FcnDcl:
+    .aFunction
+    [
+	| aIdent:
+	| aPredefinedId:
+	    #ePredefinedMisused
+    ]
+    @VerifyAndPushNewSubprogramSymbol
+    oSymbolEnterKind(sFunction)
+    oSymbolClearAttribute(saForward)	% might have been forward imports
+    @MightBeMonitorEntry
+    .aIdent	oEmitSymbol
+    aIdentText
+    .aIdentText oEmitString
+    oEmitLine
+    oTypePushNew(tFunction)
+    oTypeEnterAttribute(taRecursive)
+    oSymbolEnterType
+    @SubprogramParameters
+    oScopeEnterSymbol			% procedure; enable recursion
+    oScopePushTypeFormals		% glbl formals for check against imports
+    @ResultVariable			% leave result symbol on stack
+    oEmitLine
+    oScopePush				% imports
+    oContextSet(cFunction)
+    @OptImport
+    oEmitLine
+    oScopeClose
+    oScopePushTypeFormals		% formals in closed scope
+    oScopeEnterSymbol			% return symbol
+    oSymbolPop				% return symbol
+    oScopeEnterSymbol			% function name
+    oEmitLine
+    @SubprogramBody
+    oContextClear(cFunction)
+    oScopePop				% formals in closed scope
+    [ oContextChoose(cAutoImport)
+	| yes:
+	    @ExamineAutoImportScope
+	    oCountPushScopeNumberOfEntries
+	    {
+		[ oCountChooseZero
+		    | yes:
+			>
+		    | *:
+		]
+		oSymbolPushCountScope
+		[ oSymbolChooseAttribute(saProcedureImportsSpecialVar)
+		    | yes:
+			%% No longer considered an error - JRC 16.2.03
+			%% #eFunctionTransitivelyImportsSpecialVar
+			oSymbolPop
+			>
+		    | *:
+		]
+		oSymbolPop
+		oCountDecrement
+	    }
+	    oCountPop
+	    oContextClear(cAutoImport)
+	| *:
+    ]
+    @CalculateTransitiveImports
+    oScopeSave
+    oTypeEnterImportsScope
+    oScopePop				% imports
+    oScopePop				% global formals
+    oTypeClearAttribute(taRecursive)
+    oTypePop
+    @EndSubprogramBody
+    oSymbolPop;
+
+ExamineAutoImportScope:
+    % the current import scope is closed.  Auto-imported symbols were added
+    % to this scope.  Examine them, and take action.
+    % catch all variables that are used r/o
+    oCountPushScopeNumberOfEntries
+    {
+	[ oCountChooseZero
+	    | yes:
+		>
+	    | *:
+	]
+	oSymbolPushCountScope
+	[ oSymbolChooseAttribute(saAutoImportedVar)
+	    | yes:
+		% imported var so leave with maximum referencability
+		% however, get rid of the attribute so we can do this
+		% again if we have to.
+		oSymbolClearAttribute(saAutoImportedVar)
+	    | *:
+		[ oSymbolChooseKind
+		    | sVariable:
+			% only using it R/O so why import it var, huh?
+			oSymbolChangeKind(sReadOnlyVariable)
+			oScopeReplaceCountSymbol
+		    | sCollection:
+			% only using it R/O so why import it var, huh?
+			oSymbolChangeKind(sReadOnlyCollection)
+			oScopeReplaceCountSymbol
+		    | *:
+		]
+	]
+	oSymbolClearAttribute(saCannotImportVar)
+	oSymbolPop
+	oCountDecrement
+    }
+    oCountPop;
+
+ForwardFcnDcl:
+    .aForward
+    .aFunction
+    [
+	| aIdent:
+	| aPredefinedId:
+	    #ePredefinedMisused
+    ]
+    @VerifyAndPushNewSubprogramSymbol
+    oSymbolEnterKind(sFunction)
+    oSymbolEnterAttribute(saForward)
+    oSymbolEnterScopeLevel
+    @MightBeMonitorEntry
+    .aIdent	oEmitSymbol
+    aIdentText
+    .aIdentText oEmitString
+    oEmitLine
+    oTypePushNew(tFunction)
+    oTypeEnterAttribute(taForward)
+    oSymbolEnterType
+    @SubprogramParameters
+    oScopeEnterSymbol			% procedure; enable recursion
+    oScopePushTypeFormals		% glbl formals for check against imports
+    @ResultVariable
+    oEmitLine
+    oScopePush
+    @OptImport
+    oEmitLine
+    oScopeClose
+    oSymbolPop				% return value symbol
+    [ oContextChoose(cAutoImport)
+	| yes:
+	    oSymbolEnterAttribute(saForwardAutoImports)
+	    oContextClear(cAutoImport)
+	| *:
+    ]
+    oTypeEnterAttribute(taUnresolvedImports)
+    oScopeSave
+    oTypeEnterImportsScope
+    oScopePop				% imports
+    oScopePop				% global formals
+    @MakeForwardsGlobal
+    oEmitLine
+    oTypePop
+    oSymbolPop;
+
+ExternalFcnDcl:
+    .aExternal
+    .aFunction
+    [
+	| aIdent:
+	| aPredefinedId:
+	    #ePredefinedMisused
+    ]
+    @VerifyAndPushNewSubprogramSymbol
+    oSymbolEnterKind(sFunction)
+    oSymbolEnterAttribute(saExternal)
+    oSymbolEnterAttribute(saChild)
+    oSymbolClearAttribute(saForward)	% might have been forward imports
+    .aIdent	oEmitSymbol
+    aIdentText
+    .aIdentText oEmitString
+    [
+	| aExternalAddress:
+	    .aExternalAddress
+	    aStringLit
+	    .aStringLit oEmitString
+	| *:
+    ]
+    oEmitLine
+    oTypePushNew(tFunction)
+    oSymbolEnterType
+    @SubprogramParameters
+    oScopeEnterSymbol			% procedure; enable recursion
+    oScopePushTypeFormals		% glbl formals for check against imports
+    @ResultVariable
+    oEmitLine
+    oScopePush
+    @OptImport 				% sets cAutoImport
+    oEmitLine
+    oScopeClose
+    oSymbolPop				% return value symbol
+    @CalculateTransitiveImports
+    oScopeSave
+    oTypeEnterImportsScope
+    oScopePop				% imports
+    oScopePop				% global formals
+    oEmitLine
+    oTypePop
+    oSymbolPop;
+
+ResultVariable:
+    oScopePush				% room for subprogram symbol
+    oSymbolPushCopy			% subprogram
+    oSymbolChangeKind(sUndefined)
+    oScopeEnterSymbol
+    oSymbolPop
+    oScopePushTypeFormals		% formals
+    [
+	| aIdent:
+	    @VerifyAndPushNewFormalSymbol
+	| aPredefinedId:
+	    #ePredefinedMisused
+	    @VerifyAndPushNewFormalSymbol
+	| *:
+	    oSymbolMakeUpNameAndPushNew
+    ]
+    oScopePop
+    oScopePop
+    oSymbolEnterKind(sResult)
+    oScopePush
+    oScopeEnterSymbol
+    oScopeSave
+    oSymbolEnterLeftResultSymbolScope % save the result symbol in the function
+				      % symbol
+    oScopePop
+    .aIdent	oEmitSymbol
+    aType
+    .aType
+    @TypeSpec
+    oSymbolEnterType
+    oTypeEnterLeftResultType
+    oTypePop;
+
+MakeForwardsGlobal:
+    oScopePushTypeImports
+    oCountPushScopeNumberOfEntries
+    {
+	[ oCountChooseZero
+	    | yes:
+		>
+	    | *:
+	]
+	oSymbolPushCountScope
+	[ oSymbolChooseAttribute(saForward)
+	    | yes:
+		oScopePop
+		oScopeEnterSymbol
+		oScopePushTypeImports
+	    | *:
+	]
+	oSymbolPop
+	oCountDecrement
+    }
+    oCountPop
+    oScopePop;
+
+SubprogramParameters:
+    oScopePush				% prevent proc name from reoccurring in
+    oSymbolPushCopy			% formals list
+    oSymbolChangeKind(sUndefined)
+    oScopeEnterSymbol
+    oSymbolPop
+    oScopePush				% Formals
+    oContextSet(cProcessingParameters)
+    @OptParameterList
+    oEmitLine
+    oScopeSave
+    oTypeEnterFormalsScope
+    oContextClear(cProcessingParameters)
+    oScopePop				% Formals
+    oScopePop				% procedure name
+    ;
+
+
+
+OptParameterList:
+    [
+	| aSubs:
+	    .aSubs
+	    {[
+		| aEndSubs:
+		    .aEndSubs
+		    >
+		| *:
+		    @ParameterDeclaration
+		    oEmitLine
+	    ]}
+	| aInterruptNumber:
+	    [ oContextChoose(cDeviceMonitor)
+		| no:
+		    #eInterruptProcedureOnlyInDeviceMonitor
+		| *:
+		    [ oSymbolChooseAttribute(saExport)
+			| yes:
+			    #eInterruptProcedureCannotBeExported
+			| *:
+			    oSymbolEnterAttribute(saInterruptProcedure)
+		    ]
+	    ]
+	    .aInterruptNumber
+	    @Expn
+	    oTypePop
+	| *:
+    ];
+
+ParameterDeclaration:
+    [
+	| aVar:
+	    .aVar
+	    [ oSymbolChooseKind
+		| sFunction:
+		    %% No longer an error - JRC 19.8.22
+		    %% #eVarFormalIllegalInFunction
+		| *:
+	    ]
+	    oCountPushZero
+	    oScopePush	% Purely local scope for id-lists
+	    oSymbolPushCopy			% enter the subprogram name
+	    oSymbolChangeKind(sUndefined)
+	    oScopeEnterSymbol
+	    oSymbolPop
+	    @OptRegisterSpec
+	    {
+		[
+		    | aIdent:
+			@VerifyAndPushNewFormalSymbol
+		    | aPredefinedId:
+			#ePredefinedMisused
+			@VerifyAndPushNewFormalSymbol
+		    | *:
+			>
+		]
+		.aIdent	oEmitSymbol
+		oSymbolEnterKind(sVariable)
+		oSymbolEnterAttribute(saFormal)
+		oScopeEnterSymbol
+		oCountIncrement
+	    }
+	    oScopePop	% pop id-list scope; they get entered properly later
+	    aType
+	    .aType
+	    @ParameterType
+	    {
+		[ oCountChooseZero
+		    | yes:	>
+		    | *:
+			oSymbolEnterType
+			[ oTypeChooseAttribute(taTypeCheat)
+			    | yes:
+				oSymbolEnterAttribute(saTypeCheat)
+			    | *:
+			]
+			oScopeEnterSymbol
+			oSymbolPop
+		]
+		oCountDecrement
+	    }
+	    oTypeClearAttribute(taTypeCheat)
+	    oCountPop
+	    oTypePop
+	| aProcedure:
+	    .aProcedure
+	    [
+		| aIdent:
+		| aPredefinedId:
+		    #ePredefinedMisused
+	    ]
+	    @VerifyAndPushNewFormalSymbol
+	    .aIdent	oEmitSymbol
+	    aIdentText
+	    .aIdentText oEmitString
+	    oSymbolEnterKind(sProcedure)
+	    oSymbolEnterAttribute(saFormal)
+	    oTypePushNew(tProcedure)
+	    oSymbolEnterType
+	    oEmitLine
+	    @SubprogramParameters
+	    oScopeEnterSymbol
+	    oTypePop
+	    oSymbolPop
+	| aFunction:
+	    .aFunction
+	    [
+		| aIdent:
+		| aPredefinedId:
+		    #ePredefinedMisused
+	    ]
+	    @VerifyAndPushNewFormalSymbol
+	    .aIdent	oEmitSymbol
+	    aIdentText
+	    .aIdentText oEmitString
+	    oSymbolEnterKind(sFunction)
+	    oSymbolEnterAttribute(saFormal)
+	    oTypePushNew(tFunction)
+	    oSymbolEnterType
+	    oEmitLine
+	    @SubprogramParameters
+	    @ResultVariable
+	    oSymbolPop			% pop result symbol
+	    oScopeEnterSymbol
+	    oTypePop
+	    oSymbolPop
+	| *:
+	    oCountPushZero
+	    oScopePush	% Purely local scope for id-lists
+	    oSymbolPushCopy			% enter the subprogram name
+	    oSymbolChangeKind(sUndefined)
+	    oScopeEnterSymbol
+	    oSymbolPop
+	    @OptRegisterSpec
+	    {
+		[
+		    | aIdent:
+			@VerifyAndPushNewFormalSymbol
+		    | aPredefinedId:
+			#ePredefinedMisused
+			@VerifyAndPushNewFormalSymbol
+		    | *:
+			>
+		]
+		.aIdent	oEmitSymbol
+		oSymbolEnterKind(sConstant)
+		oSymbolEnterAttribute(saFormal)
+		oScopeEnterSymbol
+		oCountIncrement
+	    }
+	    oScopePop	% pop id-list scope; they get entered properly later
+	    aType
+	    .aType
+	    @ParameterType
+	    {
+		[ oCountChooseZero
+		    | yes:
+			>
+		    | *:
+			oSymbolEnterType
+			[ oTypeChooseAttribute(taTypeCheat)
+			    | yes:
+				oSymbolEnterAttribute(saTypeCheat)
+			    | *:
+			]
+			oScopeEnterSymbol
+			oSymbolPop
+		]
+		oCountDecrement
+	    }
+	    oTypeClearAttribute(taTypeCheat)
+	    oCountPop
+	    oTypePop
+    ];
+
+ParameterType:
+    [
+	| aType:
+	    % this is a type overide spec
+	    .aType
+	    @TypeSpec
+	    oTypeEnterAttribute(taTypeCheat)
+	| aVaryingParameter:
+	    .aVaryingParameter
+	    oTypePushBuiltin(tVaryingParameter)
+	| *:
+	    @TypeSpec
+    ];
+
+BodyDcl:
+    .aBody
+    oContextClear(cProcedureImports)
+    [
+	| aProcedure:	.aProcedure
+	    [
+		| aIdent:
+		| aPredefinedId:
+		    #ePredefinedMisused
+	    ]
+	    @VerifyAndPushSymbol
+	    .aIdent	oEmitSymbol
+	    [ oSymbolChooseKind
+		| sProcedure:
+		    [ oSymbolChooseAttribute(saForward)
+			| yes:
+			    oSymbolClearAttribute(saForward)
+			| *:
+			    [ oSymbolChooseAttribute(saExternal)
+				| yes:
+				    oSymbolClearAttribute(saExternal)
+				| *:
+				    [ oSymbolChooseAttribute(saWasExternal)
+					| yes:
+					    oSymbolClearAttribute(saWasExternal)
+					| *:
+					    #eIllegalSubprogramBodyname
+					    oSymbolEnterKind(sProcedure)
+					    oTypePushNew(tProcedure)
+					    oSymbolEnterType
+					    oTypePop
+				    ]
+			    ]
+		    ]
+
+		    [ oSymbolBodyDeclaredAtSameScopeLevel
+			| no:
+			    [ oSymbolChooseAttribute(saUnqualBody)
+				| yes:
+				    oSymbolClearAttribute(saUnqualBody)
+				| *:
+				    #eIllegalSubprogramBodyname
+			    ]
+			| *:
+		    ]
+		    oTypePushSymbolType
+		| sUndefined:
+		    oSymbolEnterKind(sProcedure)
+		    oTypePushNew(tProcedure)
+		    oSymbolEnterType
+		| *:
+		    #eIllegalSubprogramBodyname
+		    oSymbolEnterKind(sProcedure)
+		    oTypePushNew(tProcedure)
+		    oSymbolEnterType
+	    ]
+	| aFunction:	.aFunction
+	    [
+		| aIdent:
+		| aPredefinedId:
+		    #ePredefinedMisused
+	    ]
+	    @VerifyAndPushSymbol
+	    .aIdent	oEmitSymbol
+	    [ oSymbolChooseKind
+		| sFunction:
+		    [ oSymbolChooseAttribute(saForward)
+			| yes:
+			    oSymbolClearAttribute(saForward)
+			| *:
+			    [ oSymbolChooseAttribute(saExternal)
+				| yes:
+				    oSymbolClearAttribute(saExternal)
+				| *:
+				    [ oSymbolChooseAttribute(saWasExternal)
+					| yes:
+					    oSymbolClearAttribute(saWasExternal)
+					| *:
+					    #eIllegalSubprogramBodyname
+					    oSymbolEnterKind(sProcedure)
+					    oTypePushNew(tProcedure)
+					    oSymbolEnterType
+					    oTypePop
+				    ]
+			    ]
+		    ]
+
+		    [ oSymbolBodyDeclaredAtSameScopeLevel
+			| no:
+			    [ oSymbolChooseAttribute(saUnqualBody)
+				| yes:
+				    oSymbolClearAttribute(saUnqualBody)
+				| *:
+				    #eIllegalSubprogramBodyname
+			    ]
+			| *:
+		    ]
+		    oTypePushSymbolType
+		| sUndefined:
+		    oSymbolEnterKind(sFunction)
+		    oTypePushNew(tFunction)
+		    oSymbolEnterType
+		    oTypePushBuiltIn(tScalar)
+		    oTypeEnterLeftResultType
+		    oTypePop
+		| *:
+		    #eIllegalSubprogramBodyname
+		    oSymbolEnterKind(sFunction)
+		    oTypePushNew(tFunction)
+		    oSymbolEnterType
+		    oTypePushBuiltIn(tScalar)
+		    oTypeEnterLeftResultType
+		    oTypePop
+	    ]
+	    oContextSet(cFunction)
+    ]
+    oEmitLine
+    @ResolveForwardImports
+    oScopePushTypeImports
+    oScopeClose
+    oScopePushTypeFormals	% formals
+    oScopeEnterSymbol		% permit local recursion
+    [ oContextChoose(cFunction)
+	| yes:
+	    % push the result symbol scope
+	    oScopePushResultSymbolScope
+	| *:
+    ]
+    [ oSymbolChooseAttribute(saForwardAutoImports)
+	| yes:
+	    oContextSet(cAutoImport)
+	    oSymbolClearAttribute(saForwardAutoImports)
+	| *:
+    ]
+    @SubprogramBody
+    [ oContextChoose(cFunction)
+	| yes:
+	    % remove the function result symbol scope
+	    oScopePop
+	| *:
+    ]
+    oContextClear(cFunction)
+    oScopePop			% formals
+    [ oContextChoose(cAutoImport)
+	| yes:
+	    @ExamineAutoImportScope
+	    oSymbolEnterAttribute(saForwardAutoImports)
+	    oContextClear(cAutoImport)
+	| *:
+    ]
+    @CalculateTransitiveImports
+    oScopeSave
+    oTypeEnterImportsScope
+    oScopePop			% imports
+    oTypePop
+    @EndSubprogramBody
+    [ oSymbolChooseKind
+	| sProcedure:
+	    [ oContextChoose(cProcedureImports)
+		| yes:
+		    oSymbolEnterAttribute(saProcedureImportsSpecialVar)
+		| *:
+	    ]
+	| *:
+    ]
+    oSymbolPop
+    oEmitLine;
+
+ResolveForwardImports:
+    oContextClear(cForwardFound)
+    oScopePushTypeImports
+    oCountPushScopeNumberOfEntries
+    {
+	[ oCountChooseZero
+	    | yes:	>
+	    | *:
+	]
+	oSymbolPushCountScope
+	[ oSymbolChooseKind
+	    | sForward, sExport:
+		% this is a forward
+		oSymbolResolveKind
+		[ oSymbolChooseKind
+		    | sForward, sExport:
+			% still unresolved
+			#eForwardInImportsNotRefined
+			oSymbolClearAttribute(saForward)
+		    | sProcedure:
+			[ oSymbolChooseAttribute(saForward)
+			    | yes:
+				[ oContextChoose(cFunction)
+				    | yes:
+					%% No longer considered an error - JRC 16.2.03
+					%% #eFunctionCannotImportAForwardProcedure
+				    | *:
+				]
+			    | *:
+			]
+			[ oContextChoose(cFunction)
+			    | yes:
+				[ oSymbolChooseAttribute(saProcedureImportsSpecialVar)
+				    | yes:
+					%% No longer considered an error - JRC 16.2.03
+					%% #eFunctionTransitivelyImportsSpecialVar
+				    | *:
+				]
+			    | *:
+			]
+			oScopeReplaceCountSymbol
+			oContextSet(cForwardFound)
+		    | *:
+			oContextSet(cForwardFound)
+			oScopeReplaceCountSymbol
+		]
+	    | *:
+	]
+	oSymbolPop
+	oCountDecrement
+    }
+    [ oContextChoose(cForwardFound)
+	| yes:
+	    oScopeSave
+	    oTypeEnterImportsScope
+	| *:
+    ]
+    oCountPop
+    oScopePop;
+
+OptExport:
+    [
+	| aExport:
+	    .aExport
+	    {[
+		| aEndExport:
+		    >
+		| *:
+		    [
+			| aOpaque:
+			    .aOpaque
+			| *:
+		    ]
+		    [
+			| aUnqualified:
+			    .aUnqualified
+			    [
+				| aPredefinedId:
+				    #ePredefinedMisused
+				| aIdent:
+			    ]
+			    [ @VerifyAndPushNewUnqualifiedSymbol
+				| yes:
+				    .aIdent oEmitSymbol
+				| *:
+				    .aIdent oEmitSymbol
+				    oSymbolEnterKind(sExport)
+				    oSymbolEnterAttribute(saExport)
+				    oSymbolEnterScopeLevelPlus2
+			    ]
+			| *:
+			    [
+				| aPredefinedId:
+				    #ePredefinedMisused
+				| aIdent:
+			    ]
+			    @VerifyAndPushNewUnexportedSymbol
+			    .aIdent oEmitSymbol
+			    oSymbolEnterKind(sExport)
+			    oSymbolEnterAttribute(saExport)
+			    oSymbolEnterScopeLevelPlus2
+		    ]
+		    oScopeEnterSymbol
+		    oSymbolPop
+	    ]}
+	    .aEndExport
+	| *:
+    ];
+
+OptStubExport:
+    [
+	| aExport:
+	    .aExport
+	    {[
+		| aEndExport:
+		    >
+		| *:
+		    [
+			| aOpaque:
+			    .aOpaque
+			| *:
+		    ]
+		    [
+			| aUnqualified:
+			    .aUnqualified
+			    [
+				| aPredefinedId:
+				    #ePredefinedMisused
+				| aIdent:
+			    ]
+			     [ @VerifyAndPushNewUnqualifiedSymbol
+				| yes:
+				    .aIdent oEmitSymbol
+				| *:
+				    .aIdent oEmitSymbol
+				    oSymbolEnterKind(sExport)
+				    oSymbolEnterAttribute(saExport)
+				    oSymbolEnterScopeLevelPlus1
+			    ]
+			    oScopeEnterSymbol
+			    oSymbolPop
+			| *:
+			    [
+				| aPredefinedId:
+				    #ePredefinedMisused
+				| aIdent:
+			    ]
+			    @VerifyAndPushNewUnexportedSymbol
+			    .aIdent oEmitSymbol
+			    oSymbolEnterKind(sExport)
+			    oSymbolEnterScopeLevelPlus1
+			    oSymbolEnterAttribute(saExport)
+			    oScopeEnterSymbol
+			    oSymbolPop
+		    ]
+	    ]}
+	    .aEndExport
+	| *:
+    ];
+
+OptImport:
+    % top type is tProcedure, tFunction, tModule, tMonitor
+    [
+	| aImport:
+	    {
+		[
+		    | aEndImport:
+			>
+		    | aVar:
+			[
+			    | aPredefinedId:
+				oSymbolPushDummy
+				oSymbolEnterKind(sUndefined)
+			    | aIdent:
+				@VerifyAndPushSymbol
+			]
+			[ oSymbolChooseKind
+			    | sVariable, sCollection, sUndefined, sExport,
+				sModule, sMonitor:
+			    | sReadOnlyVariable, sReadOnlyModule,
+			      sReadOnlyCollection, sConstant, sReadOnlyMonitor:
+				#eReadOnlyVarImport
+			    | *:
+				#eIllegalVarImport
+			]
+			[ oTypeChooseKind	% importing type
+			    | tFunction:
+				%% No longer considered an error - JRC 16.2.03
+				%% #eFunctionImportsVar
+			    | *:
+			]
+		    | aForward:
+			[ oTypeChooseKind
+			    | tProcedure, tFunction, tError, tNotFound:
+				[ oTypeChooseAttribute(taForward)
+				    | no:
+					#eForwardInImportImproperlyUsed
+				    | *:
+				]
+			    | *:
+				#eForwardInImportImproperlyUsed
+			]
+			[
+			    | aPredefinedId:
+				#ePredefinedMisused
+			    | aIdent:
+			]
+			@VerifyAndPushNewForwardImportSymbol
+			[ oSymbolChooseKind
+			    | sExport, sForward:
+			    | sNotFound:
+				oSymbolEnterKind(sForward)
+			    | *:
+				#eForwardInImportImproperlyUsed
+			]
+			oSymbolEnterAttribute(saForward)
+		    | *:
+			[
+			    | aPredefinedId:
+				oSymbolPushDummy
+				oSymbolEnterKind(sUndefined)
+			    | aIdent:
+				@VerifyAndPushSymbol
+			]
+			[ oSymbolChooseKind
+			    | sConstant, sVariable, sCollection, sModule,
+			      sMonitor:
+				@ChangeKindToReadOnly
+			    | sProcedure:
+				[ oContextChoose(cFunction)
+				    | yes:
+					[ oSymbolChooseAttribute(saForward)
+					    | yes:
+						%% No longer considered an error - JRC 16.2.03
+						%% #eFunctionCannotImportAForwardProcedure
+					    | *:
+						[ oSymbolChooseAttribute(saProcedureImportsSpecialVar)
+						    | yes:
+							%% No longer considered an error - JRC 16.2.03
+							%% #eFunctionTransitivelyImportsSpecialVar
+						    | *:
+						]
+					]
+				    | *:
+				]
+			    | *:
+			]
+		]
+		[ oSymbolChooseKind
+		    | sUndefined:
+		    | *:
+			% check for formal import
+			[ oSymbolChooseAttribute(saFormal)
+			    | yes:
+				#eFormalImported
+			    | *:
+			]
+			% check for double import
+			[ oScopeChooseContainsSymbol
+			    | yes:
+				#eSymbolPreviouslyImported
+			    | *:
+				oScopeEnterSymbol
+			]
+		]
+		[ oTypeChooseKind	% type of thing imported into
+		    | tProcedure, tFunction:
+			oSymbolEnterAttribute(saImported)
+		    | *:
+		]
+		oSymbolPop
+	    }
+	| *:
+	    [ oTypeChooseKind
+		| tProcedure, tFunction, tProcess:
+		    oContextSet(cAutoImport)
+		| *:
+		    oContextClear(cAutoImport) 
+	    ]
+    ];
+
+ChangeKindToReadOnly:
+    [ oSymbolChooseKind
+	| sVariable:
+	    oSymbolChangeKind(sReadOnlyVariable)
+	| sModule:
+	    oSymbolChangeKind(sReadOnlyModule)
+	| sMonitor:
+	    oSymbolChangeKind(sReadOnlyMonitor)
+	| sCollection:
+	    oSymbolChangeKind(sReadOnlyCollection)
+	| *:
+    ];
+
+OptStubImport:
+    [
+	| aImport:
+	    {
+		[
+		    | aEndImport:
+			>
+		    | aVar:
+			[
+			    | aPredefinedId:
+				oSymbolPushDummy
+				oSymbolEnterKind(sUndefined)
+			    | aIdent:
+				oContextSet(cDontEnterUnimportedSymbols)
+				@VerifyAndPushSymbol
+				oContextClear(cDontEnterUnimportedSymbols)
+			]
+			[ oSymbolChooseKind
+			    | sReadOnlyVariable, sReadOnlyModule,
+			      sReadOnlyCollection, sConstant, sReadOnlyMonitor:
+				#eReadOnlyVarImport
+				% these cannot be pervasive, so don't check
+				[ oSymbolChooseAttribute(saGrant)
+				    | yes:
+					[ oSymbolChooseAttribute(saGrantVar)
+					    | yes:
+					    | *:
+						#eSymbolNotGrantedVar
+					]
+				    | *:
+					#eSymbolNotGrantedOrPervasive
+				]
+			    | sVariable, sModule, sMonitor, sCollection,
+			      sExport:
+				% these cannot be pervasive, so don't check
+				[ oSymbolChooseAttribute(saGrant)
+				    | yes:
+					[ oSymbolChooseAttribute(saGrantVar)
+					    | yes:
+						[ oTypeChooseKind
+							% importing type
+						    | tFunction:
+							[ oContextChoose(cCompile)
+							    | yes:
+								%% No longer considered an error - JRC 16.2.03
+								%% #eFunctionImportsVar
+							    | *:
+								% just ignore it
+							]
+						    | *:
+						]
+					    | *:
+						#eSymbolNotGrantedVar
+					]
+				    | *:
+					#eSymbolNotGrantedOrPervasive
+				]
+			    | sUndefined:
+			    | *:
+				#eIllegalVarImport
+			]
+		    | *:
+			[
+			    | aPredefinedId:
+				oSymbolPushDummy
+				oSymbolEnterKind(sUndefined)
+			    | aIdent:
+				oContextSet(cDontEnterUnimportedSymbols)
+				@VerifyAndPushSymbol
+				oContextClear(cDontEnterUnimportedSymbols)
+			]
+			[ oSymbolChooseAttribute(saPervasive)
+			    | yes:
+			    | *:
+				[ oSymbolChooseAttribute(saGrant)
+				    | yes:
+				    | *:
+					#eSymbolNotGrantedOrPervasive
+				]
+			]
+			@ChangeKindToReadOnly
+		]
+		[ oSymbolChooseKind
+		    | sUndefined:
+		    | *:
+			% check for double import
+			[ oScopeChooseContainsSymbol
+			    | yes:
+				#eSymbolPreviouslyImported
+			    | *:
+				oScopeEnterSymbol
+			]
+		]
+		oSymbolPop
+	    }
+	| *:
+	    [ oTypeChooseKind
+		| tProcedure, tFunction, tProcess:
+		    oContextSet(cAutoImport)
+		| *:
+		    oContextClear(cAutoImport) 
+	    ]
+    ];
+
+OptStubImportSecondTime:
+    [
+	| aImport:
+	    {
+		[
+		    | aEndImport:
+			>
+		    | aVar:
+			[
+			    | aPredefinedId:
+				oSymbolPushDummy
+				oSymbolEnterKind(sUndefined)
+			    | aIdent:
+				@VerifyAndPushSymbol
+			]
+			[ oSymbolChooseKind
+			    | sReadOnlyVariable, sReadOnlyModule,
+			      sReadOnlyCollection, sConstant, sReadOnlyMonitor:
+				#eReadOnlyVarImport
+				% these cannot be pervasive, so don't check
+				[ oSymbolChooseAttribute(saGrant)
+				    | yes:
+					[ oSymbolChooseAttribute(saGrantVar)
+					    | yes:
+					    | *:
+						#eSymbolNotGrantedVar
+					]
+				    | *:
+					#eSymbolNotGrantedOrPervasive
+				]
+			    | sVariable, sModule, sMonitor, sCollection,
+			      sExport:
+				% these cannot be pervasive, so don't check
+				[ oSymbolChooseAttribute(saGrant)
+				    | yes:
+					[ oSymbolChooseAttribute(saGrantVar)
+					    | yes:
+					    | *:
+						#eSymbolNotGrantedVar
+					]
+				    | *:
+					#eSymbolNotGrantedOrPervasive
+				]
+			    | sUndefined:
+			    | *:
+				#eIllegalVarImport
+			]
+		    | *:
+			[
+			    | aPredefinedId:
+				oSymbolPushDummy
+				oSymbolEnterKind(sUndefined)
+			    | aIdent:
+				@VerifyAndPushSymbol
+			]
+			[ oSymbolChooseAttribute(saPervasive)
+			    | yes:
+			    | *:
+				[ oSymbolChooseAttribute(saGrant)
+				    | yes:
+				    | *:
+					#eSymbolNotGrantedOrPervasive
+				]
+			]
+			@ChangeKindToReadOnly
+		]
+		[ oSymbolChooseKind
+		    | sUndefined:
+		    | *:
+			% check for double import
+			[ oScopeChooseContainsSymbol
+			    | yes:
+				#eSymbolPreviouslyImported
+			    | *:
+				% check import versus local declaration in stub
+				oScopePushTypeGrants
+				[ oScopeChooseContainsSymbolIdent
+				    | yes:
+					#eImportConflictsWithLocalDeclaration
+					oScopePop
+				    | *:
+					oScopePop
+					oScopeEnterSymbol
+				]
+			]
+		]
+		oSymbolPop
+	    }
+	| *:
+    ];
+
+OptGrant:
+    [
+	| aGrant:
+	    .aGrant
+	    {[
+		| aEndGrant:
+		    >
+		| *:
+		    [
+			| aVar:
+			    [
+				| aPredefinedId:
+				    #ePredefinedMisused
+				| aIdent:
+			    ]
+			    @VerifyAndPushGrantSymbol
+			    .aIdent	oEmitSymbol
+			    [ oSymbolChooseKind
+				| sNotFound:
+				    oSymbolEnterKind(sExport)
+				| sReadOnlyVariable, sReadOnlyModule,
+				  sReadOnlyMonitor, sReadOnlyCollection,
+				  sConstant:
+				    #eReadOnlyVarGrant
+				| *:
+			    ]
+			    oSymbolEnterAttribute(saGrant)
+			    oSymbolEnterAttribute(saGrantVar)
+			    oSymbolEnterScopeLevelPlus1
+			    oScopeEnterSymbol
+			    oSymbolPop
+			| *:
+			    [
+				| aPredefinedId:
+				    #ePredefinedMisused
+				| aIdent:
+			    ]
+			    @VerifyAndPushGrantSymbol
+			    .aIdent	oEmitSymbol
+			    [ oSymbolChooseKind
+				| sNotFound:
+				    oSymbolEnterKind(sExport)
+				| *:
+			    ]
+			    oSymbolEnterAttribute(saGrant)
+			    oSymbolEnterScopeLevelPlus1
+			    oScopeEnterSymbol
+			    oSymbolPop
+		    ]
+	    ]}
+	    .aEndGrant
+	| *:
+    ];
+
+OptPre:
+    [
+	| aPre:
+	    .aPre
+	    @Expn
+	    oTypePop
+	    oEmitLine
+	| *:
+    ];
+
+
+
+OptPost:
+    [
+	| aPost:
+	    .aPost
+	    oContextSet(cPost)
+	    @Expn
+	    oTypePop
+	    oContextClear(cPost)
+	    oEmitLine
+	| *:
+    ];
+
+OptHandler:
+    [
+	| aHandler:
+	    .aHandler
+	    [
+		| aPredefinedId:
+		    #ePredefinedMisused
+		| aIdent:
+	    ]
+	    oScopePush
+	    @VerifyAndPushNewSymbol
+	    .aIdent oEmitSymbol
+	    oSymbolEnterKind(sConstant)
+	    oTypePushBuiltin(tScalar)
+	    oSymbolEnterType
+	    oTypePop
+	    oScopeEnterSymbol
+	    oSymbolPop
+
+	    % push local scope for dcls.
+	    oScopePush
+	    @DclsAndStmts
+	    @EndDclsScope
+
+	    oScopePop
+	    aEndSubprogramBody
+	    .aEndSubprogramBody
+	    oEmitLine
+	| *:
+    ];
+
+OptInvariant:
+    [
+	| aInvariant:
+	    .aInvariant
+	    oContextSet(cAssert)
+	    @Expn
+	    oTypePop
+	    oContextClear(cAssert)
+	    oEmitLine
+	| *:
+    ];
+
+
+OptModuleInvariant:
+    [
+	| aInvariant:
+	    .aInvariant
+	    [ oContextChoose(cModuleInvariantOK)
+		| yes:
+		| *:
+		    #eModuleInvariantNotLegal
+	    ]
+	    oContextSet(cAssert)
+	    @Expn
+	    oTypePop
+	    oContextClear(cAssert)
+	    oEmitLine
+	| *:
+    ];
+
+OptInit:
+    [
+	| aInit:
+	    .aInit
+	    {
+		[
+		    | aEndInit:
+			.aEndInit
+			>
+		    | aIdent:
+		    | aPredefinedId:
+			#ePredefinedMisused
+		]
+		@VerifyAndPushNewUnexportedSymbol
+		.aIdent	oEmitSymbol
+		oSymbolEnterKind(sInit)
+		@Expn
+		oTypePop
+		oSymbolEnterType
+		oScopeEnterSymbol
+		oSymbolPop
+	    }
+	    oEmitLine
+	| *:
+    ];
+
+SubprogramBody:
+    oScopePush
+    @OptPre
+    @OptInit
+    @OptPost
+    @OptHandler
+    @DclsAndStmts
+    @EndDclsScope;
+
+
+EndSubprogramBody:
+    aEndSubprogramBody
+    .aEndSubprogramBody
+    [
+	| aIdent:
+	| aPredefinedId:
+	    #ePredefinedMisused
+    ]
+    oSymbolPushClosedScope
+    [ oSymbolChooseSameSymbols
+	| yes:
+	| *:
+	    #eProcedureEndIdentDoesNotMatch
+    ]
+    oSymbolPop;
+
+ModuleDcl:
+    .aModule
+    [
+	| aIdent:
+	| aPredefinedId:
+	    #ePredefinedMisused
+    ]
+    @VerifyAndPushNewSymbol
+    [ oSymbolChooseKind
+	| sExport:
+	    [ oSymbolChooseAttribute(saGrant)
+		| no:
+		    #eExportedModule
+		    oSymbolEnterKind(sUndefined)
+		    oSymbolPop
+		    oSymbolPushNew
+		| *:
+	    ]
+	| *:
+    ]
+    oSymbolEnterKind(sModule)
+    oTypePushNew(tModule)
+    oSymbolEnterType
+    .aIdent	oEmitSymbol
+    aIdentText
+    .aIdentText oEmitString
+    oScopePush			% imports
+    @OptImport
+    oScopeClose
+    oScopePush			% imports, exports
+    @OptExport
+    oScopePush			% imports, exports, grants
+    @OptGrant
+    oScopeSave
+    oTypeEnterGrantScope
+    oScopePush			% imports, exports, grants, locals
+    @OptPre
+    oContextPush(cModuleInvariantOK)
+    oContextSet(cModuleInvariantOK)
+    @DclsAndStmts
+    @OptModuleInvariant
+    @DclsAndStmts
+    @OptPost
+    @EndDclsScope		% imports, exports, grants
+    oScopePop			% imports, exports
+    [
+	| aEndModule:
+	    @ResolveExports
+	    oScopeSave
+	    oTypeEnterFieldsScope
+	    oScopePop		% imports
+
+	    @CalculateTransitiveImports
+	    oScopeSave
+	    oTypeEnterImportsScope
+	    oScopePop			%
+	    oScopeEnterSymbol		% module name
+	    [
+		| aIdent:
+		| aPredefinedId:
+		    #ePredefinedMisused
+	    ]
+	    @VerifyAndPushSymbol
+	    [ oSymbolChooseSameSymbols
+		| yes:
+		| *:
+		    #eEndNameNotModuleName
+	    ]
+	    oSymbolPop
+	    @ResolveGrants
+	    @ExportUnqualifiedNames
+	| aEndOfFile:
+	    @CalculateTransitiveImports
+	    oScopeSave
+	    oTypeEnterImportsScope
+	    oScopePop			%
+	    oScopePop		% imports
+	    oScopeEnterSymbol		% module name
+    ]
+    .aEndModule
+    oTypePop
+    oSymbolPop
+    oContextPop(cModuleInvariantOK);
+
+MonitorDcl:
+    .aMonitor
+    [
+	| aIdent:
+	| aPredefinedId:
+	    #ePredefinedMisused
+    ]
+    @VerifyAndPushNewSymbol
+    [ oSymbolChooseKind
+	| sExport:
+	    [ oSymbolChooseAttribute(saGrant)
+		| no:
+		    #eExportedMonitor
+		    oSymbolEnterKind(sUndefined)
+		    oSymbolPop
+		    oSymbolPushNew
+		| *:
+	    ]
+	| *:
+    ]
+    oSymbolEnterKind(sMonitor)
+    oTypePushNew(tMonitor)
+    oSymbolEnterType
+    .aIdent	oEmitSymbol
+    aIdentText
+    .aIdentText oEmitString
+    [
+	| aMonitorPriority:
+	    .aMonitorPriority
+	    @Expn
+	    oTypePop
+	    oContextSet(cDeviceMonitor)
+	| *:
+	    oContextClear(cDeviceMonitor)
+    ]
+    oScopePush			% imports
+    @OptImport
+    oScopeClose
+    oScopePush			% imports, exports
+    @OptExport
+    oScopePush			% imports, exports, grants
+    @OptGrant
+    oScopeSave
+    oTypeEnterGrantScope
+    oScopePush			% imports, exports, grants, locals
+    @OptPre
+    oContextPush(cModuleInvariantOK)
+    oContextSet(cModuleInvariantOK)
+    @DclsAndStmts
+    @OptModuleInvariant
+    @DclsAndStmts
+    @OptPost
+    @EndDclsScope		% imports, exports, grants
+    oScopePop			% imports, exports
+    oContextClear(cDeviceMonitor)
+    [
+	| aEndMonitor:
+	    @ResolveExports
+	    oScopeSave
+	    oTypeEnterFieldsScope
+	    oScopePop		% imports
+
+	    @CalculateTransitiveImports
+	    oScopeSave
+	    oTypeEnterImportsScope
+	    oScopePop			%
+	    oScopeEnterSymbol		% monitor name
+	    [
+		| aIdent:
+		| aPredefinedId:
+		    #ePredefinedMisused
+	    ]
+	    @VerifyAndPushSymbol
+	    [ oSymbolChooseSameSymbols
+		| yes:
+		| *:
+		    #eEndNameNotMonitorName
+	    ]
+	    oSymbolPop
+	    @ResolveGrants
+	    @ExportUnqualifiedNames
+	| aEndOfFile:
+	    @CalculateTransitiveImports
+	    oScopeSave
+	    oTypeEnterImportsScope
+	    oScopePop			%
+	    oScopePop		% imports
+	    oScopeEnterSymbol		% monitor name
+    ]
+    .aEndMonitor
+    oSymbolPop
+    oTypePop
+    oContextPop(cModuleInvariantOK);
+
+ResolveExports:
+    % Resolve the export list of a module to the
+    % true exported symbol kinds.  Check for unresolved exports.
+    % Assumes that the top scope is the exports list
+    % and the top type is the exporting object.
+
+    oCountPushScopeNumberOfEntries
+    {[ oCountChooseZero
+	| yes:
+	    >
+	| *:
+	    oSymbolPushCountScope
+	    oSymbolResolveKind
+	    [ oSymbolChooseKind
+		| sVariable:
+		    %% No longer an error, just a readonly - JC 7.8.22
+		    %% #eCannotExportVariable
+		    oSymbolChangeKind(sReadOnlyVariable)
+		| sCollection:
+		    %% No longer an error, just a readonly - JC 7.8.22
+		    %% #eCannotExportVariable
+		    oSymbolChangeKind(sReadOnlyCollection)
+		| sExport:
+		    #eUnresolvedExportedSymbol
+		    oSymbolChangeKind(sUndefined)
+		| sType:
+		    [ oSymbolChooseAttribute(saForward)
+			| yes:
+			    #eUnresolvedForwardType
+			| *:
+		    ]
+		| *:
+	    ]
+	    oScopeReplaceCountSymbol
+	    oSymbolPop
+	    oCountDecrement
+    ]}
+    oCountPop;
+
+ResolveGrants:
+    % Resolve the grant list of a module to the
+    % true granted symbol kinds.  Check for unresolved grants.
+    % Assumes that the top type is the module
+
+    oScopePushTypeGrants
+    oCountPushScopeNumberOfEntries
+    {[ oCountChooseZero
+	| yes:
+	    >
+	| *:
+	    oSymbolPushCountScope
+	    oSymbolResolveKind
+	    [ oSymbolChooseKind
+		| sExport:
+		    [ oTypeChooseAttribute(taCompile)
+			| yes:
+			    % we are compiling the main definition; complain
+			    #eUnresolvedGrantSymbol
+			    oSymbolChangeKind(sUndefined)
+			| *:
+		    ]
+		| sProcedure, sFunction:
+		    [ oSymbolChooseAttribute(saExternal)
+			| yes:
+			    [ oTypeChooseAttribute(taCompile)
+				| yes:
+				    % we are compiling the main definition;
+				    % complain
+				    [ oSymbolChooseAttribute(saChild)
+					| no:
+					    #eUnresolvedGrantSymbol
+					    oSymbolChangeKind(sUndefined)
+					| *:
+				    ]
+				| *:
+			    ]
+			| *:
+			    [ oSymbolChooseAttribute(saGrantVar)
+				| yes:
+				    #eCantGrantVar
+				| *:
+			    ]
+		    ]
+		| sCollection, sModule, sMonitor:
+		| sReadOnlyVariable, sReadOnlyMonitor, sConstant,
+		  sReadOnlyModule, sReadOnlyCollection, sType:
+		    [ oSymbolChooseAttribute(saGrantVar)
+			| yes:
+			    #eCantGrantVar
+			| *:
+		    ]
+		| sVariable:
+		    [ oSymbolChooseAttribute(saGrantVar)
+			| no:
+			    @ChangeKindToReadOnly
+			| *:
+		    ]
+		| sUndefined, sNotFound:
+		| *:
+		    #eCantGrant
+	    ]
+	    oSymbolClearAttribute(saGrant)
+	    oSymbolClearAttribute(saGrantVar)
+	    oScopeReplaceCountSymbol
+	    oSymbolPop
+	    oCountDecrement
+    ]}
+    oCountPop
+    oScopePop;
+
+ExportUnqualifiedNames:
+    oScopePushTypeExports
+    oCountPushScopeNumberOfEntries
+    {[ oCountChooseZero
+	| yes:
+	    >
+	| *:
+	    oSymbolPushCountScope
+	    [ oSymbolChooseAttribute(saUnqualified)
+		| yes:
+		    oScopePop
+		    [ oScopeChooseContainsSymbol
+			| yes:
+			    #eUnqualifiedNameConflicts
+			| *:
+			    oScopeEnterSymbol
+		    ]
+		    oScopePushTypeExports
+		    oSymbolClearAttribute(saUnqualified)
+		    [ oTypeChooseAttribute(taCompile)
+			| no:
+			    [ oSymbolChooseAttribute(saExternal)
+				| yes:
+				    oSymbolClearAttribute(saExternal)
+				    oSymbolEnterAttribute(saWasExternal)
+				| *:
+			    ]
+			    oSymbolClearAttribute(saForward)
+			| *:
+		    ]
+		| *:
+		    [ oSymbolChooseUnqualifiedExport
+			| yes:
+			    oSymbolDecrementUnqualifiedExport
+			    oScopePop
+			    oScopeEnterSymbol
+			    oScopePushTypeExports
+			    [ oTypeChooseAttribute(taCompile)
+				| no:
+				    [ oSymbolChooseAttribute(saExternal)
+					| yes:
+					    oSymbolClearAttribute(saExternal)
+					    oSymbolEnterAttribute(saWasExternal)
+					| *:
+				    ]
+				    oSymbolClearAttribute(saForward)
+				| *:
+			    ]
+			| *:
+		    ]
+	    ]
+	    [ oSymbolChooseAttribute(saUnqualBody)
+		| yes:
+		    % it should have been declared by now!
+		    [ oContextChoose(cInBody)
+			| yes:
+			    #eUnqualifiedBodyNotFound
+			    oSymbolClearAttribute(saUnqualBody)
+			| *:
+			    % pretend that it is declared
+			    oSymbolClearAttribute(saExternal)
+			    oSymbolEnterAttribute(saWasExternal)
+		    ]
+		| *:
+	    ]
+	    oSymbolClearAttribute(saMonitorEntry)
+	    oSymbolPop
+	    oCountDecrement
+    ]}
+    oCountPop
+    oScopePop;
+
+CheckBodyModuleExports:
+    % Check the export list of a stub module to check for unresolved bodies
+    % Assumes that the top type is the module
+
+    oScopePushTypeFields
+    oCountPushScopeNumberOfEntries
+    {[ oCountChooseZero
+	| yes:
+	    >
+	| *:
+	    oSymbolPushCountScope
+	    oSymbolResolveKind
+	    [ oSymbolChooseKind
+		| sProcedure, sFunction:
+		    [ oSymbolChooseAttribute(saExternal)
+			| yes:
+			    [ oSymbolChooseAttribute(saChild)
+				| no:
+				    #eUnresolvedExternalSubprogram
+				| *:
+			    ]
+			| *:
+		    ]
+		| *:
+	    ]
+	    oSymbolClearAttribute(saMonitorEntry)
+	    oSymbolPop
+	    oCountDecrement
+    ]}
+    oCountPop
+    oScopePop;
+
+Stmt >> Boolean:
+    [
+	| aIdent:
+	    @Variable
+	    @AssignOrCallStmt
+	| aPredefinedId:
+	    @PredefinedVariable
+	    @AssignOrCallStmt
+	| aIf:		@IfStmt
+	| aLoop:	@LoopStmt
+	| aExit:
+	    .aExit
+	    [ oLoopChooseDepth
+		| zero:
+		    #eExitNotInLoop
+		| *:
+	    ]
+	| aExitWhen:
+	    .aExitWhen
+	    @Expn
+	    oTypePop
+	    [ oLoopChooseDepth
+		| zero:
+		    #eExitNotInLoop
+		| *:
+	    ]
+	| aCase:	@CaseStmt
+	| aFor:	@ForStmt
+	| aBegin:
+	    .aBegin
+	    oEmitLine
+	    oScopePush
+	    @DclsAndStmts
+	    @EndDclsScope
+	    aEndBegin
+	    .aEndBegin
+	| aAssert:	@AssertStmt
+	| aReturn:
+	    [ oTypeChooseKind
+		| tFunction:
+		    #eValuelessFunctionReturn
+		| tModule, tMonitor:
+		    #eReturnInModule
+		| *:
+	    ]
+	    .aReturn
+	| aResult:	@ResultStmt
+	| aPut:	@PutStmt
+	| aGet:	@GetStmt
+	| aNew:
+	    .aNew
+	    @NewOrFreeStmt
+	| aFree:
+	    .aFree
+	    @NewOrFreeStmt
+	| aTag:
+	    @TagStmt
+	| aRead:
+	    @ReadStmt
+	| aWrite:
+	    @WriteStmt
+	| aSeek:
+	    @SeekStmt
+	| aTell:
+	    @TellStmt
+	| aOpen:
+	    @OpenStmt
+	| aClose:
+	    @CloseStmt
+	| aQuit:
+	    @QuitStmt
+	| aFork:
+	    @ForkStmt
+	| aAsm:
+	    @AssembleStmt
+	| aUnchecked:
+	    .aUnchecked
+	| aChecked:
+	    .aChecked
+	| aBits:
+	    @BitsStmt
+	| aTypeCheat:
+	    @TypeCheatStmt
+	| aSignal:
+	    @SignalStmt
+	| aWait:
+	    @WaitStmt
+	| aPause:
+	    @PauseStmt
+	| *:
+	    >> no	% this was not a true stmt
+    ]
+    >> yes
+    ;
+
+AssertStmt:
+    .aAssert
+    oContextSet(cAssert)
+    @Expn
+    oTypePop
+    oContextClear(cAssert);
+
+
+
+ResultStmt:
+    .aResult
+    oTypePushSymbolType
+    [ oTypeChooseKind
+	| tFunction, tNotFound:
+	    @Expn
+	| *:
+	    #eReturnValueInNonFunction
+	    @Expn
+    ]
+    oTypePop
+    oTypePop;
+
+CollectionReference:
+    @VariableReference
+    oTypePop
+    [ oSymbolChooseKind
+	| sReadOnlyCollection:
+	    #eReadOnlyCollectionNewOrFree
+	| sCollection, sUndefined:
+	| *:
+	    #eNonCollectionNewOrFree
+    ]
+    oSymbolPop;
+
+
+NewOrFreeStmt:
+    @CollectionReference
+    @VariableReference
+    oTypePop
+    [ oSymbolPopAndChooseKind
+	| sReadOnlyVariable, sConstant:
+	    #eReadOnlyOrConstantNewOrFree
+	| sVariable, sUndefined:
+	    % already handled
+	| *:
+	    #eNonVariableNewOrFree
+    ];
+
+TagStmt:
+    .aTag
+    @VariableReference
+    oTypePop
+    [ oSymbolPopAndChooseKind
+	| sReadOnlyVariable:
+	    #eReadOnlyTag
+	| sVariable, sUndefined, sNotFound:
+	| *:
+	    #eNonTagInTagStmt
+    ]
+    @Expn
+    oTypePop;
+
+OpenStmt:
+    .aOpen
+    @CheckFunctionIO
+    @VariableReference
+    oTypePop
+    [ oSymbolPopAndChooseKind
+	| sReadOnlyVariable, sConstant:
+	    #eReadOnlyOpenVariable
+	| sVariable, sNotFound, sUndefined:
+	| *:
+	    #eOpenNotVariable
+    ]
+    @Expn
+    oTypePop
+    [ *
+	| aGet, aPut, aRead, aWrite, aSeek, aMod:
+	    {[
+		| aGet:
+		    .aGet
+		| aPut:
+		    .aPut
+		| aRead:
+		    .aRead
+		| aWrite:
+		    .aWrite
+		| aSeek:
+		    .aSeek
+		| aMod:
+		    .aMod
+		| *:
+		    >
+	    ]}
+	| *:
+	    @Expn
+	    oTypePop
+    ]
+    aEndOpen
+    .aEndOpen;
+
+
+CloseStmt:
+    .aClose
+    @CheckFunctionIO
+    @Expn
+    oTypePop;
+
+ReadStmt:
+    .aRead
+    @CheckFunctionIO
+    @Expn
+    oTypePop
+    [
+	| aReadWriteStatus:
+	    .aReadWriteStatus
+	    @VariableReference
+	    oTypePop
+	    [ oSymbolPopAndChooseKind
+		| sReadOnlyVariable, sConstant:
+		    #eReadOnlyIOStatusVariable
+		| sVariable, sNotFound, sUndefined:
+		| *:
+		    #eIOStatusNotVariable
+	    ]
+	| *:
+    ]
+    {[
+	| aEndRead:
+	    .aEndRead
+	    >
+	| *:
+	    @ReadItem
+    ]}
+    ;
+
+
+WriteStmt:
+    .aWrite
+    @CheckFunctionIO
+    @Expn
+    oTypePop
+    [
+	| aReadWriteStatus:
+	    .aReadWriteStatus
+	    @VariableReference
+	    oTypePop
+	    [ oSymbolPopAndChooseKind
+		| sReadOnlyVariable, sConstant:
+		    #eReadOnlyIOStatusVariable
+		| sVariable, sNotFound, sUndefined:
+		| *:
+		    #eIOStatusNotVariable
+	    ]
+	| *:
+    ]
+    {[
+	| aEndWrite:
+	    .aEndWrite
+	    >
+	| *:
+	    @WriteItem
+    ]}
+    ;
+
+
+ReadItem:
+    @VariableReference
+    oTypePop
+    [ oSymbolPopAndChooseKind
+	| sReadOnlyVariable, sConstant:
+	    #eReadOnlyReadItem
+	| sVariable, sNotFound, sUndefined:
+	| *:
+	    #eReadWriteItemNotVariable
+    ]
+    [
+	| aReadWriteSize:
+	    .aReadWriteSize
+	    @Expn
+	    oTypePop
+	    [
+		| aReadWriteSizeResult:
+		    .aReadWriteSizeResult
+		    @VariableReference
+		    oTypePop
+		    [ oSymbolPopAndChooseKind
+			| sReadOnlyVariable, sConstant:
+			    #eReadOnlyReadWriteSizeResult
+			| sVariable, sNotFound, sUndefined:
+			| *:
+			    #eReadWriteSizeResultNotVariable
+		    ]
+		| *:
+	    ]
+	| *:
+    ];
+
+
+WriteItem:
+    @VariableOrTypeCheat
+    [ oSymbolPopAndChooseKind
+	| sVariable, sReadOnlyVariable, sConstant, sNotFound, sUndefined:
+	| *:
+	    #eReadWriteItemNotVariable
+    ]
+    oTypePop
+    [
+	| aReadWriteSize:
+	    .aReadWriteSize
+	    @Expn
+	    oTypePop
+	    [
+		| aReadWriteSizeResult:
+		    .aReadWriteSizeResult
+		    @VariableReference
+		    oTypePop
+		    [ oSymbolPopAndChooseKind
+			| sReadOnlyVariable, sConstant:
+			    #eReadOnlyReadWriteSizeResult
+			| sVariable, sNotFound, sUndefined:
+			| *:
+			    #eReadWriteSizeResultNotVariable
+		    ]
+		| *:
+	    ]
+	| *:
+    ];
+
+SeekStmt:
+    .aSeek
+    @CheckFunctionIO
+    @Expn
+    oTypePop
+    [
+	| aStar:
+	    .aStar
+	| *:
+	    @Expn
+	    oTypePop
+    ];
+
+
+TellStmt:
+    .aTell
+    @CheckFunctionIO
+    @Expn
+    oTypePop
+
+    @VariableReference
+    oTypePop
+    [ oSymbolPopAndChooseKind
+	| sConstant, sReadOnlyVariable:
+	    #eReadOnlyTellResultVariable
+	| sVariable, sNotFound, sUndefined:
+	| *:
+	    #eTellResultNotVariable
+    ];
+
+
+CheckFunctionIO:
+    [ oContextChoose(cFunction)
+	| yes:
+	    %% No longer considered an error - JRC 16.2.03
+	    %% #eIOIllegalInFunction
+	| *:
+	    oContextSet(cProcedureImports)
+    ];
+
+QuitStmt:
+    .aQuit
+    [
+	| aGreater:
+	    .aGreater
+	| aLess:
+	    .aLess
+	| *:
+    ]
+    [
+	| aQuitReason:
+	    .aQuitReason
+	    @Expn
+	    oTypePop
+	| *:
+    ];
+
+ForkStmt:
+    .aFork
+    [
+	| aIdent:
+	    @Variable
+	| aPredefinedId:
+	    #ePredefinedMisused
+	    @PredefinedVariable
+    ]
+    [ oSymbolPopAndChooseKind
+	| sProcess:
+	    @CheckForNoParameters
+	| sProcessCall, sUndefined:
+	| *:
+	    #eForkOfNonProcess
+    ]
+    oTypePop
+    [
+	| aForkStatus:
+	    .aForkStatus
+	    @VariableReference
+	    oTypePop
+	    [ oSymbolPopAndChooseKind
+		| sReadOnlyVariable, sConstant:
+		    #eReadOnlyForkStatusOrAddress
+		| sVariable, sNotFound, sUndefined:
+		| *:
+		    #eForkStatusOrAddressNotVariable
+	    ]
+	    [
+		| aForkStackSize:
+		    .aForkStackSize
+		    @Expn
+		    oTypePop
+		    [
+			| aForkAddress:
+			    .aForkAddress
+			    @VariableReference
+			    oTypePop
+			    [ oSymbolPopAndChooseKind
+				| sReadOnlyVariable, sConstant:
+				    #eReadOnlyForkStatusOrAddress
+				| sVariable, sNotFound, sUndefined:
+				| *:
+				    #eForkStatusOrAddressNotVariable
+			    ]
+			| *:
+		    ]
+		| *:
+	    ]
+	| *:
+    ];
+
+AssembleStmt:
+    .aAsm
+    @Expn
+    oTypePop
+    [
+	| aLabel:
+	    .aLabel
+	    @Expn
+	    oTypePop
+	| *:
+    ]
+    aBeginAsm
+    .aBeginAsm
+    {[
+	| aEndAsm:
+	    .aEndAsm
+	    >
+	| *:
+	    @Expn
+	    oTypePop
+    ]}
+    ;
+
+SignalStmt:
+    .aSignal
+    @ConditionReference;
+
+
+WaitStmt:
+    .aWait
+    @ConditionReference
+    [
+	| aWaitPriorityOrTimeout:
+	    .aWaitPriorityOrTimeout
+	    @Expn
+	    oTypePop
+	| *:
+    ];
+
+
+ConditionReference:
+    @VariableReference
+    [ oTypePopAndChooseKind
+	| tCondition:
+	    [ oSymbolChooseKind
+		| sReadOnlyVariable:
+		    #eSignalWaitReadOnlyCondition
+		| *:
+	    ]
+	| tError, tNotFound:
+	| *:
+	    #eSignalWaitNotCondition
+    ]
+    oSymbolPop;
+
+
+PauseStmt:
+    .aPause
+    @Expn
+    oTypePop;
+
+BitsStmt:
+    % We have just seen a 'bits'.  This must be an assignment statement
+    .aBits
+    @VariableReference
+    oTypePop
+    @BitsType
+    oTypeReplaceBuiltin(tScalar)
+    @AssignOrCallStmt;
+
+TypeCheatVariable:
+    % We have just seen a 'typecheat'.  This must be a reference to a variable
+    % pre:
+    % post: symbol on symbolStack, cheat type on TypeStack
+    .aTypeCheat
+    @TypeSpec
+    [
+	| aIdent:
+	    @Variable
+	    aEndExpression
+	    .aEndExpression
+	| aPredefinedId:
+	    #ePredefinedMisused
+	    @PredefinedVariable
+	    aEndExpression
+	    .aEndExpression
+	| aTypeCheat:
+	    @TypeCheatVariable
+	    @Reference
+	    aEndExpression
+	    .aEndExpression
+	| aAt:
+	    .aAt
+	    @Expn
+	    oSymbolPushDummy
+	    oSymbolEnterKind(sVariable)
+	    oTypeReplaceBuiltin(tScalar)
+	    oSymbolEnterType
+    ]
+    oTypePop;	% discard the symbol type
+
+
+TypeCheatStmt:
+    % We have just seen a 'type'.  This must be an assignment statement or
+    % a procedure call
+    @TypeCheatVariable
+    [ oSymbolChooseKind
+	| sReadOnlyVariable:
+	    @ReplaceSymbolWithAppropriateDummySymbol
+	    @ChangeKindToReadOnly
+	| sModule, sReadOnlyModule, sMonitor, sReadOnlyMonitor, sType,
+	  sCollection, sReadOnlyCollection, sEnumeratedElement:
+	    #eIllegalTypeCheat
+	| *:
+	    @ReplaceSymbolWithAppropriateDummySymbol
+    ]
+    @Reference
+    @AssignOrCallStmt;
+
+
+ReplaceSymbolWithAppropriateDummySymbol:
+    % we have just type converted a variable.  Change it to the appropriate
+    % type, so that it may be assigned, called, etc.
+    oSymbolPushDummyCopy
+    oSymbolSwapSymbols
+    oSymbolPop
+    oSymbolEnterType;
+
+AssignOrCallStmt:
+    [ *
+	| aAssign, aPlusEqual, aMinusEqual, aStarEqual, aXorEqual,
+	  aRealDivEqual, aDivEqual, aModEqual, aShiftLeftEqual,
+	  aShiftRightEqual, aExponentiateEqual, aAndEqual, aOrEqual:
+	    [
+		| aAssign:
+		    .aAssign
+		| aPlusEqual:
+		    .aPlusEqual
+		| aMinusEqual:
+		    .aMinusEqual
+		| aStarEqual:
+		    .aStarEqual
+		| aXorEqual:
+		    .aXorEqual
+		| aRealDivEqual:
+		    .aRealDivEqual
+		| aDivEqual:
+		    .aDivEqual
+		| aModEqual:
+		    .aModEqual
+		| aShiftLeftEqual:
+		    .aShiftLeftEqual
+		| aShiftRightEqual:
+		    .aShiftRightEqual
+		| aExponentiateEqual:
+		    .aExponentiateEqual
+		| aAndEqual:
+		    .aAndEqual
+		| aOrEqual:
+		    .aOrEqual
+	    ]
+	    @AssignmentStmt
+	| *:
+	    % Was a procedure call
+	    [ oSymbolChooseKind
+		| sProcedureCall, sUndefined:
+		| sProcedure:
+		    @CheckForNoParameters
+		| *:
+		    [ oTypeChooseKind
+			| tProcedure:
+			    @CheckForNoParameters
+			| *:
+			    #eCallToNonProcedure
+		    ]
+	    ]
+    ]
+    oTypePop
+    oSymbolPop;
+
+
+CheckForNoParameters:
+    % call to procedure type.  No parameters were
+    % noticed, therefore check the formals to see
+    % that there are no arguments.
+    oScopePushTypeFormals
+    oCountPushScopeNumberOfEntries
+    oScopePop
+    [ oCountChooseZero
+	| yes:
+	| *:
+	    #eTooFewActuals
+    ]
+    oCountPop;
+
+AssignmentStmt:
+    @Expn
+    oTypePop
+    [ oSymbolChooseKind
+	| sReadOnlyVariable:
+	    #eAssignmentToReadOnly
+	| sVariable:
+	    @MarkAutoImportVar
+	| sTag:
+	    #eAssignmentToTag
+	| sUndefined, sNotFound:
+	| *:
+	    #eIllegalAssignment
+    ];
+
+IfStmt:
+    .aIf
+    @Expn
+    oTypePop
+    oEmitLine
+    oScopePush
+    @DclsAndStmts
+    @EndDclsScope
+    {[
+	| aElsif:
+	    .aElsif
+	    @Expn
+	    oTypePop
+	    oEmitLine
+	    oScopePush
+	    @DclsAndStmts
+	    @EndDclsScope
+	| aElse:
+	    .aElse
+	    oEmitLine
+	    oScopePush
+	    @DclsAndStmts
+	    @EndDclsScope
+	    oEmitLine
+	    >
+	| *:
+	    >
+    ]}
+    aEndIf
+    .aEndIf;
+
+LoopStmt:
+    .aLoop
+    oLoopPush
+    oEmitLine
+    oScopePush
+    @OptInvariant
+    @DclsAndStmts
+    @EndDclsScope
+    oLoopPop
+    oEmitLine
+    aEndLoop
+    .aEndLoop;
+
+CaseStmt:
+    .aCase
+    @Expn
+    oTypePop
+    oEmitLine
+    @CaseBody
+    {[
+	| aEndCase:
+	    >
+	| *:
+	    [
+		| aOtherwise:
+		    .aOtherwise
+		    oEmitLine
+		    oScopePush
+		    @DclsAndStmts
+		    @EndDclsScope
+		    oEmitLine
+		| *:
+		    @CaseBody
+	    ]
+    ]}
+    .aEndCase;
+
+
+CaseBody:
+    {
+	@Expn
+	oTypePop
+	[
+	    | aEndExpressionList:
+		>
+	    | *:
+	]
+    }
+    oEmitLine
+    aCaseBody
+    .aCaseBody
+    oScopePush
+    @DclsAndStmts
+    @EndDclsScope
+    aEndCaseBody
+    .aEndCaseBody;
+
+ForStmt:
+    .aFor
+    oLoopPush
+    [
+	| aDecreasing:	.aDecreasing
+	| *:
+    ]
+    oScopePush		% for index declaration scope
+    [
+	| aIdent, aPredefinedId:
+	    @VerifyAndPushNewSymbol
+	| *:
+	    oSymbolMakeUpNameAndPushNew
+    ]
+    .aIdent	oEmitSymbol
+    oSymbolEnterKind(sConstant)
+    aForRange
+    .aForRange
+    [
+	| aSubrange:
+	    @SubrangeType
+	    oTypePop
+	| aIdent:
+	    % This is a named type.
+	    @NamedType
+	    oTypePop
+	    % Check for a non-module.ident error
+	    [
+		| aField:
+		    [
+			| aIdent:
+			| aPredefinedId:
+		    ]
+		| *:
+	    ]
+    ]
+    oTypePushBuiltin(tScalar)	% actually int or card.
+    oSymbolEnterType
+    oScopeEnterSymbol	% for index declaration scope
+    oSymbolPop
+    oTypePop
+    oEmitLine
+    oScopePush		% local declarations scope
+    @OptInvariant
+    @DclsAndStmts
+    @EndDclsScope
+    oScopePop		% for index declaration scope
+    oLoopPop
+    aEndFor
+    .aEndFor;
+
+StreamNumber:
+    .aStreamNumber
+    @Expn
+    oTypePop;
+
+
+PutItem:
+    @Expn
+    oTypePop
+    [
+	| aColon:
+	    .aColon
+	    @Expn
+	    oTypePop
+	    [
+		| aColon:
+		    .aColon
+		    @Expn
+		    oTypePop
+		    [
+			| aColon:
+			    .aColon
+			    @Expn
+			    oTypePop
+			| *:
+		    ]
+		| *:
+	    ]
+	| *:
+    ];
+
+PutStmt:
+    @CheckFunctionIO
+    .aPut
+    [
+	| aStreamNumber:
+	    @StreamNumber
+	| *:
+    ]
+    {[
+	| aEndPut:
+	    .aEndPut
+	    >
+	| aPutContinue:
+	    .aPutContinue
+	    aEndPut
+	    .aEndPut
+	    >
+	| aSkip:
+	    .aSkip
+	| *:
+	    @PutItem
+    ]}
+    ;
+
+GetItem:
+    @VariableReference
+    oTypePop
+    [ oSymbolPopAndChooseKind
+	| sReadOnlyVariable:
+	    #eIllegalPutGetOperandType
+	| sVariable, sUndefined, sNotFound:
+	| *:
+	    #eIllegalPutGetOperandType
+    ]
+    [
+	| aColon:
+	    .aColon
+	    [
+		| aStar:
+		    .aStar
+		| *:
+		    @Expn
+		    oTypePop
+	    ]
+	| *:
+    ];
+
+
+GetStmt:
+    @CheckFunctionIO
+    .aGet
+    [
+	| aStreamNumber:
+	    @StreamNumber
+	| *:
+    ]
+    {[
+	| aEndGet:
+	    .aEndGet
+	    >
+	| aSkip:
+	    .aSkip
+	| *:
+	    @GetItem
+    ]}
+    ;
+
+VariableReference:
+    [
+	| aIdent:
+	    @Variable
+	| aPredefinedId:
+	    @PredefinedVariable
+	| aTypeCheat:
+	    @TypeCheatVariable
+	    @Reference
+    ]
+    @MarkAutoImportVar	%rule only called for var references to variables!!!
+    ;
+
+PredefinedVariable:
+    .aPredefinedId
+    oEmitPredefined
+    oSymbolPushDummy
+    [ oPredefinedChooseFunction
+	| yes:
+	    oSymbolEnterKind(sFunction)
+	| *:
+	    oSymbolEnterKind(sProcedure)
+	    [ oContextChoose(cFunction)
+		| yes:
+		| *:
+		    oContextSet(cProcedureImports)
+	    ]
+    ]
+    oContextPush (cPredefinedReturnsString)
+    [ oPredefinedChooseStringResult
+	| yes:
+	    oContextSet(cPredefinedReturnsString)
+	| *:
+	    oContextClear(cPredefinedReturnsString)
+    ]
+    oTypePushBuiltin(tScalar)
+    oSymbolEnterType
+    oSymbolEnterAttribute(saPredefined)
+    oContextSet(cProcessingPredefined)
+    @Reference
+    oTypePop
+    [ oContextChoose(cPredefinedReturnsString)
+	| yes:
+	    oTypePushBuiltin(tString)
+	| *:
+	    oTypePushBuiltin(tScalar)
+    ]
+    oContextPop(cPredefinedReturnsString)
+    oSymbolEnterType
+    oContextClear(cProcessingPredefined);
+
+Variable:
+    @VerifyAndPushSymbol
+    [ oSymbolChooseKind
+	| sUndefined:
+	    oTypePushBuiltin(tError)
+	| *:
+	    oTypePushSymbolType
+    ]
+    @SurroundingModule
+    @MainVariable
+    @Reference;
+
+
+VariableOrTypeCheat:
+    [
+	| aIdent:
+	    @Variable
+	| aPredefinedId:
+	    #ePredefinedMisused
+	    @PredefinedVariable
+	| aTypeCheat:
+	    @TypeCheatVariable
+	    @Reference
+    ];
+
+MainVariable:
+    [ oSymbolChooseAttribute(saMonitorEntry)
+	| yes:
+	    #eMonitorEntryInvokedWithinMonitor
+	    oSymbolClearAttribute(saMonitorEntry)
+	| *:
+    ]
+    [ oSymbolChooseKind
+	| sVariable, sConstant:
+	    .aIdent	oEmitSymbol
+	    >>				% for efficiency only
+	| sType:
+	    >>
+	| sFunction:
+	    .aIdent	oEmitSymbol
+	    oScopePushTypeFormals
+	    oCountPushScopeNumberOfEntries
+	    [ oCountChooseZero
+		| yes:		% parameter-less function
+		    oSymbolChangeKind(sFunctionCall)
+		    oTypeReplaceResultType
+		    .aCall
+		| *:
+	    ]
+	    oCountPop
+	    oScopePop
+	    >>
+	| sResult:
+	    [ oContextChoose(cPost)
+		| yes:
+		| *:
+		    #eResultOnlyUsedInPost
+	    ]
+	    .aIdent	oEmitSymbol
+	| sProcedure:
+	    .aIdent	oEmitSymbol
+	    [ oSymbolChooseAttribute(saInterruptProcedure)
+		| yes:
+		    #eReferenceToInterruptProcedure
+		| *:
+	    ]
+	| sInit:
+	    [ oContextChoose(cPost)
+		| yes:
+		| *:
+		    [ oContextChoose(cAssert)
+			| yes:
+			| *:
+			    #eInitOnlyInPostAssertOrInvariant
+		    ]
+	    ]
+	    .aIdent	oEmitSymbol
+	| *:
+	    .aIdent	oEmitSymbol
+    ];
+
+Reference:
+	% doesn't change stacks
+    {[
+	| aSubs:
+	    oActualsPush
+	    @SubscriptOrActuals
+	    oActualsPop
+	    [ oActualsChooseInActual
+		| yes:
+		    oActualsEnterSymbol
+		    oActualsSetAttribute(aaSubscript)
+		| *:
+	    ]
+	| aField:
+	    @Field
+	    [ oActualsChooseInActual
+		| yes:
+		    oActualsEnterSymbol
+		| *:
+	    ]
+	| aHash:
+	    .aHash
+	    oTypeReplaceBuiltin(tScalar)
+	| *:
+	    [ oSymbolChooseKind
+		| sReadOnlyVariable, sVariable, sConstant:
+		    >>
+		| sProcedure, sFunction:
+		    @ImportsVisible
+		    @CheckDangerousCallFromDeviceMonitor
+		| *:
+	    ]
+	    >>
+    ]}
+    ;
+
+Field:
+    [
+	| aIdent:
+	| aPredefinedId:
+    ]
+    [ oSymbolChooseKind
+	| sVariable, sReadOnlyVariable, sConstant, sFunctionCall:
+	    .aField
+	    [ oTypeChooseKind
+		| tRecord:
+		    oScopePushTypeFields
+		    oSymbolPushLocalScope
+		    oScopePop
+		    .aIdent	oEmitSymbol
+		    [ oSymbolChooseKind
+			| sNotFound:
+			    #eUndeclaredRecordField
+			    oSymbolSwapSymbols
+			    oSymbolPop
+			| *:
+			    oSymbolSwapSymbols
+			    [ oSymbolPopAndChooseKind
+				| sReadOnlyVariable, sConstant, sFunctionCall:
+				    @ChangeKindToReadOnly
+				| *:
+			    ]
+		    ]
+		    oTypePop
+		    oTypePushSymbolType
+		| tUnion:
+		    oScopePushTypeFields
+		    oSymbolPushLocalScope
+		    oScopePop
+		    [ oSymbolChooseKind
+			| sNotFound:
+			    #eUndeclaredUnionField
+			    oSymbolSwapSymbols
+			    oSymbolPop
+			| sTag:
+			    oSymbolSwapSymbols
+			    oSymbolPop
+			| *:
+			    oSymbolSwapSymbols
+			    [ oSymbolPopAndChooseKind
+				| sReadOnlyVariable, sConstant, sFunctionCall:
+				    @ChangeKindToReadOnly
+				| *:
+			    ]
+		    ]
+		    .aIdent	oEmitSymbol
+		    oTypePop
+		    oTypePushSymbolType
+		| tNotFound, tError:
+		| *:
+		    #eNonRecordField
+	    ]
+	| sType:
+	    [ oTypeChooseKind
+		| tEnumeratedRange:
+		    oScopePushTypeFields
+		    oSymbolPushLocalScope
+		    oScopePop
+		    [ oSymbolChooseKind
+			| sEnumeratedElement, sUndefined:
+			| *:
+			    #eSymbolNotInEnumeratedRange
+		    ]
+		    .aIdent oEmitSymbol
+		    oSymbolSwapSymbols
+		    oSymbolPop
+		    oTypePop
+		    oTypePushSymbolType
+		| tNotFound, tError:
+		| *:
+		    #eNonRecordField
+	    ]
+	| sUndefined:
+	| *:
+	    #eNonRecordField
+    ];
+
+SubscriptOrActuals:
+    [ oSymbolChooseKind
+	| sVariable, SReadOnlyVariable, sConstant, sFunctionCall:
+	    [ oTypeChooseKind
+		| tArray:
+		    @Subscript
+		    oTypeReplaceComponentType
+		| tString:
+		    @SubString
+		    oTypeReplaceBuiltIn(tString)
+		    oSymbolChangeKind(sFunctionCall)	% disallow use as LHS
+							% of assignment
+		| tChar:
+		    @SubString
+		    oTypeReplaceBuiltIn(tChar)
+		| tProcedure:
+		    oContextClear(cPrintedErrorMsg)
+		    @CheckDangerousCallFromDeviceMonitor
+		    @ActualParameters
+		    oSymbolChangeKind(sProcedureCall)
+		| tFunction:
+		    oContextClear(cPrintedErrorMsg)
+		    @CheckDangerousCallFromDeviceMonitor
+		    @ActualParameters
+		    oTypeReplaceResultType
+		    oSymbolChangeKind(sFunctionCall)
+		| tError, tNotFound:
+		    @FlushSubscripts
+		    oTypeReplaceBuiltIn(tScalar)
+		| *:
+		    @IllegalSubscripts
+		    oTypeReplaceBuiltIn(tScalar)
+	    ]
+	    >>
+	| sProcedure:
+	    @ImportsVisible
+	    @CheckDangerousCallFromDeviceMonitor
+	    @ActualParameters
+	    oSymbolChangeKind(sProcedureCall)
+	    >>
+	| sProcess:
+	    @ImportsVisible
+	    @ActualParameters
+	    oSymbolChangeKind(sProcessCall)
+	    >>
+	| sFunction:
+	    @ImportsVisible
+	    @CheckDangerousCallFromDeviceMonitor
+	    @ActualParameters
+	    oTypeReplaceResultType
+	    oSymbolChangeKind(sFunctionCall)
+	    >>
+	| sType:
+	    .aIdent	oEmitSymbol		%Subscripted types emit ID
+	    [ oTypeChooseKind
+		| tSet:
+		    @SetElementList
+		    oSymbolChangeKind(sConstant)
+		| tNotFound, tError:
+		    @FlushSubscripts
+		    oTypeReplaceBuiltIn(tScalar)
+		| *:
+		    @IllegalSubscripts
+		    oTypeReplaceBuiltIn(tScalar)
+	    ]
+	    >>
+	| sCollection, sReadOnlyCollection:
+	    @CollectionSubscript
+	    oTypeReplaceComponentType
+	    [ oTypeChooseAttribute(taForward)
+		| yes:
+		    #eUnresolvedForwardInCollection
+		    oTypeEnterKind(tError)
+		    oTypeClearAttribute(taForward)
+		| *:
+	    ]
+	    [oSymbolChooseKind
+		| sCollection:
+		    oSymbolChangeKind(sVariable)
+		| sReadOnlyCollection:
+		    oSymbolChangeKind(sReadOnlyVariable)
+		| *:
+	    ]
+	    >>
+	| sUndefined:
+	    @FlushSubscripts
+	| *:
+	    @IllegalSubscripts
+    ];
+
+CheckDangerousCallFromDeviceMonitor:
+    [ oContextChoose(cDeviceMonitor)
+	| yes:
+	    [ oSymbolChooseAttribute(saDangerousToCallFromDeviceMonitor)
+		| yes:
+		    [ oContextChoose(cPrintedErrorMsg)
+			| no:
+			    #eDeviceMonitorCallsDangerousRoutine
+			    oContextSet(cPrintedErrorMsg)
+			| *:
+		    ]
+		| *:
+	    ]
+	| *:
+    ];
+
+Subscript:
+    .aSubs
+    {[
+	| aEndExpressionList:
+	    >
+	| *:
+	    @Expn
+	    oTypePop
+    ]}
+    aEndSubs
+    .aEndSubs;
+
+SubString:
+    .aSubstring
+    [
+	| aStar:
+	    .aStar
+	    [
+		| aMinus:
+		    .aMinus
+		    @Expn
+		    oTypePop
+		| *:
+	    ]
+	| *:
+	    @Expn
+	    oTypePop
+    ]
+    [
+	| aSubstring:
+	    .aSubstring
+	    aEndExpressionList
+	    .aEndExpressionList
+	    aEndSubs
+	    .aEndSubs
+	| aEndExpressionList:
+	    .aEndExpressionList
+	    aEndSubs
+	    .aEndSubs
+	| *:
+	    [
+		| aStar:
+		    .aStar
+		    [
+			| aMinus:
+			    .aMinus
+			    @Expn
+			    oTypePop
+			| *:
+		    ]
+		| *:
+		    @Expn
+		    oTypePop
+	    ]
+	    [
+		| aSubString:
+		    .aSubString
+		    aEndExpressionList
+		    .aEndExpressionList
+		    aEndSubs
+		    .aEndSubs
+		| *:
+		    @IllegalSubscripts
+	    ]
+    ];
+
+CollectionSubscript:
+    % Handle a collection pointer subscript.
+    % Assumes that the top entry in the Symbol Stack is
+    % the collection.
+
+    .aCollection
+    .aSubs
+    @Expn
+    oTypePop
+    @ExtraneousSubscripts
+    .aEndSubs;
+
+SetElementList:
+    .aSet
+    .aSubs
+    [
+	| aAll:
+	    aEndExpressionList
+	    .aAll
+	    aEndSubs
+	| *:
+	    @SetElements
+    ]
+    .aEndSubs;
+
+
+
+SetElements:
+    {[
+	| aEndExpressionList:
+	    >
+	| *:
+	    @Expn
+	    oTypePop
+    ]}
+    aEndSubs;
+
+ActualParameters:
+    % symstk: ...,subprogram	- no change on exit
+    % typstk: ...,subprogram	- no change on exit
+    .aCall .aSubs
+    oContextClear(cAliasChecked)
+    oCountPushZero
+    {[
+	| aEndExpressionList:
+	    aEndSubs
+	    >
+	| aAll:
+	    % This handles function(all)
+	    #eIllegalUseOfAll
+	| *:
+	    oCountIncrement
+	    oScopePushTypeFormals
+	    oSymbolPushCountScope		% symstk: ...,proc,formal
+	    oScopePop
+		% typstk: ...,proc
+	    [ oSymbolChooseKind
+		| sVariable:
+		    @VarReferenceActual
+		| sConstant:
+		    [ oSymbolChooseAttribute(saTypeCheat)
+			| yes:
+			    % parameter type cheats must be by reference
+			    % they may be string or set or charstring expns
+			    @ConstReferenceExpnActual
+			| *:
+			    oTypePushSymbolType
+			    [ oTypePopAndChooseKind
+				| tArray, tRecord, tUnion:
+				    @ConstReferenceActual
+				| tString, tChar, tSet:
+				    @ConstReferenceExpnActual
+				| tProcedure, tFunction:
+				    @ParametricActual
+				| tVaryingParameter:
+				    % account for count increment below
+				    oCountDecrement
+				    @ValueActual
+				| *:
+				    @ValueActual
+			    ]
+		    ]
+		| sProcedure, sFunction:
+		    @ParametricActual
+		| sNotFound:	% there are no more formals
+		    oSymbolPop		% symstk: ...,proc
+		    [ oSymbolChooseAttribute(saPredefined)
+			| no:
+			    #eTooManyActuals
+			| *:
+		    ]
+		    @FlushSubscripts
+		    >
+	    ]
+	    oSymbolPop			% symstk: ...,proc
+    ]}
+    .aEndSubs
+    oCountIncrement
+    oScopePushTypeFormals
+    oSymbolPushCountScope		% symstk: ...,proc,formal
+    oScopePop
+    [ oSymbolChooseKind			% symstk: ...,proc
+	| sNotFound:	% no more formals
+	| *:
+	    oTypePushSymbolType
+	    [ oTypePopAndChooseKind
+		| tVaryingParameter:
+		| *:
+		    #eTooFewActuals
+	    ]
+    ]
+    oSymbolPop
+    oCountPop
+    [ oSymbolChooseKind
+	| sProcedure:
+	    [ oContextChoose(cAliasChecked)
+		| yes:
+		    %% Alias checking disabled - JRC 16.2.03
+		    %% .aAliasCheck
+		    %% oEmitAliasCheck
+		    %% .aEndAliasCheck
+		| *:
+		    oActualsFlush
+	    ]
+	| *:
+	    oActualsFlush
+    ];
+
+VarReferenceActual:
+	% symstk: ...,proc,formal	- no change
+	% typstk: ...,proc		- no change
+    [
+	| aIdent:
+	    @ReferenceActualVariable		% symstk: ...,proc,formal,actual
+	    @MarkAutoImportVar
+	    [
+		| aEndExpression:
+		    [ oSymbolChooseKind
+			| sVariable, sUndefined:
+			| sReadOnlyVariable:
+			    #eReadOnlyPassedToVarFormal
+			| sConstant:
+			    #eConstantPassedToVarFormal
+			| *:
+			    #eNonVariablePassedToVarFormal
+		    ]
+		    oSymbolPop			% symstk: ...,proc,formal
+		    .aEndExpression
+		| *:
+		    oSymbolPop			% symstk: ...,proc,formal
+		    oTypePushBuiltin(tNotFound)	% we will pop the type below
+		    @IllegalReferenceActual
+	    ]
+	| aTypeCheat:
+	    .aTypeCheat
+	    @TypeSpec
+	    [
+		| aAt:
+		    .aAt
+		    @Expn
+		    oTypePop
+		| *:
+		    @VarReferenceActual
+		    [
+			| aTypeCheatSize:
+			    #eNonVariablePassedToVarFormal
+			    .aTypeCheatSize
+			    @Expn
+			    oTypePop
+			| *:
+		    ]
+	    ]
+	    @Reference		% finish off the typecheat reference
+	    [
+		| aEndExpression:
+		    oTypePop
+		    .aEndExpression
+		| *:
+		    @IllegalReferenceActual
+	    ]
+	| *:
+	    @IllegalReferenceActual
+    ];
+
+ConstReferenceActual:
+	% symstk: ...,proc,formal	- no change
+	% typstk: ...,proc		- no change
+    [
+	| aIdent:
+	    @ReferenceActualVariable		% symstk: ...,proc,formal,actual
+	    [
+		| aEndExpression:
+		    [ oSymbolPopAndChooseKind
+			| sVariable, sUndefined, sTag, sEnumeratedElement,
+			  sReadOnlyVariable, sFunctionCall, sConstant:
+			| *:
+			    #eNonVariablePassedToReferenceParameter
+		    ]
+		    .aEndExpression
+		| *:
+		    oSymbolPop
+		    oTypePushBuiltin(tNotFound)	% we will pop the type below
+		    @IllegalReferenceActual
+	    ]					% symstk: ...,proc,formal
+	| aTypeCheat:
+	    .aTypeCheat
+	    @TypeSpec
+	    [
+		| aAt:
+		    .aAt
+		    @Expn
+		    oTypePop
+		| *:
+		    @ConstReferenceActual
+		    [
+			| aTypeCheatSize:
+			    #eNonVariablePassedToReferenceParameter
+			    .aTypeCheatSize
+			    @Expn
+			    oTypePop
+			| *:
+		    ]
+	    ]
+	    @Reference		% finish off the typecheat reference
+	    [
+		| aEndExpression:
+		    oTypePop
+		    .aEndExpression
+		| *:
+		    @IllegalReferenceActual
+	    ]
+	| *:
+	    @IllegalReferenceActual
+    ];
+
+ConstReferenceExpnActual:
+	% symstk: ...,proc,formal	- no change
+	% typstk: ...,proc		- no change
+    [
+	| aIdent:
+	    @VerifyAndPushSymbol	% symstk: ...,proc,formal,actual
+	    oTypePushSymbolType		% typstk: ...,proc,actual
+	    @SurroundingModule
+	    [ oSymbolChooseKind
+		| sVariable, sCollection, sReadOnlyVariable,
+		  sReadOnlyCollection, sConstant:
+		    .aIdent	oEmitSymbol
+		    oActualsBeginActual
+		    oSymbolSwapSymbols	% symstk: ...,proc,actual,formal
+		    [ oSymbolChooseKind
+			| sVariable:
+			    oActualsSetAttribute(aaVar)
+			| *:
+		    ]
+		    oSymbolSwapSymbols	% symstk: ...,proc,formal,actual
+		    oActualsEnterSymbol
+		    @Reference
+		    oActualsEndActual
+		    [
+			| aEndExpression:
+			    % now check for actual/import overlap
+			    oTypeSwapTypes	% typstk: ...actual,proc
+			    @CheckReferenceActualImportOverlap
+			    oTypeSwapTypes	% typstk: ...proc,actual
+			    [ oActualsChooseActualOverlaps
+				| yes:
+				    %% Alias checking disabled - JRC 16.2.03
+				    %% #eReferenceActualsOverlap
+				    oContextSet(cAliasChecked)
+				| maybe:
+				    oContextSet(cAliasChecked)
+				| *:
+			    ]
+			    oSymbolPop		% symstk: ...,proc,formal
+			    .aEndExpression
+			| *:
+			    oActualsRemoveActual
+			    oSymbolPop		% symstk: ...,proc,formal
+			    @Expn
+		    ]
+		| sType:	% may be set constructor
+		    oActualsEnterDummy
+		    [ oTypeChooseKind
+			| tSet:
+			    [ *
+				| aEndExpression:
+				    @MainVariable
+				    @Reference
+				    aEndExpression
+				    .aEndExpression
+				| aSubs:
+				    @MainVariable
+				    @Reference
+				    @Expn
+				| *:
+				    @MainVariable
+				    @Reference
+				    @Expn
+			    ]
+			| *:
+			    @MainVariable
+			    @Reference
+			    @Expn
+		    ]
+		    oSymbolPop			% symstk: ...,proc,formal
+		| *:
+		    oActualsEnterDummy
+		    @MainVariable
+		    @Reference
+		    oSymbolPop			% symstk: ...,proc,formal
+		    @Expn
+	    ]
+	    oTypePop				% typstk: ...,proc
+	| aTypeCheat:
+	    .aTypeCheat
+	    @TypeSpec
+	    [
+		| aAt:
+		    .aAt
+		    @Expn
+		    oTypePop
+		| *:
+		    @ConstReferenceExpnActual
+		    [
+			| aTypeCheatSize:
+			    oActualsRemoveActual	% this is now an expn
+			    .aTypeCheatSize
+			    @Expn
+			    oTypePop
+			| *:
+		    ]
+	    ]
+	    @Reference		% finish off the typecheat reference
+	    @Expn
+	    oTypePop
+	| *:
+	    @ValueActual
+    ];
+
+ParametricActual:
+	% symstk: ...,proc,formal	- no change
+	% typstk: ...,proc		- no change
+    oActualsEnterDummy
+    [
+	| aIdent:
+	    @VerifyAndPushSymbol	% symstk: ...,proc,formal,actual
+	    oTypePushSymbolType		% typstk: ...,proc,actual
+	    @SurroundingModule
+	    @MainVariable
+	    @Reference
+	| aPredefinedId:
+	    [ *
+		| aEndExpression:
+		    [ oPredefinedChoose
+			| pAbs, pMin, pMax, pEof, pOrd, pChr,
+			  pAddr, pSize, pEmpty, pStrdelete, pStrmove,
+			  pStrreplace, pSucc, pPred, pUpper, pLower, pNil:
+			    % get the error message right
+			    oSymbolPushDummy
+			    #eIllegalUseOfPredefined
+			    oSymbolPop
+			    aEndExpression
+			    >>
+			| * :
+		    ]
+		    @PredefinedVariable
+		    aEndExpression
+		    .aEndExpression
+		| *:
+		    #eNonExpressionSubprogram
+		    @PredefinedVariable	% pushes symbol, type
+		    @Expn
+		    oTypePop            % the actual
+		    oSymbolPop		% summy symbol
+		    >>
+	    ]
+	| aTypeCheat:
+	    .aTypeCheat
+	    @TypeSpec
+	    @ConstReferenceExpnActual
+	    [
+		| aTypeCheatSize:
+		    oActualsRemoveActual	% this is now an expn
+		    .aTypeCheatSize
+		    @Expn
+		    oTypePop
+		| *:
+	    ]
+	    @Reference
+	    oSymbolPushDummy
+	| *:
+	    #eNonExpressionSubprogram
+	    @Expn
+	    oTypePop            % the formal
+	    >>
+    ]
+    [
+	| aEndExpression:
+	    .aEndExpression
+	    @ParametricCleanup
+	| *:
+	    oTypePushBuiltin(tNotFound)	% we will pop the type below
+	    @IllegalReferenceActual
+    ]
+    oSymbolPop
+    oTypePop;
+
+ReferenceActualVariable:
+    @VerifyAndPushSymbol	% symstk: ...,formal,actual
+    oTypePushSymbolType		% typstk: ...,proc,actual
+    @SurroundingModule
+    @MainVariable
+    @CheckReferenceAliasing
+    oTypePop;			% typstk: ...,proc
+
+
+CheckReferenceAliasing:
+	% symstk: ...,formal,actual		- not changed
+	% typstk: ...,proc,actual		- not changed
+    [ oSymbolChooseKind
+	| sVariable, sReadOnlyVariable,
+	  sReadOnlyCollection, sCollection:
+	    oTypeSwapTypes			% typstk: ...,actual,proc
+	    @CheckReferenceActualImportOverlap
+	    oTypeSwapTypes			% typstk: ...,proc,actual
+	    oActualsBeginActual
+	    oSymbolSwapSymbols			% symstk: ...,actual,formal
+	    [ oSymbolChooseKind
+		| sVariable:
+		    oActualsSetAttribute(aaVar)
+		| *:
+	    ]
+	    oSymbolSwapSymbols			% symstk: ...,formal,actual
+	    oActualsEnterSymbol
+	    @Reference	% doesn't change stacks
+	    oActualsEndActual
+	    [ oActualsChooseActualOverlaps
+		| yes:
+		    %% Alias checking disabled - JRC 16.2.03
+		    %% #eReferenceActualsOverlap
+		    oContextSet(cAliasChecked)
+		| maybe:
+		    oContextSet(cAliasChecked)
+		| *:
+	    ]
+	| sFunction:
+	    % overlap irrelevant
+	    oActualsEnterDummy
+	    @Reference
+	    oSymbolChangeKind(sFunctionCall)
+	| *:
+	    % overlap irrelevant
+	    oActualsEnterDummy
+	    @Reference
+    ];
+
+IllegalReferenceActual:
+    #eExpressionPassedByReference
+    @Expn
+    oTypePop;
+
+
+ValueActual:
+    oActualsEnterDummy
+    @Expn
+    oTypePop;
+
+ParametricCleanup:
+    [ oTypeChooseAttribute(taRecursive)
+	| yes:
+	    [ oContextChoose(cAutoImport)
+		| yes:
+		    #eAutoImportPassesItself
+		| *:
+		    @RecursiveParametricImportsVisible
+		    @RecursiveCheckParametricAliasing
+	    ]
+	| *:
+	    @ParametricImportsVisible
+	    @CheckParametricAliasing
+    ];
+
+
+RecursiveCheckParametricAliasing:
+    oCountPushClosedScopeNumberOfEntries
+    {
+	[ oCountChooseZero
+	    | yes:
+		>
+	    | *:
+	]
+	oSymbolPushCountClosedScope
+	[ oSymbolChooseAttribute(saImported)
+	    | yes:	% import
+		oActualsBeginActual	% enter imports of parametric
+		oActualsEnterSymbol	% into actuals scope for alias checking
+		[ oSymbolChooseKind
+		    | sVariable, sCollection:	% imported 'var'
+			oActualsSetAttribute(aaVar)
+		    | *:
+		]
+		oActualsEndActual
+		[ oActualsChooseActualOverlaps
+		    | yes:
+			%% Alias checking disabled - JRC 16.2.03
+			%% #ePotentialAliasDueToParaImportActualOverlap
+		    | *:
+		]
+		oActualsFlush
+		@CheckParametricImportConflict
+	    | *:
+	]
+	oSymbolPop
+	oCountDecrement
+    }
+    oCountPop;
+
+CheckParametricAliasing:
+    oScopePushTypeImports
+    oCountPushScopeNumberOfEntries
+    {
+	[ oCountChooseZero
+	    | yes:
+		>
+	    | *:
+	]
+	oSymbolPushCountScope
+	oActualsBeginActual
+	oActualsEnterSymbol
+	[ oSymbolChooseKind
+	    | sVariable, sCollection:
+		oActualsSetAttribute(aaVar)
+	    | *:
+	]
+	oActualsEndActual
+	[ oActualsChooseActualOverlaps
+	    | yes:
+		%% Alias checking disabled - JRC 16.2.03
+		%% #ePotentialAliasDueToParaImportActualOverlap
+	    | *:
+	]
+	oActualsFlush
+	@CheckParametricImportConflict
+	oSymbolPop
+	oCountDecrement
+    }
+    oCountPop
+    oScopePop;
+
+Expn:
+    {[
+	| aEndExpression:
+	    >
+	| aIdent:
+	    @Variable
+	    [ oSymbolChooseKind
+		| sVariable, sReadOnlyVariable, sConstant, sEnumeratedElement,
+		  sTag, sResult, sInit, sProcedure, sFunction, sFunctionCall,
+		  sUndefined:
+		| sType:
+		    % special case for size(namedType)
+		    [ oContextChoose(cProcessingPredefined)
+			| no:
+			    #eNonExpressionVariable
+			    oTypeReplaceBuiltIn(tError)
+			| *:
+			    .aIdent oEmitSymbol
+		    ]
+		| sCollection, sReadOnlyCollection:
+		    % special case for nil(collection)
+		    [ oContextChoose(cProcessingPredefined)
+			| no:
+			    #eNonExpressionVariable
+			    oTypeReplaceBuiltIn(tError)
+			| *:
+		    ]
+		| *:
+		    #eNonExpressionVariable
+		    oTypeReplaceBuiltIn(tError)
+	    ]
+	    oSymbolPop
+	| aIntegerLit:
+	    .aIntegerLit	oEmitInteger
+	    oTypePushBuiltIn(tScalar)
+	| aRealLit:
+	    .aRealLit	oEmitReal
+	    oTypePushBuiltIn(tScalar)
+	| aCharLit:
+	    .aCharLit	oEmitChar
+	    oTypePushBuiltIn(tChar)
+	| aStringLit:
+	    .aStringLit	oEmitString
+	    oTypePushBuiltIn(tString)
+	| aPredefinedId:
+	    @PredefinedVariable
+	    oSymbolPop
+	| aTrue:
+	    .aTrue
+	    oTypePushBuiltIn(tScalar)
+	| aFalse:
+	    .aFalse
+	    oTypePushBuiltIn(tScalar)
+	| aAll:
+	    .aAll
+	    #eIllegalUseOfAll
+	    oTypePushBuiltIn(tScalar)
+	    >
+	| aSubstring:
+	    .aSubstring
+	    #eIllegalUseOfSubstring
+	    oTypePushBuiltIn(tScalar)
+	    >
+	| aStar:
+	    .aStar
+	    aSubstring
+	    .aSubstring
+	    #eIllegalUseOfSubstring
+	    oTypePushBuiltIn(tScalar)
+	    >
+	| *:
+	    [*
+		| aEndExpressionList:	% want expn, found end of list
+		    #eMissingValue
+		    oTypePushBuiltin(tError)	% fake expn type
+		    >
+		| *:
+		    @Operator
+	    ]
+    ]}
+    .aEndExpression;
+
+Operator:
+    [
+	| aPlus:
+	    .aPlus
+	    @ResolveType
+	| aMinus:
+	    .aMinus
+	    @ResolveType
+	| aAdd:
+	    .aAdd
+	    @ResolveTypes
+	| aSubtract:
+	    .aSubtract
+	    @ResolveTypes
+	| aMultiply:
+	    .aMultiply
+	    @ResolveTypes
+	| aExponentiate:
+	    .aExponentiate
+	    @ResolveTypes
+	| aDivideReal:
+	    .aDivideReal
+	    @ResolveTypes
+	| aDiv:
+	    .aDiv
+	    @ResolveTypes
+	| aMod:
+	    .aMod
+	    @ResolveTypes
+	| aXor:
+	    .aXor
+	    @ResolveTypes
+	| aShiftLeft:
+	    .aShiftLeft
+	    @ResolveTypes
+	| aShiftRight:
+	    .aShiftRight
+	    @ResolveTypes
+
+	| aHash:
+	    .aHash
+
+	% type cheap operator
+	| aTypeCheat:
+	    @TypeCheat
+
+	% bits operator
+	| aBits:
+	    @Bits
+
+	% Relational operators; all are postfix.
+	% aInfixCompare marks the original location of the infix operator
+
+	| aInfixCompare:
+	    .aInfixCompare
+	| aEqual:
+	    .aEqual
+	    oTypePop
+	    oTypeReplaceBuiltin(tScalar)
+	| aNotEqual:
+	    .aNotEqual
+	    oTypePop
+	    oTypeReplaceBuiltin(tScalar)
+	| aLess:
+	    .aLess
+	    oTypePop
+	    oTypeReplaceBuiltin(tScalar)
+	| aLessEqual:
+	    .aLessEqual
+	    oTypePop
+	    oTypeReplaceBuiltin(tScalar)
+	| aGreater:
+	    .aGreater
+	    oTypePop
+	    oTypeReplaceBuiltin(tScalar)
+	| aGreaterEqual:
+	    .aGreaterEqual
+	    oTypePop
+	    oTypeReplaceBuiltin(tScalar)
+	| aNotIn:
+	    .aNotIn
+	    oTypePop
+	    oTypeReplaceBuiltin(tScalar)
+	| aIn:
+	    .aIn
+	    oTypePop
+	    oTypeReplaceBuiltin(tScalar)
+
+	% Boolean operators; both infix and postix are provided
+
+	| aNot:
+	    .aNot
+	    oTypeReplaceBuiltin(tScalar)
+	| aInfixAnd:
+	    .aInfixAnd
+	| aAnd:
+	    .aAnd
+	    oTypePop
+	    oTypeReplaceBuiltin(tScalar)
+	| aInfixOr:
+	    .aInfixOr
+	| aOr:
+	    .aOr
+	    oTypePop
+	    oTypeReplaceBuiltin(tScalar)
+	| aInfixImply:
+	    .aInfixImply
+	| aImply:
+	    .aImply
+	    oTypePop
+	    oTypeReplaceBuiltin(tScalar)
+    ];
+
+Bits:
+    % We have just seen a 'bits'
+    .aBits
+    @Expn
+    oTypePop
+    @BitsType
+    oTypeReplaceBuiltin(tScalar);
+
+
+TypeCheat:
+    % We have just seen a 'typecheat'.
+    .aTypeCheat
+    @TypeSpec
+    [
+	| aAt:
+	    .aAt
+	    @Expn
+	    oTypePop
+	| *:
+	    @Expn
+	    oTypePop
+	    [
+		| aTypeCheatSize:
+		    .aTypeCheatSize
+		    @Expn
+		    oTypePop
+		| *:
+	    ]
+    ]
+    oSymbolPushDummy
+    oSymbolEnterType
+    oSymbolEnterKind(sConstant)
+    @Reference
+    oSymbolPop;
+
+ResolveTypes:
+    % pick the proper type for an operation involving two types
+    % just return the second from top type.
+    oTypePop;
+
+VerifyAndPushNewSymbol:
+    oSymbolPushGlobalScope
+    [ oSymbolChooseKind
+	| sNotFound:
+	    % the high frequency case
+	    oSymbolPop
+	    oSymbolPushNew
+	| *:
+	    [ oSymbolChooseAttribute(saPervasive)
+		| yes:
+		    #eSymbolPreviouslyDeclared
+		| *:
+		    oSymbolPop
+		    oSymbolPushClosedScope
+		    [ oSymbolChooseKind
+			| sNotFound:
+			    oSymbolPop
+			    oSymbolPushNew
+			| sExport:
+			    [ oSymbolBodyDeclaredAtSameScopeLevel
+				| yes:
+				| *:
+				    % this is in a begin block;  make it
+				    % a different symbol
+				    oSymbolPop
+				    oSymbolPushNew
+			    ]
+			| *:
+			    #eSymbolPreviouslyDeclared
+			    oSymbolPop
+			    oSymbolPushNew
+		    ]
+	    ]
+    ];
+
+VerifyAndPushNewVariableSymbol:
+    oSymbolPushGlobalScope
+    [ oSymbolChooseKind
+	| sNotFound:
+	    % the high frequency case
+	    oSymbolPop
+	    oSymbolPushNew
+	| *:
+	    [ oSymbolChooseAttribute(saPervasive)
+		| yes:
+		    #eSymbolPreviouslyDeclared
+		| *:
+		    oSymbolPop
+		    oSymbolPushClosedScope
+		    [ oSymbolChooseKind
+			| sNotFound:
+			    oSymbolPop
+			    oSymbolPushNew
+			| sExport:
+			    % account for the extra scope for var id lists
+			    [ oSymbolBodyDeclaredAtSameScopeLevelMinus1
+				| yes:
+				| *:
+				    % this is in a begin block;  make it
+				    % a different symbol
+				    oSymbolPop
+				    oSymbolPushNew
+			    ]
+			| *:
+			    #eSymbolPreviouslyDeclared
+			    oSymbolPop
+			    oSymbolPushNew
+		    ]
+	    ]
+    ];
+
+VerifyAndPushNewForwardImportSymbol:
+    oSymbolPushGlobalScope
+    [ oSymbolChooseKind
+	| sNotFound:
+	    % the high frequency case
+	    oSymbolPop
+	    oSymbolPushNew
+	| *:
+	    [ oSymbolChooseAttribute(saPervasive)
+		| yes:
+		    #eSymbolPreviouslyDeclared
+		| *:
+		    oSymbolPop
+		    oSymbolPushClosedScope
+		    [ oSymbolChooseKind
+			| sNotFound:
+			    oSymbolPop
+			    oSymbolPushNew
+			| sExport:
+			| *:
+			    [ oSymbolChooseAttribute(saForward)
+				| no:
+				    #eSymbolPreviouslyDeclared
+				    oSymbolPop
+				    oSymbolPushNew
+				| *:
+			    ]
+		    ]
+	    ]
+    ];
+
+VerifyAndPushNewTypeSymbol:
+    oSymbolPushGlobalScope
+    [ oSymbolChooseKind
+	| sNotFound:
+	    % the high frequency case
+	    oSymbolPop
+	    oSymbolPushNew
+	| *:
+	    [ oSymbolChooseAttribute(saPervasive)
+		| yes:
+		    [ oSymbolChooseKind
+			| sType:
+			    [ oSymbolChooseAttribute(saForward)
+				| yes:
+				    oSymbolPop
+				    oSymbolPushLocalScope
+				    [ oSymbolChooseKind
+					| sType:
+					    [ oSymbolChooseAttribute(saForward)
+						| yes:
+						| *:
+						    #eForwardMustBeResolvedAtSameScope
+					    ]
+					| sNotFound, sExport:
+					    oSymbolPop
+					    oSymbolPushEnclosingEnclosingLocalScope
+					    [ oSymbolChooseKind
+						| sType:
+						    [ oSymbolChooseAttribute(saForward)
+							| yes:
+							    [ oSymbolChooseAttribute(saDeferredForward)
+								| yes:
+								| *:
+								    #eForwardMustBeResolvedAtSameScope
+							    ]
+							| *:
+							    #eForwardMustBeResolvedAtSameScope
+						    ]
+						| *:
+						    #eForwardMustBeResolvedAtSameScope
+					    ]
+					| *:
+					    #eForwardMustBeResolvedAtSameScope
+				    ]
+				    oSymbolClearAttribute(saForward)
+				| *:
+				    #eSymbolPreviouslyDeclared
+			    ]
+			| *:
+			    #eSymbolPreviouslyDeclared
+		    ]
+		| *:
+		    oSymbolPop
+		    oSymbolPushClosedScope
+		    [ oSymbolChooseKind
+			| sNotFound:
+			    oSymbolPop
+			    oSymbolPushNew
+			| sExport:
+			    [ oSymbolBodyDeclaredAtSameScopeLevel
+				| yes:
+				| *:
+				    % this is in a begin block;  make it
+				    % a different symbol
+				    oSymbolPop
+				    oSymbolPushNew
+			    ]
+			| sType:
+			    [ oSymbolChooseAttribute(saForward)
+				| yes:
+				    oSymbolPop
+				    oSymbolPushLocalScope
+				    [ oSymbolChooseKind
+					| sType:
+					    [ oSymbolChooseAttribute(saForward)
+						| yes:
+						| *:
+						    #eForwardMustBeResolvedAtSameScope
+					    ]
+					| sNotFound, sExport:
+					    oSymbolPop
+					    oSymbolPushEnclosingEnclosingLocalScope
+					    [ oSymbolChooseKind
+						| sType:
+						    [ oSymbolChooseAttribute(saForward)
+							| yes:
+							    [ oSymbolChooseAttribute(saDeferredForward)
+								| yes:
+								| *:
+								    #eForwardMustBeResolvedAtSameScope
+							    ]
+							| *:
+							    #eForwardMustBeResolvedAtSameScope
+						    ]
+						| *:
+						    #eForwardMustBeResolvedAtSameScope
+					    ]
+					| *:
+					    #eForwardMustBeResolvedAtSameScope
+				    ]
+				    oSymbolClearAttribute(saForward)
+				| *:
+				    #eSymbolPreviouslyDeclared
+				    oSymbolPop
+				    oSymbolPushNew
+			    ]
+			| *:
+			    #eSymbolPreviouslyDeclared
+			    oSymbolPop
+			    oSymbolPushNew
+		    ]
+	    ]
+    ];
+
+VerifyAndPushNewSubprogramSymbol:
+    oSymbolPushGlobalScope
+    oSymbolResolveKind
+    [ oSymbolChooseKind
+	| sNotFound:
+	    % the high frequency case
+	    oSymbolPop
+	    oSymbolPushNew
+	| *:
+	    [ oSymbolChooseAttribute(saPervasive)
+		| yes:
+		    #eSymbolPreviouslyDeclared
+		    oSymbolPop
+		    oSymbolPushNew
+		| *:
+		    oSymbolPop
+		    oSymbolPushClosedScope
+		    [ oSymbolChooseKind
+			| sNotFound:
+			    oSymbolPop
+			    oSymbolPushNew
+			| sExport:
+			    % can't have invariant after exported subprogram
+			    oContextClear(cModuleInvariantOK)
+			| sForward:
+			    oSymbolResolveKind
+			    [ oSymbolChooseKind
+				| sForward:
+				    oSymbolPop
+				    oSymbolPushLocalScope
+				    [ oSymbolChooseAttribute(saForward)
+					| yes:
+					| *:
+					    #eForwardMustBeResolvedAtSameScope
+				    ]
+				| *:
+				    #eSymbolPreviouslyDeclared
+				    oSymbolPop
+				    oSymbolPushNew
+			    ]
+			| *:
+			    #eSymbolPreviouslyDeclared
+			    oSymbolPop
+			    oSymbolPushNew
+		    ]
+	    ]
+    ];
+
+VerifyAndPushNewSubprogramSymbolForStub:
+    oSymbolPushGlobalScope
+    oSymbolResolveKind
+    [ oSymbolChooseKind
+	| sNotFound:
+	    % the high frequency case
+	    oSymbolPop
+	    oSymbolPushNew
+	| *:
+	    [ oSymbolChooseAttribute(saPervasive)
+		| yes:
+		    #eSymbolPreviouslyDeclared
+		    oSymbolPop
+		    oSymbolPushNew
+		| *:
+		    oSymbolPop
+		    oSymbolPushClosedScope
+		    [ oSymbolChooseKind
+			| sNotFound:
+			    oSymbolPop
+			    oSymbolPushNew
+			| sExport:
+			    % can't have invariant after exported subprogram
+			    oContextClear(cModuleInvariantOK)
+			| sProcedure, sFunction:
+			    % can't have invariant after exported subprogram
+			    [ oSymbolChooseAttribute(saExternal)
+				| yes:
+				    oContextClear(cModuleInvariantOK)
+				| *:
+			    ]
+			| *:
+			    [ oSymbolChooseAttribute(saForward)
+				| yes:
+				    oSymbolPop
+				    oSymbolPushLocalScope
+				    [ oSymbolChooseAttribute(saForward)
+					| yes:
+					| *:
+					    #eForwardMustBeResolvedAtSameScope
+				    ]
+				| *:
+				    #eSymbolPreviouslyDeclared
+				    oSymbolPop
+				    oSymbolPushNew
+			    ]
+		    ]
+	    ]
+    ];
+
+VerifyAndPushNewFormalSymbol:
+    % formal parameters may not conflict with each other, with the subprogram
+    % symbol, or with pervasive identifiers.
+    oSymbolPushEnclosingLocalScope	% subprogram symbol
+    [ oSymbolChooseKind
+	| sNotFound:
+	    oSymbolPop			%
+	    oSymbolPushLocalScope	% formal symbols
+	    [ oSymbolChooseKind
+		| sNotFound:
+		    oSymbolPop			%
+		    oSymbolPushGlobalScope	% global symbol
+		    [ oSymbolChooseKind
+			| sNotFound:
+			    oSymbolPop		%
+			    oSymbolPushNew	% new symbol
+			| *:
+			    [ oSymbolChooseAttribute(saPervasive)
+				| yes:
+				    #eSymbolPreviouslyDeclared
+				    oSymbolPop			%
+				    oSymbolPushNew		% new symbol
+				| *:
+				    oSymbolPop		%
+				    oSymbolPushNew	% new symbol
+			    ]
+		    ]
+		| *:
+		    #eSymbolPreviouslyDeclared
+		    oSymbolPop		%
+		    oSymbolPushNew	% new symbol
+	    ]
+	| *:
+	    #eSymbolPreviouslyDeclared	% same as subprogram symbol
+	    oSymbolPop			%
+	    oSymbolPushNew		% new symbol
+    ];
+
+VerifyAndPushNewUnexportedSymbol:
+    @VerifyAndPushNewSymbol
+    [ oSymbolChooseKind
+	| sExport:
+	    #eSymbolPreviouslyDeclared
+	    oSymbolPop
+	    oSymbolPushNew
+	| *:
+    ];
+
+%
+% Allow the case of an stub subprogram being declared at a lower
+% scope level (i.e. higher).  Return yes if we get that case.
+%
+VerifyAndPushNewUnqualifiedSymbol >> Boolean:
+    oSymbolPushGlobalScope
+    [ oSymbolChooseKind
+	| sNotFound:
+	    % the high frequency case
+	    oSymbolPop
+	    oSymbolPushNew
+	    oSymbolEnterAttribute(saUnqualified)
+	| *:
+	    [ oSymbolChooseAttribute(saPervasive)
+		| yes:
+		    #eSymbolPreviouslyDeclared
+		| *:
+		    oSymbolPop
+		    oSymbolPushClosedScope
+		    [ oSymbolChooseKind
+			| sNotFound:
+			    % check that it isn't a grant or export from
+			    % the next level up
+			    oSymbolPop
+			    oSymbolPushEnclosingClosedScope
+			    [ oSymbolChooseKind
+				| sExport:
+				    % we must make sure that it is the same
+				    % symbol in both scopes.  Therefore do
+				    % nothing.
+				    oSymbolIncrementUnqualifiedExport
+				| sNotFound, sUndefined:
+				    oSymbolPop
+				    oSymbolPushNew
+				    oSymbolEnterAttribute(saUnqualified)
+				| sProcedure, sFunction:
+				    % is this a stub subprogram?
+				    [ oSymbolChooseAttribute(saExternal)
+					| yes:
+					    % we got one.  Use the same symbol
+					    oSymbolEnterAttribute(saUnqualBody)
+					    >> yes
+					| *:
+					    oSymbolPop
+					    oSymbolPushNew
+					    #eUnqualifiedNameConflicts
+				    ]
+				| *:
+				    oSymbolPop
+				    oSymbolPushNew
+				    #eUnqualifiedNameConflicts
+			    ]
+			| sExport:
+			    #eSymbolPreviouslyDeclared
+			    oSymbolPop
+			    oSymbolPushNew
+			| *:
+			    #eSymbolPreviouslyDeclared
+			    oSymbolPop
+			    oSymbolPushNew
+		    ]
+	    ]
+    ]
+    >> no;
+
+VerifyAndPushNewFieldSymbol:
+
+    % Verify that a newly declared symbol is valid and
+    % push a new symbol for it.  The symbol is the field of
+    % and enumerated type, a record, a union, or it is a union tag
+
+    oSymbolPushLocalScope
+    [ oSymbolChooseKind
+	| sNotFound:
+	    oSymbolPop
+	    oSymbolPushNew
+	| *:
+	    #eSymbolPreviouslyDeclared
+	    oSymbolPop
+	    oSymbolPushNew
+    ];
+
+VerifyAndPushNewRecordFieldSymbol:
+
+    % Verify that a newly declared symbol is valid and
+    % push a new symbol for it.  The symbol is the field of
+    % and enumerated type, a record, a union, or it is a union tag
+
+    oSymbolPushEnclosingLocalScope
+    [ oSymbolChooseKind
+	| sNotFound:
+	    oSymbolPop
+	    oSymbolPushNew
+	| *:
+	    #eSymbolPreviouslyDeclared
+	    oSymbolPop
+	    oSymbolPushNew
+    ];
+
+VerifyAndPushSymbol:
+    % Verify that a referenced symbol is declared and visible
+    % and push the symbol for it.
+
+    oSymbolPushClosedScope
+    [ oSymbolChooseKind
+	| sConstant, sReadOnlyVariable:
+	    % high frequency case
+	    >>
+	| sVariable, sCollection, sReadOnlyCollection:
+	    [ oSymbolChooseAttribute(saBound)
+		| yes:
+		    @ChangeKindToReadOnly
+		| *:
+	    ]
+	    >>
+	| sNotFound:
+	    [ oContextChoose(cAutoImport)
+		| yes:
+		    oSymbolPop
+		    oSymbolPushEnclosingClosedScope
+		    [ oSymbolChooseKind
+			| sNotFound:
+			    oSymbolPop
+			    oSymbolPushGlobalScope
+			    [ oSymbolChooseKind
+				| sNotFound:
+				    #eUndeclaredSymbol
+				    oSymbolChangeKind(sUndefined)
+				    [ oContextChoose(cProcessingParameters)
+					| yes:	% don't enter in scope
+					| *:
+					    oScopeEnterSymbol
+				    ]
+				    >>
+				| *:
+				    [ oSymbolChooseAttribute(saPervasive)
+					| yes:
+					| *:
+					    #eUnimportedSymbol 
+					    [ oContextChoose(cProcessingParameters)
+						| yes:	% don't enter in scope
+						| *:
+						    oScopeEnterSymbol
+					    ]
+				    ]
+			    ]
+			| sType:	% no need to do anything special
+			| sUndefined:
+			| sInvisible:
+			    %% No longer considered an error - JRC 16.2.03
+			    %% #eInvisibleSymbol 
+			    oSymbolResolveKind
+			    >>
+			| sExport:
+			    #eUndeclaredSymbol
+			    oSymbolChangeKind(sNotFound)
+			    >>
+			| *:
+			    [ oSymbolChooseAttribute(saPervasive)
+				| yes:
+				| *:
+				    [ oContextChoose(cFunction)
+					| yes:
+					    [ oSymbolChooseKind
+						| sVariable, sCollection,
+						  sMonitor, sModule:
+						    %% Function side effects now allowed - JRC 7.8.22
+						    %% @ChangeKindToReadOnly
+						| *:
+					    ]
+					| *:
+				    ]
+				    [ oContextChoose(cSubprogramStubBody)
+					| yes:
+					    [ oSymbolChooseAttribute(saGrant)
+						| no:
+						    #eSymbolNotGrantedOrPervasive
+						    oSymbolEnterAttribute(saGrant)
+						| *:
+					    ]
+					| *:
+				    ]
+				    oSymbolEnterAttribute(saImported)
+				    [ oContextChoose(cProcessingParameters)
+					| yes:	% don't enter in scope
+					| *:
+					    [ oSymbolChooseAttribute(saForward)
+						| yes:
+						    % optimization doesn't work
+						    % for forward subprograms
+						| *:
+						    % optimize access by
+						    % adding symbol to
+						    % local scope
+						    oScopeEnterSymbol
+					    ]
+					    oScopeAutoImportEnterSymbol
+				    ]
+			    ]
+		    ]
+		| *:
+		    oSymbolPop
+		    oSymbolPushGlobalScope
+		    [ oSymbolChooseKind
+			| sNotFound:
+			    #eUndeclaredSymbol
+			    oSymbolChangeKind(sUndefined)
+			    [ oContextChoose(cProcessingParameters)
+				| yes:	% don't enter in scope
+				| *:
+				    oScopeEnterSymbol
+			    ]
+			    >>
+			| sInvisible:
+			    %% No longer considered an error - JRC 16.2.03
+			    %% #eInvisibleSymbol 
+			    oSymbolResolveKind
+			    >>
+			| sExport:
+			    #eUndeclaredSymbol
+			    oSymbolChangeKind(sNotFound)
+			    >>
+			| sUndefined:
+			| *:
+			    [ oSymbolChooseAttribute(saPervasive)
+				| yes:
+				| *:
+				    #eUnimportedSymbol 
+				    [ oContextChoose(cProcessingParameters)
+					| yes:	% don't enter in scope
+					| *:
+					    [ oContextChoose(cDontEnterUnimportedSymbols)
+						| no:
+						    oScopeEnterSymbol
+						| *:
+					    ]
+				    ]
+			    ]
+		    ]
+	    ]
+	| sInvisible:
+	    %% No longer considered an error - JRC 16.2.03
+	    %% #eInvisibleSymbol 
+	    oSymbolResolveKind
+	    >>
+	| sExport:
+	    #eUndeclaredSymbol
+	    oSymbolChangeKind(sNotFound)
+	    >>
+	| *:
+    ]
+    [ oSymbolChooseKind
+	| sVariable, sCollection:
+	    [ oSymbolChooseAttribute(saBound)
+		| yes:
+		    @ChangeKindToReadOnly
+		| *:
+	    ]
+	| sType:
+	    [ oSymbolChooseAttribute(saForward)
+		| yes:
+		    #eUnresolvedForwardType
+		    oSymbolChangeKind(sUndefined)
+		    oSymbolClearAttribute(saForward)
+		    [ oContextChoose(cProcessingParameters)
+			| yes:	% don't enter in scope
+			| *:
+			    oScopeEnterSymbol
+		    ]
+		| *:
+	    ]
+	| *:
+    ];
+
+VerifyAndPushGrantSymbol:
+    % Push granted symbol:  may have already been declared
+    oSymbolPushClosedScope
+    [ oSymbolChooseKind
+	| sNotFound:
+	    oSymbolPop
+	    oSymbolPushGlobalScope
+	    [ oSymbolChooseAttribute(saPervasive)
+		| yes:
+		| *:
+		    oSymbolPop
+		    oSymbolPushNew
+	    ]
+	| *:
+    ];
+
+VerifyAndPushIgnoredImportSymbol:
+    % Verify that a referenced symbol is declared and visible
+    % and push the symbol for it.  Don't complain at all if it isn't;
+    % just return an undefined symbol!
+
+    oSymbolPushClosedScope
+    [ oSymbolChooseKind
+	| sConstant, sReadOnlyVariable:
+	    % high frequency case
+	    >>
+	| sVariable, sCollection, sReadOnlyCollection:
+	    [ oSymbolChooseAttribute(saBound)
+		| yes:
+		    @ChangeKindToReadOnly
+		| *:
+	    ]
+	    >>
+	| sNotFound:
+	    oSymbolPop
+	    oSymbolPushGlobalScope
+	    [ oSymbolChooseKind
+		| sNotFound, sInvisible, sExport:
+		    oSymbolPop
+		    oSymbolPushDummy
+		    oSymbolEnterKind(sUndefined)
+		    >>
+		| sUndefined:
+		    >>
+		| *:
+		    [ oSymbolChooseAttribute(saPervasive)
+			| yes:
+			| *:
+			    oSymbolPop
+			    oSymbolPushDummy
+			    oSymbolEnterKind(sUndefined)
+			    >>
+		    ]
+	    ]
+	| sInvisible, sExport:
+	    oSymbolPop
+	    oSymbolPushDummy
+	    oSymbolEnterKind(sUndefined)
+	    >>
+	| *:
+    ]
+    [ oSymbolChooseKind
+	| sVariable, sCollection:
+	    [ oSymbolChooseAttribute(saBound)
+		| yes:
+		    @ChangeKindToReadOnly
+		| *:
+	    ]
+	| *:
+    ];
+
+CalculateTransitiveImports:
+    @CalculateTransitiveImportsNoStrip
+    oScopeStrip;
+
+
+CalculateTransitiveImportsNoStrip:
+    oContextClear(cPrintedErrorMsg)
+    oCountPushScopeNumberOfEntries
+    {
+	[ oCountChooseZero
+	    | yes:
+		>
+	    | *:
+		oSymbolPushCountScope
+		[ oSymbolChooseKind
+		    | sProcedure, sModule, sMonitor, sProcess:
+			@CalculateOneTranstiveImport
+			oScopeMergeScopes
+		    | sReadOnlyModule, sReadOnlyMonitor:
+			oTypePushSymbolType
+			oScopePushTypeImports
+			oTypePop
+			@ChangeImportsToReadOnly
+			oScopeMergeScopes
+		    | sFunction:
+			oTypePushSymbolType
+			oScopePushTypeImports
+			oTypePop
+			oScopeMergeScopes
+		    | *:
+		]
+		oSymbolPop
+		oCountDecrement
+	]
+    }
+    oCountPop
+    oTypeClearAttribute(taUnresolvedImports);
+
+
+CalculateOneTranstiveImport:
+    [ oSymbolChooseAttribute(saProcedureImportsSpecialVar)
+	| yes:
+	    oSymbolSwapSymbols	% importer on top
+	    oSymbolEnterAttribute(saProcedureImportsSpecialVar)
+	    oSymbolSwapSymbols	% reset symbol stack
+	| *:
+    ]
+    oTypePushSymbolType
+    oScopePushTypeImports
+    oTypePop
+    [ oTypeChooseKind	% importer type
+	| tFunction:
+	    % watch for transitive var imports
+	    oCountPushScopeNumberOfEntries
+	    {
+		[ oCountChooseZero
+		    | yes:
+			>
+		    | *:
+			oSymbolPushCountScope
+			[ oSymbolChooseKind
+			    | sVariable, sModule, sMonitor, sCollection:
+				[ oContextChoose(cCompile)
+				    | yes:
+					[ oContextChoose(cPrintedErrorMsg)
+					    | no:
+						%% No longer considered an error - JRC 16.2.03
+						%% #eFunctionTransitivelyImportsVar
+						oContextSet(cPrintedErrorMsg)
+					    | *:
+					]
+				    | *:
+				]
+			    | *:
+			]
+			oSymbolPop
+		]
+		oCountDecrement
+	    }
+	    oCountPop
+	| *:
+    ];
+
+ChangeImportsToReadOnly:
+    oCountPushScopeNumberOfEntries
+    {[ oCountChooseZero
+	| yes:
+	    >
+	| *:
+	    oSymbolPushCountScope
+	    [ oSymbolChooseKind
+		| sVariable, sCollection, sModule, sMonitor:
+		    @ChangeKindToReadOnly
+		    oScopeReplaceCountSymbol
+		| *:
+	    ]
+	    oSymbolPop
+	    oCountDecrement
+    ]}
+    oCountPop;
+
+CheckReferenceActualImportOverlap:
+	% Checks for overlap with the imports of a routine.
+	% symstk: ...,formal,actual		- no change
+	% typstk: actual, proc			- no change
+
+    % check for overlap with imports
+    [ oTypeChooseAttribute(taRecursive)
+	| yes:
+	    [ oSymbolChooseAttribute(saImported)
+		| yes:
+		    %% No longer an error - JRC 16.2.03
+		    %% #eRecursivePassesGlobalVarByRef
+		| *:
+	    ]
+	| *:
+	    oScopePushTypeImports
+	    [ oScopeChooseContainsSymbol
+		| yes:
+		    oSymbolSwapSymbols		% symstk: actual, formal
+		    [ oSymbolChooseKind
+			| sVariable, sCollection:
+			    oSymbolSwapSymbols
+			    %% Alias checking disabled - JRC 16.2.03
+			    %% #eReferenceActualOverlapsImports
+			| *:
+			    oSymbolSwapSymbols
+			    oCountPushScopeNumberOfEntries
+			    {
+				[ oCountChooseZero
+				    | yes:
+					>
+				    | *:
+				]
+				oSymbolPushCountScope
+				[ oSymbolChooseSameSymbols
+				    | yes:
+					[ oSymbolPopAndChooseKind
+					    | sVariable, sCollection:
+						%% Alias checking disabled - JRC 16.2.03
+						%% #eReferenceActualOverlapsImports
+					    | *:
+					]
+					>
+				    | *:
+					oSymbolPop
+				]
+				oCountDecrement
+			    }
+			    oCountPop
+		    ]				% symstk: formal, acutal
+		| *:
+	    ]
+	    oScopePop	% imports
+    ];
+
+CheckParametricImportConflict:
+    % Checks for overlap with the imports of a routine.
+    % Assumes that the top entry in the Symbol Stack is the actual
+    % symbol to be checked and the top type is the parametric actual and
+    % the next type is the called procedure.
+
+    oTypeSwapTypes
+    [ oTypeChooseAttribute(taRecursive)
+	| yes:	% procedure calling itself, handle specially
+	    oCountPushClosedScopeNumberOfEntries % start search for imports
+	    {
+		[ oCountChooseZero
+		    | yes:
+			>
+		    | *:
+		]
+		oSymbolPushCountClosedScope
+		[ oSymbolChooseAttribute(saImported)
+		    | yes:	% found an import
+			[ oSymbolChooseSameSymbols
+			    | yes:	% found the right import
+				[ oContextChoose(cAutoImport)
+				    | yes:
+					[ oSymbolChooseAttribute(saAutoImportedVar)
+					    | yes:
+						oSymbolPop
+						%% Alias checking disabled - JRC 16.2.03
+						%% #eParametricImportOverlapsImports
+					    | *:
+						oSymbolPop
+						[ oSymbolChooseKind
+						    | sVariable, sCollection:
+							%% Alias checking disabled - JRC 16.2.03
+							%% #eParametricImportOverlapsImports
+						    | *:
+						]
+					]
+				    | *:
+					[oSymbolChooseKind
+					    | sVariable, sCollection:
+						%% Alias checking disabled - JRC 16.2.03
+						%% #eParametricImportOverlapsImports
+						oSymbolPop
+					    | *:
+						oSymbolPop
+						[ oSymbolChooseKind
+						    | sVariable, sCollection:
+							%% Alias checking disabled - JRC 16.2.03
+							%% #eParametricImportOverlapsImports
+						    | *:
+						]
+						oSymbolSwapSymbols
+					]
+				]
+				>
+			    | *:
+				oSymbolPop
+			]
+		    | *:
+			oSymbolPop
+		]
+		oCountDecrement
+	    }
+	    oCountPop
+	| *:
+	    oScopePushTypeImports
+	    [ oScopeChooseContainsSymbol
+		| yes:
+		    [ oSymbolChooseKind
+			| sVariable, sCollection:
+			    %% Alias checking disabled - JRC 16.2.03
+			    %% #eParametricImportOverlapsImports
+			| *:
+			    oCountPushScopeNumberOfEntries
+			    {
+				[ oCountChooseZero
+				    | yes:
+					>
+				    | *:
+				]
+				oSymbolPushCountScope
+				[ oSymbolChooseSameSymbols
+				    | yes:
+					[ oSymbolPopAndChooseKind
+					    | sVariable, sCollection:
+						%% Alias checking disabled - JRC 16.2.03
+						%% #eParametricImportOverlapsImports
+					    | *:
+					]
+					>
+				    | *:
+					oSymbolPop
+				]
+				oCountDecrement
+			    }
+			    oCountPop
+		    ]
+		| *:
+	    ]
+	    oScopePop	% imports
+    ]
+    oTypeSwapTypes;
+
+ResolveType:
+    % Resolve the top type on the Type Stack to its root type.
+    [ oTypeChooseKind
+	| tScalar, tVaryingParameter:
+	    oTypeReplaceBuiltIn(tScalar)
+	| tString:
+	    oTypeReplaceBuiltIn(tString)
+	| tEnumeratedElement:
+	    oTypeReplaceBuiltIn(tScalar)
+	| *:
+    ];
+
+SurroundingModule:
+    [ oSymbolChooseKind
+	| sVariable, sConstant, sReadOnlyVariable:
+	| sModule, sMonitor, sReadOnlyModule, sReadOnlyMonitor:
+	    [
+		| aField:
+		    [
+			| aIdent:
+			| aPredefinedId:
+		    ]
+		    oScopePushTypeFields
+		    oScopeClose
+		    oSymbolPushClosedScope	% symstk: ...,module,field
+		    oScopePop
+		    [ oSymbolChooseKind
+			| sNotFound:
+			    #eModuleFieldNotFound
+			    oSymbolChangeKind(sUndefined)
+			| *:
+		    ]
+		    oSymbolSwapSymbols		% symstk: ...,field,module
+		    [ oSymbolPopAndChooseKind
+			| sReadOnlyModule, sReadOnlyMonitor:
+			    [ oSymbolChooseKind
+				| sProcedure:
+				    #eReadOnlyModuleProcedureCall
+				| *:
+			    ]
+			| *:
+		    ]
+		    oTypePop			% typstk: ...
+		    oTypePushSymbolType		% typstk: ...,field
+		| *:
+	    ]
+	| sUndefined:
+	    [
+		| aField:
+		    [
+			| aIdent:
+			| aPredefinedId:
+		    ]
+		| *:
+	    ]
+	| *:
+    ];
+
+ImportsVisible:
+    [ oTypeChooseAttribute(taRecursive)		% proc calling itself?
+	| yes:
+	    oCountPushClosedScopeNumberOfEntries
+	    {
+		[ oCountChooseZero
+		    | yes:
+			>
+		    | *:
+		]
+		oSymbolPushCountClosedScope
+		[ oSymbolChooseAttribute(saImported)
+		    | yes:	% symbol imported by subprogram
+			[ oSymbolChooseKind
+			    | sInvisible:
+				%% No longer considered an error - JRC 16.2.03
+				%% #eInvisibleImportedSymbol 
+			    | *:
+				[ oSymbolChooseAttribute(saBoundVar)
+				    | yes:
+					%% No longer considered an error - JRC 16.2.03
+					%% #eInvisibleImportedSymbol 
+				    | *:
+					[ oSymbolChooseAttribute(saBound)
+					    | yes:
+						[ oContextChoose(cAutoImport)
+						    | yes:
+							[ oSymbolChooseAttribute(saAutoImportedVar)
+							    | yes:
+								#eVarImportReadOnlyInCurrentContext 
+							    | *:
+								oSymbolEnterAttribute(saCannotImportVar)
+							]
+						    | *:
+							[ oSymbolChooseKind
+							    | sVariable, sCollection:
+								#eVarImportReadOnlyInCurrentContext 
+								% imported var
+							    | *:
+							]
+						]
+					    | *:
+					]
+				]
+			]
+		    | *:
+		]
+		oSymbolPop
+		oCountDecrement
+	    }
+	    oCountPop
+	| *:
+	    [ oTypeChooseAttribute(taUnresolvedImports)
+		| yes:
+		    @ResolveForwardImports
+		    oScopePushTypeImports
+		    @CalculateTransitiveImportsNoStrip
+		| *:
+		    oScopePushTypeImports
+	    ]
+	    oCountPushScopeNumberOfEntries
+	    oContextClear(cPrintedErrorMsg)
+	    {[ oCountChooseZero
+		| yes:
+		    >
+		| *:
+		    oSymbolPushCountScope
+		    [ oSymbolChooseKind
+			| sInvisible:
+			    %% No longer considered an error - JRC 16.2.03
+			    %% #eInvisibleImportedSymbol 
+			| sVariable, sCollection:	% imported var
+			    [ oSymbolChooseAttribute(saBoundVar)
+				| yes:
+				    %% No longer considered an error - JRC 16.2.03
+				    %% #eInvisibleImportedSymbol 
+				| *:
+				    [ oSymbolChooseAttribute(saBound)
+					| yes: % bound to and thus R/O
+					    #eVarImportReadOnlyInCurrentContext 
+					| *:
+				    ]
+			    ]
+			| sReadOnlyVariable, sReadOnlyCollection:
+			    [ oSymbolChooseAttribute(saBoundVar)
+				| yes:
+				    %% No longer considered an error - JRC 16.2.03
+				    %% #eInvisibleImportedSymbol 
+				| *:
+			    ]
+			| sModule, sReadOnlyModule:
+			    [ oContextChoose(cDeviceMonitor)
+				| yes:
+				    [ oSymbolChooseAttribute(saExternal)
+					| yes:
+					    [ oContextChoose(cPrintedErrorMsg)
+						| no:
+						    #eDeviceMonitorCallsStubModule
+						    oContextSet(cPrintedErrorMsg)
+						| *:
+					    ]
+					| *:
+				    ]
+				| *:
+			    ]
+			| sMonitor, sReadOnlyMonitor:
+			    [ oContextChoose(cDeviceMonitor)
+				| yes:
+				    [ oContextChoose(cPrintedErrorMsg)
+					| no:
+					    #eDeviceMonitorCallsMonitor
+					    oContextSet(cPrintedErrorMsg)
+					| *:
+				    ]
+				| *:
+			    ]
+			| *:
+		    ]
+		    oSymbolPop
+		    oCountDecrement
+	    ]}
+	    oCountPop
+	    oScopePop
+    ];
+
+RecursiveParametricImportsVisible:
+    oCountPushClosedScopeNumberOfEntries
+    {
+	[ oCountChooseZero
+	    | yes:
+		>
+	    | *:
+	]
+	oSymbolPushCountClosedScope
+	[ oSymbolChooseAttribute(saImported)
+	    | yes:	% one of the imports
+		[ oSymbolChooseKind
+		    | sInvisible:	% invisible due to 'var' bind
+			%% No longer considered an error - JRC 16.2.03
+			%% #eInvisibleImportByParametric 
+		    | sVariable, sCollection:
+			[ oSymbolChooseAttribute(saBoundVar)
+			    | yes:
+				%% No longer considered an error - JRC 16.2.03
+				%% #eInvisibleImportByParametric 
+			    | *:
+				[ oSymbolChooseAttribute(saBound)
+				    | yes: % bound to and thus R/O
+					%% No longer considered an error - JRC 16.2.03
+					%% #eVarParametricImportReadOnlyHere 
+				    | *:
+				]
+			]
+		    | sReadOnlyVariable, sReadOnlyCollection:
+			[ oSymbolChooseAttribute(saBoundVar)
+			    | yes:
+				%% No longer considered an error - JRC 16.2.03
+				%% #eInvisibleImportByParametric 
+			    | *:
+			]
+		    | *:
+		]
+	    | *:
+	]
+	oSymbolPop
+	oCountDecrement
+    }
+    oCountPop;
+
+ParametricImportsVisible:
+    [ oTypeChooseAttribute(taUnresolvedImports)
+	| yes:
+	    @ResolveForwardImports
+	    oScopePushTypeImports
+	    @CalculateTransitiveImportsNoStrip
+	| *:
+	    oScopePushTypeImports
+    ]
+    oCountPushScopeNumberOfEntries
+    {[ oCountChooseZero
+	| yes:
+	    >
+	| *:
+	    oSymbolPushCountScope
+	    [ oSymbolChooseKind
+		| sInvisible:	% invisible due to 'var' bind
+		    %% No longer considered an error - JRC 16.2.03
+		    %% #eInvisibleImportByParametric 
+		| sVariable, sCollection:
+		    [ oSymbolChooseAttribute(saBoundVar)
+			| yes:
+			    %% No longer considered an error - JRC 16.2.03
+			    %% #eInvisibleImportByParametric 
+			| *:
+			    [ oSymbolChooseAttribute(saBound)
+				| yes: % bound to and thus R/O
+				    %% No longer an error - JRC 16.2.03
+				    %% #eVarParametricImportReadOnlyHere 
+				| *:
+			    ]
+		    ]
+		| sReadOnlyVariable, sReadOnlyCollection:
+		    [ oSymbolChooseAttribute(saBoundVar)
+			| yes:
+			    %% No longer considered an error - JRC 16.2.03
+			    %% #eInvisibleImportByParametric 
+			| *:
+		    ]
+		| *:
+	    ]
+	    oSymbolPop
+	    oCountDecrement
+    ]}
+    oCountPop
+    oScopePop;
+
+IllegalSubscripts:
+
+    % Flag and flush an illegal subscript or actuals list.
+
+    #eIllegalSubscripts
+    @FlushSubscripts;
+
+
+
+ExtraneousSubscripts:
+    % Check for extraneous subscripts and flag and flush them if present.
+
+    [
+	| aEndExpressionList:
+	| *:
+    ]
+    [
+	| aEndSubs:
+	| *:
+	    #eTooManySubscripts
+	    @FlushSubscripts
+    ];
+
+
+
+FlushSubscripts:
+
+    % Flush extraneous or illegal subscripts.
+
+    {[
+	| aEndSubs:
+	    >
+	| aEndExpressionList:
+	    aEndSubs
+	    >
+	| aAll:
+	| aSubString:
+	| aStar:
+	| *:
+	    @Expn
+	    oTypePop
+    ]};
+
+EndDclsScope:
+    oCountPushScopeNumberOfEntries
+    {
+	[ oCountChooseZero
+	    | yes:
+		>
+	    | *:
+	]
+	oSymbolPushCountScope
+	[ oSymbolChooseAttribute(saBinds)
+	    | yes:
+		oSymbolPushBoundSymbol
+		oSymbolClearAttribute(saBound)
+		oSymbolClearAttribute(saBoundVar)
+		oSymbolPop
+	    | *:
+	]
+	oSymbolResolveKind
+	[ oSymbolChooseKind
+	    | sType:
+		[ oSymbolChooseAttribute(saForward)
+		    | yes:
+			[ oTypeChooseAttribute(taStub)
+			    | yes:
+				% let forward types be deferred in stubs
+				oSymbolEnterAttribute(saDeferredForward)
+			    | *:
+				#eUnresolvedForwardType
+			]
+		    | *:
+		]
+	    | *:
+	]
+	oSymbolPop
+	oCountDecrement
+    }
+    oCountPop
+    [ oSymbolChooseKind		% only check forward procedures/fcns
+				% in modules or in the global scope
+	| sModule, sMonitor:
+	    [ oSymbolChooseAttribute(saExternal)
+		| no:
+		    oCountPushScopeNumberOfEntries
+		    {
+			[ oCountChooseZero
+			    | yes:
+				>
+			    | *:
+			]
+			oSymbolPushCountScope
+			oSymbolResolveKind
+			[ oSymbolChooseKind
+			    | sProcedure, sFunction:
+				@CheckOneSubprogramSymbol
+			    | *:
+			]
+			oSymbolPop
+			oCountDecrement
+		    }
+		    oCountPop
+		| *:
+	    ]
+	| *:
+    ]
+    oScopePop;
+
+CheckOneSubprogramSymbol:
+    [ oSymbolChooseAttribute(saForward)
+	| yes:
+	    #eUnresolvedForwardSubprogram
+	    oSymbolClearAttribute(saForward)
+	| *:
+	    [ oSymbolChooseAttribute(saExternal)
+		| yes:
+		    [ oSymbolChooseAttribute(saChild)
+			| no:
+			    [ oSymbolBodyDeclaredAtSameScopeLevel
+				| yes:
+				    #eUnresolvedExternalSubprogram
+				| *:
+			    ]
+			| *:
+		    ]
+		| *:
+	    ]
+    ];
+
+MarkAutoImportVar:
+    [ oContextChoose(cAutoImport)
+	| yes:
+	    [ oSymbolChooseAttribute(saImported)
+		| yes:	% must have auto-imported the sucker so brand'er Tex
+		    [ oSymbolChooseAttribute(saAutoImportedVar)
+			| yes:	% already seen and marked
+			| *:
+			    [ oContextChoose(cFunction)
+				| yes:
+				    %% No longer considered an error - JRC 16.2.03
+				    %% #eFunctionImportsVar
+				| *:
+				    [ oSymbolChooseAttribute(saCannotImportVar)
+					| yes:
+					    #eCannotImportVar 
+					| *:
+				    ]
+			    ]
+			    [ oContextChoose(cSubprogramStubBody)
+				| yes:
+				    [ oSymbolChooseAttribute(saGrant)
+					| yes:
+					    [ oSymbolChooseAttribute(saGrantVar)
+						| yes:
+						| *:
+						    #eSymbolNotGrantedVar
+					    ]
+					| *:
+				    ]
+				| *:
+			    ]
+			    % Well Tex, it's time to brand 'er
+			    oSymbolEnterAttribute(saAutoImportedVar)
+		    ]
+		| *:
+	    ]
+	| *:
+    ];
+
+end

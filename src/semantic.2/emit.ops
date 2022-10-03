@@ -1,0 +1,137 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+%
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+%
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+label oEmitInteger:
+    assert compoundToken = aIntegerLit
+    Emit.EmitByte(compoundTokenValue.integerKind)
+    Emit.EmitLong(compoundTokenValue.val)
+
+label oEmitString:
+    assert compoundToken = aStringLit or compoundToken = aIdentText
+    Emit.EmitString (compoundTokenValue.stringLen,
+		     compoundTokenValue.stringText)
+
+label oEmitSavedIdentText:
+    Emit.EmitString (savedIdentTextLen, savedIdentText)
+
+label oSaveIdentText:
+    assert compoundToken = aIdentText
+    savedIdentTextLen:= compoundTokenValue.stringLen
+    savedIdentText:= compoundTokenValue.stringText
+
+label oEmitChar:
+    assert compoundToken = aCharLit
+    Emit.EmitString (compoundTokenValue.stringLen,
+		     compoundTokenValue.stringText)
+
+label oEmitReal:
+    assert compoundToken = aRealLit
+    Emit.EmitString (compoundTokenValue.stringLen,
+		     compoundTokenValue.stringText)
+
+label oEmitSymbol:
+    Emit.EmitInt (Symbol.SymbolIndexx)
+
+label oEmitExtraIdentSymbol:
+    assert Symbol.SymbolHasAttribute(saTag)
+    Emit.EmitInt (Symbol.SymbolIndexx+1)
+
+label oEmitPredefined:
+    assert compoundToken = aPredefinedId
+    Emit.EmitInt (compoundTokenValue.predefinedIdentIndex)
+
+label oEmitTypeTop:
+    var v : Value.ValueDescriptor
+    case parameterValue of
+	label tSet:
+	    Emit.EmitOutputToken(aSet)
+	    Emit.EmitOutputToken(aSubrange)
+	    Value.PushValueIndex(Types.TypeSetSubrangeLowerBound)
+	    Value.ValueValue(v)
+	    Emit.EmitValue(v)
+	    Value.PopValue
+	    Value.PushValueIndex(Types.TypeSetSubrangeUpperBound)
+	    Value.ValueValue(v)
+	    Emit.EmitValue(v)
+	    Value.PopValue
+
+	label tChar:
+	    Emit.EmitOutputToken(aChar)
+	    if Types.TypeKind = tCharString then
+		Emit.EmitOutputToken(aStringSizeBound)
+		Value.PushValueIndex(Types.TypeStringBound)
+		Value.ValueValue(v)
+		Emit.EmitValue(v)
+		Value.PopValue
+	    else
+		assert Types.TypeKind = tChar
+	    end if
+
+	label tEnumeratedRange:
+	    /* this is really nat:size */
+	    Emit.EmitOutputToken(aNat)
+	    const ts := Types.TypeSize
+	    if ts not= viFour then
+		Emit.EmitOutputToken(aStorageSize)
+		Value.PushValueIndex(ts)
+		Value.ValueValue(v)
+		Emit.EmitValue(v)
+		Value.PopValue
+		Emit.EmitOutputToken(aEndExpression)
+	    end if
+    end case
+
+label oEmitManifestValue:
+    assert Value.ValueKind not = vRunTime
+    var v : Value.ValueDescriptor
+    Value.ValueValue(v)
+    Emit.EmitValue(v)
+
+label oEmitManifestSymbolValue:
+    assert Value.ValueKind not = vRunTime
+    var v : Value.ValueDescriptor
+    Value.ValueValue(v)
+    Types.PushType(Symbol.SymbolType)
+    Emit.EmitValueWithTypeKind (v, Types.TypeKind)
+    Types.PopType
+
+label oEmitSubstringKind:
+    Emit.EmitInt(Substring.ReturnLeftKind * 256 + Substring.ReturnRightKind)
+
+label oEmitLine:
+    if emitNewSourceFile then
+	Emit.EmitOutputToken(aNewFile)
+	Emit.EmitString(length(nextSourceFileName), nextSourceFileName)
+	emitNewSourceFile:= false
+    end if
+    emitNewLineNumber:= true
+
+label oEmitBufferPush:
+    Emit.EmitBufferPush(indirect)
+
+label oEmitBufferPop:
+    Emit.EmitBufferPop(indirect)
+
+label oEmitBufferPushDirect:
+    Emit.EmitBufferPush(direct)
+
+label oEmitBufferPopDirect:
+    Emit.EmitBufferPop(direct)
+
+label oEmitBufferEmit:
+    Emit.EmitBufferEmit

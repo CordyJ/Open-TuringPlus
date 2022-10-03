@@ -1,0 +1,841 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+% 
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+% 
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+/*
+ *  Turing Plus to C Translator
+ *  Module:Transform T+ Assignments
+ *  By:    Mark Mendell
+ *  Date:  18 Dec 1986
+ */
+body "transassign.st" module TransformAssignment
+
+    function AnyOpEqual (i: int) : boolean
+	case i of
+	    label aAndEqual, aBooleanAndEqual, aBooleanOrEqual,
+		    aConcatenateAssign, aExponentiateEqual, aDivEqual,
+		    aMinusEqual, aModEqual, aOrEqual, aPlusEqual,
+		    aRealDivEqual, aSetDifferenceAssign,
+		    aSetIntersectionAssign, aSetUnionAssign,
+		    aSetXorAssign, aShiftLeftEqual, aShiftRightEqual,
+		    aStarEqual, aXorEqual:
+		result true
+	    label :
+		result false
+	end case
+    end AnyOpEqual
+
+
+    function MapFromOpEqual (i : int) : int
+	case i of
+	    label aBooleanAndEqual:
+		result aAnd
+	    label aBooleanOrEqual:
+		result aOr
+	    label aConcatenateAssign:
+		result aConcatenate
+	    label aExponentiateEqual:
+		result aExponentiate
+	    label aDivEqual:
+		result aDiv
+	    label aModEqual:
+		result aMod
+	    label aRealDivEqual:
+		result aDivideReal
+	    label aSetDifferenceAssign:
+		result aSetDifference
+	    label aSetIntersectionAssign:
+		result aSetIntersection
+	    label aSetUnionAssign:
+		result aSetUnion
+	    label aSetXorAssign:
+		result aSetXor
+	    label aAndEqual:
+		result aLogicalAnd
+	    label aMinusEqual:
+		result aMinus
+	    label aOrEqual:
+		result aLogicalOr
+	    label aPlusEqual:
+		result aAdd
+	    label aShiftLeftEqual:
+		result aShiftLeft
+	    label aShiftRightEqual:
+		result aShiftRight
+	    label aStarEqual:
+		result aMultiply
+	    label aXorEqual:
+		result aLogicalXor
+	    label :
+		result i
+	end case
+    end MapFromOpEqual
+
+
+    function FindAssignment(t : TreePointer) : TreePointer
+	var register x := t
+	var register z : TreePointer
+
+	loop
+	    if tNode(x).operatorNumber = aBegin then
+		z := FindAssignment(tNode(x).operand)
+		if z not= nil(tNode) then
+		    result z
+		end if
+	    elsif tNode(x).operatorNumber = aAssign or
+		    AnyOpEqual(tNode(x).operatorNumber) then
+		result x
+	    end if
+	    x := tNode(x).sibling
+	    if x = nil(tNode) then
+		result nil(tNode)
+	    end if
+	end loop
+    end FindAssignment
+
+
+    /*
+     * Replace the op= operator with the equivalent 
+     *		var := var op expn
+     *
+     * BUT:
+     *	   We must ensure that the variable is only evaluated once.
+     *     To do so, we declare a new variable, of type *var, and
+     *	   get the address of var.  We then use *temp for var.
+     *
+     *	   If isBits is true, then we are simplifying a bits expression
+     */
+    procedure ReplaceOpEqualWithEquivalent(t : TreePointer, isBits : boolean)
+	var register x : TreePointer
+	var register e : ExpressionPointer
+	var newStmt : TreePointer
+	var newId : ExpressionPointer
+	var register tp := t
+	var firstOperand := tNode(tNode(tp).operand).leaf
+	var variableType  : TreePointer
+
+	VariableType(firstOperand, variableType)
+	if isBits then
+	    firstOperand := eNode(firstOperand).u.operand
+	end if
+
+	if not SimpleExpression(firstOperand) then
+	    CreateBeginBlock(tp, newStmt)
+	    Expression.CreateUniqueIdentifier(newId)
+	    Types.SetType(newId, variableType)
+	    Types.EnterTypeInfo(newId)
+	    Types.IncreaseIndirection(newId, inPointer)
+
+	    /* create the predefined declaration & assignment */
+	    x := newStmt
+	    tp := tNode(newStmt).sibling
+	    tNode(x).operatorNumber := aCall
+	    tNode(x).nodeKind := NodeKinds.ExpressionLeaf
+	    tNode(x).operand := nil(tNode)
+
+	    new eNode, tNode(x).leaf
+	    e := tNode(x).leaf
+	    tag eNode(e).u, aCall
+	    eNode(e).sibling := nil(eNode)
+	    
+	    new eNode, eNode(e).u.operand
+	    e := eNode(e).u.operand
+	    tag eNode(e).u, aPredefinedId
+	    eNode(e).u.funcOrProcNumber := pTempPointer
+	    
+	    new eNode, eNode(e).sibling
+	    e := eNode(e).sibling
+
+	    tag eNode(e).u, aSubs
+	    eNode(e).sibling := nil(eNode)
+	    Expression.Copy(newId, eNode(e).u.operand)
+	    e := eNode(e).u.operand
+	    Expression.Copy(firstOperand, eNode(e).sibling)
+	    e := eNode(e).sibling
+
+	    /* copy the type of the variable */
+	    new eNode, eNode(e).sibling
+	    e := eNode(e).sibling
+	    eNode(e).sibling := nil(eNode)
+	    tag eNode(e).u, aType
+	    eNode(e).u.expnType := variableType
+	    if tNode(eNode(e).u.expnType).operatorNumber = aType then
+		eNode(e).u.expnType := tNode(eNode(e).u.expnType).operand
+	    end if
+
+	    /* replace the expn with the temporary */
+	    eNode(firstOperand).u := eNode(newId).u
+	end if
+
+	/* create a new expression node for the new expn */
+	new tNode, x
+	tNode(x).operatorNumber := 0
+	tNode(x).nodeKind := NodeKinds.ExpressionLeaf
+	tNode(x).operand := nil(tNode)
+	tNode(x).sibling := nil(tNode)
+	tNode(x).transformed := false
+	tNode(x).lineNumber := 0
+
+	/* create the new expression leaf for the operator */
+	new eNode, e
+	tNode(x).leaf := e
+
+	eNode(e).sibling := nil(eNode)
+
+	tag eNode(e).u, MapFromOpEqual(tNode(tp).operatorNumber)
+	eNode(e).u.nodeIsMarked := false
+
+	/* create a copy of the left hand side */
+	Expression.Copy(tNode(tNode(tp).operand).leaf, eNode(e).u.operand)
+
+	/*
+	 * place the right hand expression into the sibling of the
+	 * newly created copy
+	 */
+	eNode(eNode(e).u.operand).sibling :=
+	    tNode(tNode(tNode(tp).operand).sibling).leaf
+
+	/* now link it into the original expression node */
+	tNode(tp).operatorNumber := aAssign
+	tNode(tNode(tp).operand).sibling := x
+    end ReplaceOpEqualWithEquivalent
+
+
+    /*
+     * rewrite bits(xxx, a..b) := expn to:
+     *	xxx := ((expn shl a)  AND bitmask(a..b)) OR
+     *			(xxx AND not bitmask)
+     */
+    procedure TransformBitsAssignment (t : TreePointer)
+	var register tp := t
+	var register x,e : ExpressionPointer
+
+	e := tNode(tNode(tp).operand).leaf
+
+	if AnyOpEqual(tNode(tp).operatorNumber) then
+	    ReplaceOpEqualWithEquivalent(tp, true)
+	    tp := FindAssignment(tp)
+	end if
+
+	assert eNode(e).u.operatorNumber = aBits
+	e := eNode(e).u.operand
+
+	/* transform the target expression */
+	TransExpn.TransExpn (t, e, nil(eNode))
+	tp := FindAssignment(t)
+
+	assert eNode(eNode(e).sibling).u.operatorNumber = aSubrange or
+	    eNode(eNode(e).sibling).u.operatorNumber = aPacked
+
+	/* e now points to the variable (xxx) */
+	var copyVar : ExpressionPointer
+	Expression.Copy(e, copyVar)
+
+	x := eNode(eNode(e).sibling).u.operand
+	if eNode(eNode(e).sibling).u.operatorNumber = aPacked then
+	    x := eNode(x).u.operand
+	end if
+	const lowerBound := eNode(x).u.integerValue
+	const bitMask := BitMask(lowerBound,
+				 eNode(eNode(x).sibling).u.integerValue)
+
+	/* replace the aBits expn with the variable */
+	tNode(tNode(tp).operand).leaf := e
+
+	/* make the OR node */
+	new eNode, x
+	const newNode := x
+	tag eNode(x).u, aLogicalOr
+	eNode(x).sibling := nil(eNode)
+
+	/* make the first AND node */
+	new eNode, eNode(x).u.operand
+	x := eNode(x).u.operand
+	tag eNode(x).u, aLogicalAnd
+
+	/* first argument to first AND is expn SHL lowerBound */
+	new eNode, eNode(x).u.operand
+	var register y := eNode(x).u.operand
+	tag eNode(y).u, aShiftLeft
+
+	/* The second argument to the AND is the mask */
+	new eNode, eNode(y).sibling
+	tag eNode(eNode(y).sibling).u, aIntegerLit
+	eNode(eNode(y).sibling).u.integerValue := bitMask
+	eNode(eNode(y).sibling).u.integerKind := iInteger
+	eNode(eNode(y).sibling).sibling := nil(eNode)
+
+	/* put the original expression as the first argument to the SHL */
+	eNode(y).u.operand := tNode(tNode(tNode(tp).operand).sibling).leaf
+
+	/* second arg is the lower bound */
+	new eNode, eNode(eNode(y).u.operand).sibling
+	y := eNode(eNode(y).u.operand).sibling
+	tag eNode(y).u, aIntegerLit
+	eNode(y).u.integerValue := lowerBound
+	eNode(y).u.integerKind := iInteger
+	eNode(y).sibling := nil(eNode)
+
+	/* now the second argument to the first AND : the second AND */
+	new eNode, eNode(x).sibling
+	x := eNode(x).sibling
+	tag eNode(x).u, aAnd
+	eNode(x).sibling := nil(eNode)
+
+	/* first argument to second AND is variable (xxx) */
+	eNode(x).u.operand := copyVar
+
+	/* second argument to second AND is not(bitMask) */
+	new eNode, eNode(copyVar).sibling
+	x := eNode(copyVar).sibling
+
+	tag eNode(x).u, aIntegerLit
+	eNode(x).u.integerValue := - bitMask - 1
+	eNode(x).u.integerKind := iInteger
+	eNode(x).sibling := nil(eNode)
+
+	/* now link this expn into the original assignment */
+	tNode(tNode(tNode(tp).operand).sibling).leaf := newNode
+
+	/* I hate to do this, but we have to pass this through again! */
+	TransformAssign(tp)
+    end TransformBitsAssignment
+
+
+    procedure TransformSubstringAssignment (t : TreePointer,
+					   ep : ExpressionPointer)
+	var register e := eNode(ep).u.operand
+
+	TransExpn.TransExpn (t, e, nil(eNode))
+	e := eNode(e).sibling
+	TransExpn.TransExpn (t, e, nil(eNode))
+	assert eNode(eNode(e).sibling).u.operatorNumber = aEndSubstring and
+	       eNode(eNode(e).sibling).u.substringKind = ssExpn*256 + ssNone
+	eNode(e).sibling := nil(eNode)
+
+	/*
+	 * We must account for 0-origin in C code
+	 */
+	OneToZeroOrigin(e)
+    end TransformSubstringAssignment
+
+
+    procedure StringExpressionAssignment (ep : ExpressionPointer,
+					  t : TreePointer)
+	const register firstOperand := eNode(ep).u.operand
+	var register e := VariableId(firstOperand)
+	var register as := Types.ArrayStringInformation(e)
+
+	/* ensure that the expression is a string */
+	TransExpn.ToString(t, eNode(firstOperand).sibling)
+
+	/* replace this by a procedure call to STRASSIGN(size, left, right) */
+	var register x := ep
+
+	tag eNode(x).u, aCall
+	new eNode, eNode(x).u.operand
+	x := eNode(x).u.operand
+
+	tag eNode(x).u, aPredefinedId
+	eNode(x).u.funcOrProcNumber := pStringAssignment
+	
+	new eNode, eNode(x).sibling
+	x := eNode(x).sibling
+	tag eNode(x).u, aSubs
+	eNode(x).sibling := nil(eNode)
+
+	if asNode(as).u.kind = manifestStringLength then
+	    new eNode, eNode(x).u.operand
+	    x := eNode(x).u.operand
+	    tag eNode(x).u, aIntegerLit
+	    eNode(x).u.integerValue := asNode(as).u.mStringUpper
+	    eNode(x).u.integerKind := iInteger
+	else
+	    Expression.Copy(asNode(as).u.nmStringUpper, eNode(x).u.operand)
+	    x := eNode(x).u.operand
+	end if
+
+	eNode(x).sibling := firstOperand
+    end StringExpressionAssignment
+
+
+    procedure ExpressionPredefinedAssignment (ep : ExpressionPointer,
+					      predef : int)
+	const firstOperand := eNode(ep).u.operand
+	var register x := ep
+
+	tag eNode(x).u, aCall
+
+	new eNode, eNode(x).u.operand
+	x := eNode(x).u.operand
+
+	tag eNode(x).u, aPredefinedId
+	eNode(x).u.funcOrProcNumber := predef
+	
+	new eNode, eNode(x).sibling
+	x := eNode(x).sibling
+	tag eNode(x).u, aSubs
+	eNode(x).sibling := nil(eNode)
+	eNode(x).u.operand := firstOperand
+    end ExpressionPredefinedAssignment
+
+
+    procedure StructureExpressionAssignment (ep : ExpressionPointer)
+	/* replace this by a procedure call to STRUCTASS(left, right) */
+	ExpressionPredefinedAssignment(ep, pStructureAssignment)
+    end StructureExpressionAssignment
+
+
+    procedure NonScalarExpressionAssignment (ep : ExpressionPointer)
+	/* replace this by a procedure call to NONSCALASS(left, right) */
+	ExpressionPredefinedAssignment(ep, pNonScalarAssignment)
+    end NonScalarExpressionAssignment
+
+
+    procedure SetExpressionAssignment (ep : ExpressionPointer)
+	const register e := VariableId(eNode(ep).u.operand)
+
+	if CTypes.NonScalar(Types.GetType(e)) then
+	    NonScalarExpressionAssignment(ep)
+	end if
+    end SetExpressionAssignment
+
+
+    procedure FixupOneExpressionAssignment (ep : ExpressionPointer,
+					    t  : TreePointer)
+	case ExpnType(eNode(ep).u.operand) of
+	    label tString, tParameterString:
+		StringExpressionAssignment(ep, t)
+	    
+	    label tChar:
+		/* ensure that the right side is a char */
+		TransExpn.ToChar(t, eNode(eNode(ep).u.operand).sibling)
+
+	    label tRecord, tUnion:
+		StructureExpressionAssignment(ep)
+
+	    label tSet:
+		SetExpressionAssignment(ep)
+
+	    label tCharString, tArray:
+		NonScalarExpressionAssignment(ep)
+
+	    label :
+	end case
+    end FixupOneExpressionAssignment
+
+
+    procedure StringAssignment(t : TreePointer)
+	var register e := VariableId(tNode(tNode(t).operand).leaf)
+	var register as := Types.ArrayStringInformation(e)
+
+	/* ensure that the expression is a string */
+	TransExpn.ToString(t, tNode(tNode(tNode(t).operand).sibling).leaf)
+	var register T := FindAssignment(t)
+
+	/* replace this by a procedure call to STRASSIGN(size, left, right) */
+	var register x : ExpressionPointer
+
+	tNode(T).operatorNumber := aCall
+	tNode(T).nodeKind := NodeKinds.ExpressionLeaf
+
+	new eNode, x
+	tag eNode(x).u, aCall
+	eNode(x).sibling := nil(eNode)
+	const callNode := x
+
+	new eNode, eNode(x).u.operand
+	x := eNode(x).u.operand
+
+	tag eNode(x).u, aPredefinedId
+	eNode(x).u.funcOrProcNumber := pStringAssignment
+	
+	new eNode, eNode(x).sibling
+	x := eNode(x).sibling
+	tag eNode(x).u, aSubs
+	eNode(x).sibling := nil(eNode)
+
+	if asNode(as).u.kind = manifestStringLength then
+	    new eNode, eNode(x).u.operand
+	    x := eNode(x).u.operand
+	    tag eNode(x).u, aIntegerLit
+	    eNode(x).u.integerValue := asNode(as).u.mStringUpper
+	    eNode(x).u.integerKind := iInteger
+	else
+	    Expression.Copy(asNode(as).u.nmStringUpper, eNode(x).u.operand)
+	    x := eNode(x).u.operand
+	end if
+
+	Expression.Copy(tNode(tNode(T).operand).leaf, eNode(x).sibling)
+	x := eNode(x).sibling
+	eNode(x).sibling := tNode(tNode(tNode(T).operand).sibling).leaf
+	tNode(T).leaf := callNode
+	tNode(T).operand := nil(tNode)
+    end StringAssignment
+
+
+    procedure PredefinedAssignment (t : TreePointer, predef : int)
+	var register x : ExpressionPointer
+
+	tNode(t).operatorNumber := aCall
+	tNode(t).nodeKind := NodeKinds.ExpressionLeaf
+
+	new eNode, x
+	tag eNode(x).u, aCall
+	eNode(x).sibling := nil(eNode)
+	const callNode := x
+
+	new eNode, eNode(x).u.operand
+	x := eNode(x).u.operand
+
+	tag eNode(x).u, aPredefinedId
+	eNode(x).u.funcOrProcNumber := predef
+	
+	new eNode, eNode(x).sibling
+	x := eNode(x).sibling
+	tag eNode(x).u, aSubs
+	eNode(x).sibling := nil(eNode)
+
+	Expression.Copy(tNode(tNode(t).operand).leaf, eNode(x).u.operand)
+	x := eNode(x).u.operand
+	eNode(x).sibling := tNode(tNode(tNode(t).operand).sibling).leaf
+	tNode(t).leaf := callNode
+	tNode(t).operand := nil(tNode)
+    end PredefinedAssignment
+
+
+    procedure StructureAssignment (t : TreePointer)
+	/* replace this by a procedure call to STRUCTASS(left, right) */
+	PredefinedAssignment(t, pStructureAssignment)
+    end StructureAssignment
+
+
+    procedure NonScalarAssignment (t : TreePointer)
+	/* replace this by a procedure call to NONSCALASS(left, right) */
+	PredefinedAssignment(t, pNonScalarAssignment)
+    end NonScalarAssignment
+
+
+    procedure SetAssignment (t : TreePointer)
+	const register e := VariableId(tNode(tNode(t).operand).leaf)
+
+	if CTypes.NonScalar(Types.GetType(e)) then
+	    NonScalarAssignment(t)
+	end if
+    end SetAssignment
+
+
+    procedure FixupOneAssignment (t : TreePointer)
+#if DEBUG then
+	handler (quitCode)
+	    if quitCode not= excpSIGINT then
+		put : 0, "FixupOneAssignment Abort:"
+		Tree.Dump(t, 0, 0)
+	    end if
+	    quit >
+	end handler
+#end if
+	case ExpnType(tNode(tNode(t).operand).leaf) of
+	    label tString, tParameterString:
+		StringAssignment(t)
+	    
+	    label tChar:
+		/* ensure that the right side is a char */
+		TransExpn.ToChar(t, tNode(tNode(tNode(t).operand).sibling).leaf)
+
+	    label tRecord, tUnion:
+		StructureAssignment(t)
+
+	    label tSet:
+		SetAssignment(t)
+
+	    label tCharString, tArray:
+		NonScalarAssignment(t)
+
+	    label :
+	end case
+    end FixupOneAssignment
+
+
+    procedure FixupAssignments (t : TreePointer, var found : boolean)
+	var register x := t
+
+	loop
+	    if tNode(x).operatorNumber = aBegin then
+		FixupAssignments(tNode(x).operand, found)
+		if found then
+		    return
+		end if
+	    elsif tNode(x).operatorNumber = aTempAssign then
+		FixupOneAssignment(x)
+	    elsif tNode(x).operatorNumber = aAssign or
+		    AnyOpEqual(tNode(x).operatorNumber) then
+		FixupOneAssignment(x)
+		found := true
+		return
+	    end if
+	    x := tNode(x).sibling
+	    if found or x = nil(tNode) then
+		return
+	    end if
+	end loop
+    end FixupAssignments
+
+
+    /*
+     * Only fixup the assignments if this is a begin block
+     *    -- used when the original assignment is now a aCall, etc
+     */
+    procedure FixupNestedAssignments (t : TreePointer)
+	if tNode(t).operatorNumber = aBegin then
+	    var dummy := false
+	    FixupAssignments(tNode(t).operand, dummy)
+	end if
+    end FixupNestedAssignments
+
+
+    body procedure TransformAssign % (t : TreePointer)
+	var register e := tNode(t).operand
+
+	case eNode(tNode(e).leaf).u.operatorNumber of
+	    label aBits:
+		TransformBitsAssignment(t)
+
+	    label aSubstring:
+		TransformSubstringAssignment(t, tNode(e).leaf)
+
+	    label :
+		/* transform the target */
+		TransExpn.TransExpn (t, tNode(e).leaf, nil(eNode))
+	end case
+	/* transform the right hand expression */
+	TransExpn.TransExpn (t, tNode(tNode(e).sibling).leaf, nil(eNode))
+
+	/*
+	 * Now correct all the assignments that were generated,
+	 * including this one.
+	 */
+	var dummy := false
+	FixupAssignments(t, dummy)
+    end TransformAssign
+
+
+    /*
+     * Change str += expn to STRCATASS(str, expn, stringSize)
+     */
+    procedure TranformStringConcatenateAssign (t : TreePointer)
+	var register tp := tNode(t).operand
+
+	if Expression.AreEqual(tNode(tp).leaf,
+		tNode(tNode(tp).sibling).leaf) then
+	    /*
+	     * we have s += s  -- strcat won't work;  
+	     * do this the hard way
+	     */
+	    ReplaceOpEqualWithEquivalent(t, false)
+	    tp := FindAssignment(t)
+	    TransformAssign(t)
+	    return
+	end if
+
+	const firstOperand := tp
+
+	TransExpn.TransExpn (t, tNode(tp).leaf, nil(eNode))
+	TransExpn.TransExpn (t, tNode(tNode(tp).sibling).leaf, nil(eNode))
+
+	const variable := VariableId(tNode(firstOperand).leaf)
+
+	/* we know the left is a string;  ensure the right is as well */
+	TransExpn.ToString(FindAssignment(t), tNode(tNode(tp).sibling).leaf)
+
+	tp := FindAssignment(t)
+	tNode(tp).operatorNumber := aCall
+	tNode(tp).nodeKind := NodeKinds.ExpressionLeaf
+	tNode(tp).operand := nil(tNode)
+
+	var register e : ExpressionPointer
+
+	new eNode, tNode(tp).leaf
+	e := tNode(tp).leaf
+	tag eNode(e).u, aCall
+	eNode(e).sibling := nil(eNode)
+	
+	new eNode, eNode(e).u.operand
+	e := eNode(e).u.operand
+	tag eNode(e).u, aPredefinedId
+	eNode(e).u.funcOrProcNumber := pStringConcatenateAssign
+	
+	new eNode, eNode(e).sibling
+	e := eNode(e).sibling
+
+	tag eNode(e).u, aSubs
+	eNode(e).sibling := nil(eNode)
+	Expression.Copy(tNode(firstOperand).leaf, eNode(e).u.operand)
+	e := eNode(e).u.operand
+	Expression.Copy(tNode(tNode(firstOperand).sibling).leaf,
+	    eNode(e).sibling)
+	e := eNode(e).sibling
+
+	const register as := Types.ArrayStringInformation(variable)
+
+	if asNode(as).u.kind = manifestStringLength then
+	    new eNode, eNode(e).sibling
+	    e := eNode(e).sibling
+	    eNode(e).sibling := nil(eNode)
+	    tag eNode(e).u, aIntegerLit
+	    eNode(e).u.integerValue := asNode(as).u.mStringUpper
+	    eNode(e).u.integerKind := iInteger
+	else
+	    Expression.Copy(asNode(as).u.nmStringUpper, eNode(e).sibling)
+	end if
+	/*
+	 * Now correct all the assignments that were generated
+	 */
+	FixupNestedAssignments(t)
+    end TranformStringConcatenateAssign
+
+
+    procedure TransformSetAssignment (t : TreePointer)
+	var register tp := tNode(t).operand
+
+	const variable := VariableId(tNode(tp).leaf)
+
+	const firstOperand := tp
+	const operator := tNode(t).operatorNumber
+
+	TransExpn.TransExpn (t, tNode(tp).leaf, nil(eNode))
+	TransExpn.TransExpn (t, tNode(tNode(tp).sibling).leaf,
+	    nil(eNode))
+
+	if Types.HasAttribute(variable, aaSmallSet) then
+	    /*
+	     * Now correct all the assignments that were generated,
+	     * including this one.
+	     */
+	    var dummy := false
+	    FixupAssignments(t, dummy)
+	    return
+	end if
+
+	tp := FindAssignment(t)
+
+	/*
+	 * this is a large set op=;  make it a predefined call
+	 */
+	tNode(tp).operatorNumber := aCall
+	tNode(tp).nodeKind := NodeKinds.ExpressionLeaf
+	tNode(tp).operand := nil(tNode)
+
+	var register e : ExpressionPointer
+
+	new eNode, tNode(tp).leaf
+	e := tNode(tp).leaf
+	tag eNode(e).u, aCall
+	eNode(e).sibling := nil(eNode)
+	
+	new eNode, eNode(e).u.operand
+	e := eNode(e).u.operand
+	tag eNode(e).u, aPredefinedId
+
+	case operator of
+	    label aSetUnionAssign:
+		eNode(e).u.funcOrProcNumber := pLargeSetUnionAssign
+
+	    label aSetIntersectionAssign:
+		eNode(e).u.funcOrProcNumber := pLargeSetIntersectionAssign
+
+	    label aSetXorAssign:
+		eNode(e).u.funcOrProcNumber := pLargeSetXorAssign
+
+	    label aSetDifferenceAssign:
+		eNode(e).u.funcOrProcNumber := pLargeSetDifferenceAssign
+	end case
+	
+	new eNode, eNode(e).sibling
+	e := eNode(e).sibling
+
+	tag eNode(e).u, aSubs
+	eNode(e).sibling := nil(eNode)
+	Expression.Copy(tNode(firstOperand).leaf, eNode(e).u.operand)
+	e := eNode(e).u.operand
+	Expression.Copy(tNode(tNode(firstOperand).sibling).leaf,
+	    eNode(e).sibling)
+	/*
+	 * Now correct all the assignments that were generated
+	 */
+	FixupNestedAssignments(t)
+    end TransformSetAssignment
+
+
+    body procedure TransformOpEqual % (t : TreePointer)
+	var register tp := t
+	case tNode(tp).operatorNumber of
+	    label aExponentiateEqual:
+		/*
+		 * change this to an assignment, with the left hand side 
+		 * replicated on the right, with the correct assignment operator
+		 */
+		ReplaceOpEqualWithEquivalent(tp, false)
+		tp := FindAssignment(tp)
+
+	    label aDivEqual, aModEqual:
+		/*
+		 * if neither side is real then okay, else ..
+		 */
+		const operand := tNode(tp).operand
+
+		if ExpnType(tNode(operand).leaf) = tReal or
+			ExpnType(tNode(tNode(operand).sibling).leaf) =
+			    tReal then
+		    ReplaceOpEqualWithEquivalent(tp, false)
+		    tp := FindAssignment(tp)
+		end if
+
+	    label aConcatenateAssign:
+		TranformStringConcatenateAssign(tp)
+		return
+
+	    label aSetDifferenceAssign, aSetIntersectionAssign, aSetUnionAssign,
+		    aSetXorAssign:
+		/*
+		 * If this is a large set, change it to a predefined call
+		 */
+		TransformSetAssignment(tp)
+		return
+
+	    label aPlusEqual, aMinusEqual:
+
+	    label :
+		/* C supports += -= *= /= >>= <<= &= ^= |= */
+		/* aBooleanAndEqual == &=, aBooleanOrEqual == |= */
+		if ExpnType(tNode(tNode(tp).operand).leaf) = tAddressInt then
+		    ReplaceOpEqualWithEquivalent(tp, false)
+		    tp := FindAssignment(tp)
+		end if
+
+	end case
+	/* now let the assignment transformation get it */
+	TransformAssign(tp)
+    end TransformOpEqual
+
+    /*
+     * Now, link FixupOneExpressionAssignment in, so that TransExpn
+     * can use it
+     */
+    fixupExpressionAssignment := FixupOneExpressionAssignment
+
+end TransformAssignment

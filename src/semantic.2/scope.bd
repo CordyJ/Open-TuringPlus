@@ -1,0 +1,304 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+% 
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+% 
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+body "scope.st" module Scope
+
+    /*
+     *  Module:	Turing Plus Semantic Pass 2 Scope Mechanism V1.00
+     *	Author: M. Mendell and S.G. Perelgut
+     *	Date:	7 April 1986
+     */
+
+    /*
+     * This mechanism is used to store formals and record lists
+     * of symbols.
+     */
+
+
+    /* Scope Entry */
+    type ScopeEntry :
+	record
+	    symbol:	SymbolIndex
+	end record
+
+    /* Scope Element */
+#if DEBUG then
+    var scopes : collection of forward ScopeElement
+#else
+    var scopes : unchecked collection of forward ScopeElement
+#end if
+
+    type *ScopeElementPtr : pointer to scopes
+
+    const *ScopeEntriesPerElement := 20
+
+    type *ScopeElement :
+	record
+	    numElems:	0..ScopeEntriesPerElement
+	    next:	ScopeElementPtr
+	    entries:	array 1..ScopeEntriesPerElement of ScopeEntry
+	end record
+
+    /* Scope Header Entry */
+    type *ScopeHeaderEntry :
+	record
+	    numElems:	int
+	    first:	ScopeElementPtr
+	    last:	ScopeElementPtr
+	end record
+
+    /* Scope Display Entry */
+    type *ScopeDisplayEntry :
+	record
+	    numElems:	int
+	    first:	ScopeElementPtr
+	    last:	ScopeElementPtr
+	end record
+
+
+    /* Scope Display */
+    /*
+     * The display entry for each list is the (zero) origin of
+     * the corresponding list.  The top list extends from
+     * scopeDisplay(scopeLevel)+1 to scopeTop.
+     */
+    var scopeDisplay: array 1..maxScopeLevel of ScopeDisplayEntry
+
+    var scopeLevel: 0..maxScopeLevel := 0
+    var maxxScopeLevel: 0..maxScopeLevel := 0
+
+    /* Saved Scope Table */
+    var scopeTable: array 1..maxSavedScopes of ScopeHeaderEntry
+    var scopeTableTop: 0..maxSavedScopes := 0
+    var savedScopeIndex: 0..maxSavedScopes
+
+    /* results of Lookup Symbol Operations */
+    var scopeSymbolIndex: SymbolIndex
+
+
+    function ConsistentNumElems (s : int) : boolean
+	pre s <= scopeLevel
+	var p := scopeDisplay(s).first
+	var count := 0
+	loop
+	    exit when p = nil(scopes)
+	    count += scopes(p).numElems
+	    p := scopes(p).next
+	end loop
+	result count >= scopeDisplay(s).numElems
+    end ConsistentNumElems
+
+
+    body procedure PushNewScope
+	if scopeLevel < maxScopeLevel then
+	    scopeLevel += 1
+	    if statistics and maxxScopeLevel < scopeLevel then
+		maxxScopeLevel := scopeLevel
+	    end if
+	    bind var register d to scopeDisplay(scopeLevel)
+	    d.numElems := 0
+	    d.first := nil(scopes)
+	    d.last := nil(scopes)
+	else
+	    Error (eScopeDisplayOverflow)
+	end if
+    end PushNewScope
+
+
+    body procedure PushScope % (scope: ScopeIndex)
+	pre scope <= scopeTableTop
+	post ConsistentNumElems(scopeLevel)
+
+	if scopeLevel < maxScopeLevel then
+	    scopeLevel += 1
+	    if statistics and maxxScopeLevel < scopeLevel then
+		maxxScopeLevel := scopeLevel
+	    end if
+	    if scope not= 0 then
+		bind var register d to scopeDisplay(scopeLevel),
+		    t to scopeTable(scope)
+		d.numElems := t.numElems
+		d.first := t.first
+		d.last := t.last
+	    else
+		bind var register d to scopeDisplay(scopeLevel)
+		d.numElems := 0
+		d.first := nil(scopes)
+		d.last := nil(scopes)
+	    end if
+	else
+	    Error (eScopeDisplayOverflow)
+	end if
+    end PushScope
+
+
+    body procedure SaveScope
+	pre scopeLevel > 0 and ConsistentNumElems(scopeLevel)
+
+	if scopeTableTop < maxSavedScopes then
+	    if scopeDisplay(scopeLevel).numElems = 0 then
+		savedScopeIndex := 0
+	    else
+		scopeTableTop += 1
+		bind var register t to scopeTable(scopeTableTop),
+		    var register d to scopeDisplay(scopeLevel)
+
+		t.numElems := d.numElems
+		t.first := d.first
+		t.last := d.last
+
+		savedScopeIndex := scopeTableTop
+	    end if
+	else
+	    Error (eScopeTableOverflow)
+	end if
+    end SaveScope
+
+
+    body procedure ScoEnterSymbol % symbol: SymbolIndex)
+
+	pre  scopeLevel > 0 and ConsistentNumElems(scopeLevel)
+	post ConsistentNumElems(scopeLevel)
+
+	bind var register d to scopeDisplay(scopeLevel)
+	if d.first = nil(scopes) or
+		scopes(d.last).numElems = ScopeEntriesPerElement then
+	    % must allocate a new scope element
+	    var p : ScopeElementPtr
+	    new scopes, p
+	    if p = nil(scopes) then
+		Error (eScopeSymbolOverflow)
+	    end if
+	    scopes(p).next := nil(scopes)
+	    if d.first = nil(scopes) then
+		d.first := p
+		d.last := p
+		d.numElems := 0
+	    else
+		scopes(d.last).next := p
+	    end if
+	    d.last := p
+
+	    % tranfer the information
+	    scopes(d.last).numElems := 1
+	    d.numElems += 1
+
+	    bind var register el to scopes(d.last).entries(1)
+	    el.symbol := symbol
+	else
+	    d.numElems += 1
+	    bind var register e to scopes(d.last)
+	    e.numElems += 1
+	    bind var register el to e.entries(e.numElems)
+	    el.symbol := symbol
+	end if
+    end ScoEnterSymbol
+
+
+    body procedure PopScope
+	pre scopeLevel > 0 and ConsistentNumElems(scopeLevel)
+	scopeLevel -= 1
+    end PopScope
+
+
+    body procedure LookupCountSymbol % (entry: int)
+	pre scopeLevel > 0 and ConsistentNumElems(scopeLevel)
+
+	if entry <= scopeDisplay(scopeLevel).numElems then
+	    var p := scopeDisplay(scopeLevel).first
+	    var i := 0
+	    loop
+		exit when entry-i <= scopes(p).numElems
+		i += scopes(p).numElems
+		p := scopes(p).next
+	    end loop
+
+	    % now select the proper entry
+	    scopeSymbolIndex := scopes(p).entries(entry-i).symbol
+	else
+	    scopeSymbolIndex := -1
+	end if
+    end LookupCountSymbol
+
+
+    body function ScopeNumberOfEntries % : int
+	pre scopeLevel > 0
+	result scopeDisplay(scopeLevel).numElems
+    end ScopeNumberOfEntries
+
+
+    body function ScoStackEmpty % : boolean
+	result scopeLevel = 0
+    end ScoStackEmpty
+
+
+    body procedure ScopeStats
+	put "Scope\n\tSaved scopes = ", scopeTableTop, "/", maxSavedScopes
+    end ScopeStats
+
+
+    body function ScopeSymbolIndex % : SymbolIndex
+	result scopeSymbolIndex
+    end ScopeSymbolIndex
+
+
+    body function SavedScopeIndex % : int
+	result savedScopeIndex
+    end SavedScopeIndex
+
+
+    procedure DumpScopeList (sc : ScopeElementPtr, count : int)
+	var p := sc
+	var c := count
+	loop
+	    exit when p = nil(scopes) or c <= 0
+	    put natstr(#p,1,16) , ":"
+	    for j : 1 .. min(scopes(p).numElems, c)
+		put "\t" ..
+		put "\t", scopes(p).entries(j).symbol
+	    end for
+	    c -= scopes(p).numElems
+	    p := scopes(p).next
+	end loop
+	put ""
+    end DumpScopeList
+
+
+    body procedure DumpScopes
+	put "Scope Display"
+	for decreasing i : scopeLevel..1
+	    bind register d to scopeDisplay(i)
+	    put i:5, "\t", natstr(#(d.first),1,16), "\t",
+		natstr(#(d.last),1,16), "\t", d.numElems
+	    assert ConsistentNumElems(i)
+	    DumpScopeList(d.first, d.numElems)
+	end for
+	put "\nSaved Scopes\n\tnum els\tfirst\tlast"
+	var start := 1
+	if not allSymbols then
+	    start := 22		% MAGIC NUMBER !!!!!!
+	end if
+	for i : start..scopeTableTop
+	    put i:5, "\t", scopeTable(i).numElems, "\t",
+		natstr(#(scopeTable(i).first),1,16), "\t",
+		natstr(#(scopeTable(i).last),1,16)
+	    DumpScopeList(scopeTable(i).first, scopeTable(i).numElems)
+	end for
+	put "\n", repeat("-", 79)
+    end DumpScopes
+end Scope

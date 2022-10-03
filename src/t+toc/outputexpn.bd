@@ -1,0 +1,1656 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+% 
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+% 
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+body "outputexpn.st" module OutputExpn
+
+    /* stack for use of variable references */
+    var variableStack : array 1..20 of ExpressionPointer
+    var variableTop   : 0..20 := 0
+
+
+    procedure CheckRange(e : ExpressionPointer, arrIndex : ArrayStringPointer,
+		     var tExpn : ExpressionPointer)
+	if asNode(arrIndex).u.kind = manifestUpperBound then
+	    var register mUpper : ExpressionPointer
+	    new eNode, mUpper
+
+	    tag eNode(mUpper).u, aIntegerLit
+	    eNode(mUpper).u.integerValue := asNode(arrIndex).u.mUpper
+	    eNode(mUpper).u.integerKind := iInteger
+
+	    InRange(e, mUpper, asNode(arrIndex).u.mLower, tExpn, true, 1)
+
+	    free eNode, mUpper
+	else
+	    InRange(e, asNode(arrIndex).u.nmUpper, asNode(arrIndex).u.nmLower,
+		    tExpn, true, 1)
+	end if
+    end CheckRange
+
+
+    procedure OutputOneSlice (register e : ExpressionPointer,
+			register arrIndex: ArrayStringPointer)
+	var tExpn : ExpressionPointer
+
+	put :outFile, "((" ..
+	CheckRange(e, arrIndex, tExpn)
+	OutputExpression(tExpn, false)
+	Expression.Free(tExpn)
+	if asNode(arrIndex).u.kind = manifestUpperBound then
+	    put :outFile, ") + ", asNode(arrIndex).u.mUpper -
+		    asNode(arrIndex).u.mLower + 1, " * " ..
+	else
+	    put :outFile, ") + " ..
+	    OutputExpression(asNode(arrIndex).u.nmUpper, false)
+	    put :outFile, " * " ..
+	end if
+    end OutputOneSlice
+
+
+    /*
+     * We have to use Horner's rule:
+     * A [ (( i1 * #i2 + i2) * #i3 + i3) ...]
+     * where i1, i2, ... are scaled, and #iN is the number of elements in
+     * subscript N
+     * We output it in reverse, because that seems easier
+     * A [ ... (i3 + #i3 * (i2 + #i2 * (i1))) ]
+     */
+    procedure OutputMultiDimensionalSubscript (register e : ExpressionPointer,
+				         register arrIndex: ArrayStringPointer,
+					 firstTime : boolean)
+	var tExpn : ExpressionPointer
+
+	if eNode(e).sibling = nil(eNode) then
+	    OutputOneSlice(e, arrIndex)
+	else
+	    OutputMultiDimensionalSubscript(eNode(e).sibling,
+		asNode(arrIndex).next, false)
+	    if firstTime then
+		put :outFile, "(" ..
+		CheckRange(e, arrIndex, tExpn)
+		OutputExpression(tExpn, false)
+		Expression.Free(tExpn)
+		put :outFile, ")" ..
+	    else
+		OutputOneSlice(e, arrIndex)
+	    end if
+	end if
+    end OutputMultiDimensionalSubscript
+
+
+    procedure OutputComma (var firstTime : boolean)
+	if firstTime then
+	    firstTime := false
+	else
+	    put :outFile, ", " ..
+	end if
+    end OutputComma
+
+
+    procedure OutputParameterStringExpression(param,
+					      actual : ExpressionPointer)
+	/* actual parameter may be an expression ! */
+
+	/* output the string base */
+	if not ImplicitReference(actual) then
+	    put :outFile, "&(" ..
+	    OutputExpression(actual, noParen)
+	    put :outFile, ")" ..
+	else
+	    OutputExpression(actual, noParen)
+	end if
+
+	if eNode(actual).u.operatorNumber = aStringLit then
+	    put :outFile, ", ", intCast, eNode(actual).u.stringLen ..
+	elsif eNode(actual).u.operatorNumber = aCharLit then
+	    put :outFile, ", ", intCast, eNode(actual).u.charLen ..
+	else
+	    const register id := VariableId(actual)
+	    if id not= nil(eNode) then
+		const register asActual := Types.ArrayStringInformation(id)
+
+		if asNode(asActual).u.kind = nonManifestStringLength then
+		    put :outFile, ", ", intCast ..
+		    OutputExpression (asNode(asActual).u.nmStringUpper, noParen)
+		else
+		    put :outFile, ", ", intCast,
+			asNode(asActual).u.mStringUpper ..
+		end if
+	    else
+		/* this might have been a char substring */
+		var register x := actual
+
+		if eNode(x).u.operatorNumber = aCall then
+		    x := eNode(x).u.operand
+		    if eNode(x).u.operatorNumber = aPredefinedId and
+			    eNode(x).u.funcOrProcNumber = pAddr then
+			x := eNode(eNode(x).sibling).u.operand
+			assert eNode(x).u.operatorNumber = aSubstring
+			put :outFile, ", ", intCast, "1" ..
+		    else
+			put :outFile, ", ", intCast, "255" ..
+		    end if
+		else
+		    put :outFile, ", ", intCast, "255" ..
+		end if
+	    end if
+	end if
+    end OutputParameterStringExpression
+
+
+    procedure OutputParameterArrayParameterString(actual : ExpressionPointer)
+	const register asActual := Types.ArrayStringInformation(actual)
+
+	if asNode(asActual).u.kind = nonManifestStringLength then
+	    put :outFile, ", ", intCast ..
+	    OutputExpression (asNode(asActual).u.nmStringUpper, noParen)
+	    put :outFile, ", ", intCast ..
+	    OutputExpression (asNode(asActual).u.nmStringSize, noParen)
+	else
+	    put :outFile, ", ", intCast, asNode(asActual).u.mStringUpper,
+		", ", intCast ..
+	    if Types.HasAttribute(actual, aaNoDeclaration) then
+		var register ep : ExpressionPointer
+
+		new eNode, ep
+		eNode(ep).sibling := nil(eNode)
+		CTypes.EnterTypeSize(eNode(ep), Types.GetType(actual), false)
+		OutputExpression(ep, noParen)
+		Expression.Free(ep)
+	    else
+		put :outFile, "sizeof (" ..
+		OutputExpression(actual, noParen)
+		put :outFile, ")" ..
+	    end if
+	end if
+    end OutputParameterArrayParameterString
+
+
+    procedure OutputParameterArrayExpression(var param,
+						 actual : ExpressionPointer)
+	var register asActual := Types.ArrayStringInformation(
+				    VariableId(actual))
+	var register asParam  := Types.ArrayStringInformation(param)
+
+	/* output the array base */
+	OutputExpression(actual, noParen)
+
+	/* now get all the bounds */
+	loop
+	    exit when asNode(asParam).u.kind = componentType
+	    assert asNode(asParam).u.kind = nonManifestUpperBound
+	    if asNode(asActual).u.kind = nonManifestUpperBound then
+		put :outFile, ", ", intCast ..
+		OutputExpression (asNode(asActual).u.nmUpper, noParen)
+	    else
+		put :outFile, ", ", intCast, asNode(asActual).u.mUpper -
+		    asNode(asActual).u.mLower + 1 ..
+	    end if
+	    asParam := asNode(asParam).next
+	    asActual := asNode(asActual).next
+	end loop
+	param := asNode(asParam).u.id
+	actual := asNode(asActual).u.id
+    end OutputParameterArrayExpression
+
+
+    function IsSubprogramInItsGlory (e : ExpressionPointer) : boolean
+	const varId := VariableId(e)
+
+	if varId = nil(eNode) then
+	    result false
+	else
+	    const eKind := ExpnType(varId)
+
+	    result eKind = tProcedure or eKind = tFunction
+	end if
+    end IsSubprogramInItsGlory
+
+
+    body procedure OutputParameters % (func, parameters : ExpressionPointer)
+	/* get a pointer to the parameter list */
+	var register plist := Types.GetType(VariableId(func))
+	var firstTime := true
+
+	if tNode(plist).operatorNumber = aExternal or
+		tNode(plist).operatorNumber = aForward then
+	    plist := tNode(plist).operand
+	end if
+	plist := tNode(tNode(plist).operand).sibling
+	assert tNode(plist).operatorNumber = aSubs
+	plist := tNode(plist).operand
+
+	/* also a pointer to the actuals list */
+	var register actuals := parameters
+
+	/* now walk through the parameter list */
+	loop
+	    exit when actuals = nil(eNode)
+
+	    OutputComma(firstTime)
+	    const tKind := Types.GetKind(tNode(plist).leaf)
+	    case tKind of
+		label tParameterArray:
+		    var actual := actuals
+		    var param  := tNode(plist).leaf
+		    OutputParameterArrayExpression(param, actual)
+
+		label tParameterCharString, tParameterString:
+		    OutputParameterStringExpression(tNode(plist).leaf,
+						    actuals)
+
+		label tParameterArrayParameterCharString,
+		      tParameterArrayParameterString:
+		    var actual := actuals
+		    var param  := tNode(plist).leaf
+		    OutputParameterArrayExpression(param, actual)
+		    OutputParameterArrayParameterString(actual)
+
+		label :
+		    if Types.HasAttribute(tNode(plist).leaf, aaReference) or
+			    Types.HasAttribute(tNode(plist).leaf,
+				aaTypeCheat) then
+			/* this is a reference parameter of some sort */
+			if not ImplicitReference(actuals) then
+			    put :outFile, "&(" ..
+			    OutputExpression(actuals, noParen)
+			    put :outFile, ")" ..
+			else
+			    /* no & in front of arrays in C */
+			    OutputExpression(actuals, noParen)
+			end if
+		    else
+			if Types.HasAttribute(tNode(plist).leaf,
+				aaVaryingParameter) then
+			    OutputExpression(actuals, noParen)
+			else
+			    case tKind of
+				label tNat, tInt, tChar, tBoolean,
+					tAddressInt, tSubrange, tEnumeration,
+					tSet:
+				    const oldRangecheck := currentRangecheck
+
+				    currentRangecheck :=
+					valueParameterRangecheck
+				    if not (IsSubprogramInItsGlory(actuals) or
+					    (tKind = tSet and
+						not Types.HasAttribute(
+						    tNode(plist).leaf,
+						    aaSmallSet))) then
+					const register ty :=
+					    Types.GetTree(tNode(plist).leaf)
+
+					put :outFile, "(" ..
+					CTypes.Output(ty, nil(tNode), outFile,0)
+					put :outFile, ") " ..
+				    end if
+				    OutputExpression(actuals, paren)
+				    currentRangecheck := oldRangecheck
+
+				label tReal:
+				    put :outFile, realCast ..
+				    OutputExpression(actuals, paren)
+
+				label tString, tCharString:
+				    const oldRangecheck := currentRangecheck
+
+				    currentRangecheck :=
+					stringParameterRangecheck
+				    OutputExpression(actuals, noParen)
+				    currentRangecheck := oldRangecheck
+
+				label :
+				    OutputExpression(actuals, noParen)
+			    end case
+			end if
+		    end if
+	    end case
+
+	    actuals := eNode(actuals).sibling
+	    if tNode(plist).sibling not= nil(tNode) then
+		plist := tNode(plist).sibling
+	    end if
+	end loop
+    end OutputParameters
+
+
+    body procedure OutputCastedExpression % (e : ExpressionPointer)
+	case ExpnType(e) of
+	    label tInt, tNat, tSubrange, tEnumeration:
+		put :outFile, intCast ..
+
+	    label tReal:
+		put :outFile, realCast ..
+
+	    label tAddressInt:
+		put :outFile, "(", macdepType(mAddressint), ") " ..
+
+	    label tChar:
+		put :outFile, "(", macdepType(mChar), ") " ..
+
+	    label tBoolean:
+		put :outFile, "(", macdepType(mBoolean), ") " ..
+
+	    label tCondition, tPriorityCondition, tDeferredCondition,
+		    tTimeoutCondition:
+		put :outFile, "& " ..
+	    label :
+	end case
+	OutputExpression(e, paren)
+    end OutputCastedExpression
+
+
+    body procedure OutputCastedExpressionList % (n : ExpressionPointer)
+	var register next := n
+	var register first := true
+	put : outFile, "(" ..
+	loop
+	    exit when next = nil(eNode)
+	    if not first then
+		put : outFile, ", " ..
+	    else
+		first := false
+	    end if
+	    OutputCastedExpression (next)
+	    next := eNode(next).sibling
+	end loop
+	put : outFile, ")" ..
+    end OutputCastedExpressionList
+
+
+    procedure OutputCommaRestOfList(expn : ExpressionPointer)
+	var register e := expn
+
+	loop
+	    exit when e = nil(eNode)
+	    put :outFile, ", " ..
+	    OutputCastedExpression(e)
+	    e := eNode(e).sibling
+	end loop
+    end OutputCommaRestOfList
+
+
+    body procedure OutputAddressExpression % (param : ExpressionPointer)
+	if eNode(param).u.operatorNumber = aAt then
+	    OutputExpression(eNode(param).u.operand, paren)
+	elsif not ImplicitReference(param) then
+	    put :outFile, "&(" ..
+	    OutputExpression(param, noParen)
+	    put :outFile, ")" ..
+	else
+	    /* no & in front of arrays in C */
+	    OutputExpression(param, noParen)
+	end if
+    end OutputAddressExpression
+
+
+    procedure ReversedExpressionList (register n : ExpressionPointer)
+	if eNode(n).sibling not= nil(eNode) then
+	    ReversedExpressionList(eNode(n).sibling)
+	    put : outFile, ", " ..
+	    OutputCastedExpression(n)
+	else
+	    OutputCastedExpression(n)
+	end if
+    end ReversedExpressionList
+
+
+    procedure OutputReversedExpressionList (n : ExpressionPointer)
+	put : outFile, "(" ..
+	ReversedExpressionList(n)
+	put : outFile, ")" ..
+    end OutputReversedExpressionList
+
+    /* used for pNonScalarAssignment & friends */
+    var dummy : TreePointer
+    begin
+	var register d : TreePointer
+
+	new tNode, d
+	dummy := d
+	tNode(d).nodeKind := NodeKinds.ExpressionLeaf
+	tNode(d).operatorNumber := 0
+	tNode(d).sibling := nil(tNode)
+	tNode(d).operand := nil(tNode)
+	tNode(d).lineNumber := 0
+    end
+
+
+    procedure OutputTypeCheatType (ty : TreePointer, id : ExpressionPointer)
+	CTypes.Output(ty, nil(tNode), outFile, 0)
+    end OutputTypeCheatType
+
+
+    procedure OutputPredefinedCall (predef, params : ExpressionPointer)
+	const register predefNum := eNode(predef).u.funcOrProcNumber
+
+	case predefNum of
+	    label pArctan, pArctand, pCeil, pCos, pCosd, pExp, pFloor,
+		    pLn, pRound, pSign, pSin, pSind, pSqrt:
+		/* one real parameter */
+		put :outFile, predefNames(predefNum), "(", realCast ..
+		OutputExpression(params, paren)
+		put :outFile, ")" ..
+
+	    label pSize:
+		put :outFile, predefNames(pSize), "(" ..
+		if eNode(params).u.operatorNumber = aIdent then
+		    const eKind := Types.GetKind(params)
+		    if ((Types.HasAttribute(params, aaSizeofType) or
+			 Types.HasAttribute(params, aaTypeName)) and
+			not Types.HasAttribute(params, aaTypeNameRenames)) and
+			    (eKind = tRecord or eKind = tUnion) then
+			put :outFile, "struct " ..
+			OutputExpression(params, paren)
+		    elsif eKind not= tPointer and
+			    Types.HasAttribute(params, aaTypeName) then
+			OutputExpression(params, noParen)
+		    else
+			OutputTypeCheatType (Types.GetTree(params), params)
+		    end if
+		else
+		    OutputExpression(params, paren)
+		end if
+		put :outFile, ")" ..
+
+	    label pAddr:
+		const eKind := ExpnType(params)
+		const subProg := eKind = tProcedure or eKind = tFunction
+
+		if not subProg then
+		    put :outFile, "((", macdepType(mAddressintAsNat), ")" ..
+		end if
+		if eNode(params).u.operatorNumber = aTypeCheat then
+		    OutputAddressExpression(
+			eNode(eNode(params).u.operand).sibling)
+		else
+		    OutputAddressExpression(params)
+		end if
+		if not subProg then
+		    put :outFile, ")" ..
+		end if
+
+	    label pInternalAddr:
+		if eNode(params).u.operatorNumber = aTypeCheat then
+		    OutputAddressExpression(
+			eNode(eNode(params).u.operand).sibling)
+		else
+		    OutputAddressExpression(params)
+		end if
+
+	    label pChr:
+		put :outFile, "((", macdepType(mChar), ") " ..
+		OutputExpression(params, paren)
+		put :outFile, ")" ..
+
+	    label pOrd:
+		put :outFile, "(", natCast ..
+		OutputExpression(params, paren)
+		put :outFile, ")" ..
+
+	    label pEmpty, pRand:
+		/* one reference parameter */
+		put :outFile, predefNames(predefNum), "(&" ..
+		OutputExpression(params, paren)
+		put :outFile, ")" ..
+
+	    label pRealstr, pErealstr, pFrealstr:
+		/* one real parameter, rest of list */
+		put :outFile, predefNames(predefNum), "(", realCast ..
+		OutputExpression(params, paren)
+		OutputCommaRestOfList(eNode(params).sibling)
+		put :outFile, ")" ..
+
+	    label pRandInt, pRandNext:
+		/* one reference parameter, rest of list */
+		put :outFile, predefNames(predefNum), "(&" ..
+		OutputExpression(params, paren)
+		OutputCommaRestOfList(eNode(params).sibling)
+		put :outFile, ")" ..
+
+	    label pNil:
+		put :outFile, "(" ..
+		CTypes.Output(Types.CollectionInformation(params), nil(tNode),
+		    outFile, 0)
+		put :outFile, ") 0" ..
+
+	    label pAllocate:
+		/* one int parameter, one reference parameter */
+		put :outFile, predefNames(pAllocate), "(", intCast..
+		OutputExpression(params, noParen)
+		put :outFile, ", &" ..
+		OutputExpression(eNode(params).sibling, paren)
+		put :outFile, ")" ..
+
+	    label pDeallocate:
+		/* one reference parameter */
+		put :outFile, predefNames(pDeallocate), "(&" ..
+		OutputExpression(params, paren)
+		put :outFile, ")" ..
+
+	    label pPowerrr, pRealMod8, pRealDiv8, pRealMin, pRealMax:
+		put :outFile, predefNames(predefNum), "(", realCast ..
+		OutputExpression(params, paren)
+		put :outFile, ", ", realCast ..
+		OutputExpression(eNode(params).sibling, paren)
+		put :outFile, ")" ..
+
+	    label pPowerri:
+		put :outFile, predefNames(pPowerri), "(", intCast..
+		OutputExpression(params, paren)
+		put :outFile, ", ", realCast ..
+		OutputExpression(eNode(params).sibling, paren)
+		put :outFile, ")" ..
+
+	    label pSubstringExpn, pSubstringStar, pSubstringExpnExpn,
+		    pSubstringExpnStar, pSubstringStarExpn, pSubstringStarStar:
+		/* must reverse the arguments */
+		put :outFile, predefNames(predefNum) ..
+		OutputReversedExpressionList(params)
+
+	    label pStructureAssignment, pNonScalarAssignment:
+		const v := VariableId(params)
+
+		put :outFile, predefNames(predefNum), "(" ..
+		OutputExpression(params, noParen)
+		put :outFile, ", " ..
+		OutputExpression(eNode(params).sibling, noParen)
+		put :outFile, ", " ..
+		if Types.HasAttribute(v, aaTypeName) then
+		    tNode(dummy).leaf := v
+		    CTypes.Output(dummy, nil(tNode), outFile, 0)
+		else
+		    CTypes.Output(Types.GetTree(v), nil(tNode), outFile, 0)
+		end if
+		put :outFile, ")" ..
+
+	    label pTempPointer:
+		put :outFile, predefNames(pTempPointer), "(" ..
+		OutputExpression(params, noParen)
+		put :outFile, ", " ..
+		OutputAddressExpression(eNode(params).sibling)
+		put :outFile, ", " ..
+		OutputExpression(eNode(eNode(params).sibling).sibling, noParen)
+		put :outFile, ")" ..
+
+	    label pBind, pBindRegister:
+		put :outFile, predefNames(predefNum), "(" ..
+		OutputExpression(params, noParen)
+		put :outFile, ", " ..
+		OutputExpression(eNode(params).sibling, noParen)
+		const tKind :=
+		    CTypes.TypeKind(eNode(eNode(params).sibling).u.expnType)
+		if tKind = tFlexCharString or tKind = tParameterCharString or
+			(tKind = tCharString and
+			 tNode(eNode(eNode(params).sibling).u.expnType).nodeKind
+			    not= NodeKinds.ExpressionLeaf) then
+		    /* named charstring types don't have extra * */
+		    put :outFile, " *" ..
+		end if
+		put :outFile, ")" ..
+
+	    label pIgnoreOneIndirection:
+		Types.DecreaseIndirection(params, inPointer)
+		OutputExpression(params, noParen)
+		Types.IncreaseIndirection(params, inPointer)
+
+	    label pNatstr:
+		/* one nat parameter, rest of list */
+		put :outFile, predefNames(pNatstr), "(", natCast ..
+		OutputExpression(params, paren)
+		OutputCommaRestOfList(eNode(params).sibling)
+		put :outFile, ")" ..
+
+	    label pStrmoveSS, pStrmoveSC, pStrmoveCS, pStrmoveCC:
+		var register x := params
+
+		put :outFile, predefNames(predefNum), "(" ..
+		if ExpnType(x) = tCharString then
+		    OutputParameterStringExpression(nil(eNode), x)
+		else
+		    OutputExpression(x, noParen)
+		end if
+		x := eNode(x).sibling
+		put :outFile, ", " ..
+		if ExpnType(x) = tCharString then
+		    OutputParameterStringExpression(nil(eNode), x)
+		else
+		    OutputExpression(x, noParen)
+		end if
+		OutputCommaRestOfList(eNode(x).sibling)
+		put :outFile, ")" ..
+
+	    label pStrreplaceS, pStrreplaceC:
+		put :outFile, predefNames(predefNum), "(" ..
+		var register x := params
+		OutputParameterStringExpression(nil(eNode), x)
+		put :outFile, ", " ..
+		x := eNode(x).sibling
+
+		if predefNum = pStrreplaceC then
+		    OutputParameterStringExpression(nil(eNode), x)
+		else
+		    OutputExpression(x, noParen)
+		end if
+		OutputCommaRestOfList(eNode(x).sibling)
+		put :outFile, ")" ..
+
+	    label pStrdelete:
+		put :outFile, predefNames(pStrdelete), "(" ..
+		OutputParameterStringExpression(nil(eNode), params)
+		OutputCommaRestOfList(eNode(params).sibling)
+		put :outFile, ")" ..
+
+	    label pInitializeMonitor:
+		put :outFile, predefNames(pInitializeMonitor), "(" ..
+		OutputExpression(currentMonitorVariable, noParen)
+		put :outFile, ", \"" ..
+		OutputExpression(params, noParen)
+		put :outFile, "\")" ..
+
+	    label pInitializeDeviceMonitor:
+		put :outFile, predefNames(pInitializeDeviceMonitor), "(" ..
+		OutputExpression(currentMonitorVariable, noParen)
+		put :outFile, ", \"" ..
+		OutputExpression(params, noParen)
+		put :outFile, "\", " ..
+		OutputExpression(eNode(params).sibling, noParen)
+		put :outFile, ")" ..
+
+	    label pConditionInitialize:
+		/* figure out what kind of condition */
+		var register cKind := Types.GetKind(VariableId(params))
+		var numElems := 1
+
+		var register as : ArrayStringPointer
+
+		if cKind = tArray or cKind = tFlexArray then
+		    as := Types.ArrayStringInformation(VariableId(params))
+		    loop
+			exit when asNode(as).u.kind = componentType
+			if asNode(as).u.kind = manifestUpperBound then
+			    numElems *=
+				(asNode(as).u.mUpper - asNode(as).u.mLower + 1)
+			else
+			    numElems := 0
+			end if
+			as := asNode(as).next
+		    end loop
+		    cKind := Types.GetKind(asNode(as).u.id)
+		end if
+		if cKind = tCondition then
+		    put : outFile, predefNames(pConditionInitialize) ..
+		elsif cKind = tTimeoutCondition then
+		    put : outFile, predefNames(pTimeOutConditionInitialize) ..
+		elsif cKind = tDeferredCondition then
+		    put : outFile, predefNames(pDeferredConditionInitialize) ..
+		else
+		    assert cKind = tPriorityCondition
+		    put : outFile, predefNames(pPriorityConditionInitialize) ..
+		end if
+		put :outFile, "(\"" ..
+		OutputExpression(params, noParen)
+		put :outFile, "\", " ..
+		OutputAddressExpression(params)
+		put :outFile, ", ", intCast ..
+		if numElems not= 0 then
+		    put :outFile, numElems, ", " ..
+		else
+		    as := Types.ArrayStringInformation(VariableId(params))
+		    loop
+			exit when asNode(as).u.kind = componentType
+			if asNode(as).u.kind = manifestUpperBound then
+			    put :outFile, asNode(as).u.mUpper -
+				asNode(as).u.mLower + 1, " * " ..
+			else
+			    put :outFile, "(" ..
+			    OutputExpression(asNode(as).u.nmUpper, noParen)
+			    put :outFile, ") * " ..
+			end if
+			as := asNode(as).next
+		    end loop
+		    put :outFile, "1, " ..
+		end if
+		OutputAddressExpression(currentMonitorVariable)
+		put :outFile, ")" ..
+
+	    label pInitializeInterruptProcedure:
+		put :outFile, predefNames(pInitializeInterruptProcedure), "(" ..
+		OutputExpression(currentMonitorVariable, noParen)
+		put :outFile, ", " ..
+		OutputExpression(params, noParen)
+		put :outFile, ", " ..
+		OutputExpression(eNode(params).sibling, noParen)
+		put :outFile, ")" ..
+
+	    label :
+		/* no special processing - just output the list */
+		put :outFile, predefNames(predefNum) ..
+		if predefNum <= lastLibraryPredefinedRoutine then
+		    OutputCastedExpressionList(params)
+		else
+		    OutputExpressionList(params)
+		end if
+	end case
+    end OutputPredefinedCall
+
+
+    /*
+     * Output a subprogram call
+     */
+    procedure OutputCall (call : ExpressionPointer)
+	var register c := eNode(call).sibling
+
+	if eNode(call).u.operatorNumber = aPredefinedId then
+	    if c = nil(eNode) then
+		OutputPredefinedCall(call, nil(eNode))
+	    else
+		OutputPredefinedCall(call, eNode(c).u.operand)
+	    end if
+	else
+	    if eNode(call).u.operatorNumber = aIdent then
+		const register indir := Types.Indirection(call)
+
+		if indir(inPointer) > 0 then
+		    put :outFile, repeat("*", indir(inPointer)) ..
+		end if
+		if Types.HasAttribute(call, aaSubprogramVariable) then
+		    put :outFile, "(", repeat("*", indir(inSubprogram)) ..
+		    Expression.Output (call, outFile)
+		    put :outFile, ")" ..
+		else
+		    Expression.Output (call, outFile)
+		end if
+	    else
+		put :outFile, "(" ..
+		OutputExpression (call, noParen)
+		put :outFile, ")" ..
+	    end if
+	    if c = nil(eNode) then
+		/* no parameters */
+		put :outFile, "()" ..
+	    else
+		put :outFile, "(" ..
+		assert eNode(c).u.operatorNumber = aSubs
+		OutputParameters (call, eNode(c).u.operand)
+		put :outFile, ")" ..
+	    end if
+	end if
+    end OutputCall
+
+
+    forward procedure OutputVariable (e : ExpressionPointer, lab : int,
+				      isReference : boolean)
+	import eNode, forward OutputArrayReference, OutputExpression,
+	       OutputVariable, outFile, var variableStack, variableTop,
+	       var Expression, OutputCall, var Types, TokenToName,
+	       var CTypes, forward OutputHash, forward OutputTypeCheat,
+	       forward OutputParameterArrayParameter, tNode,
+	       OutputTypeCheatType
+
+
+    forward procedure OutputParameterArrayParameter (aKind : TypeKinds,
+						     arr : ExpressionPointer,
+						     isReference : boolean)
+	import eNode, var Types, asNode, OutputVariable, OutputExpression,
+	       var Expression, outFile, OutputMultiDimensionalSubscript,
+	       variableTop, var variableStack, CheckRange
+
+
+    function HashVarTypeSize(e : ExpressionPointer) : TreePointer
+	var ep : ExpressionType
+	var tp : TreePointer
+
+	ExpnTypeTree(e, tp)
+	CTypes.EnterTypeSize(ep, tp, false)
+	if ep.u.operatorNumber = aIntegerLit then
+	    if ep.u.integerValue = 1 then
+		result predtree(pWithoutType, pNat1)
+	    elsif ep.u.integerValue = 2 then
+		result predtree(pWithoutType, pNat2)
+	    else
+		result predtree(pWithoutType, pNat4)
+	    end if
+	else
+	    result predtree(pWithoutType, pNat4)
+	end if
+    end HashVarTypeSize
+
+
+    function HashTypeSize(e : ExpressionPointer) : TreePointer
+	case eNode(e).u.operatorNumber of
+	    label aCharLit:
+		assert eNode(e).u.charLen = 1
+		result predtree(pWithoutType, pNat1)
+
+	    label aTrue, aFalse:
+		result predtree(pWithoutType, pNat1)
+
+	    label :
+		result predtree(pWithoutType, pNat4)
+	end case
+    end HashTypeSize
+
+
+    function IsAddressCastable(e : ExpressionPointer) : boolean
+	case eNode(e).u.operatorNumber of
+	    label aIdent:
+		result not Types.HasAttribute(e, aaRegister)
+
+	    label aField, aSubstring, aSubs, aCollection:
+		result true
+
+	    label aTypeCheat:
+		const register second := eNode(eNode(e).u.operand).sibling
+
+		if eNode(second).u.operatorNumber = aAt or
+			((eNode(second).u.operatorNumber = aStorageSize or
+			  eNode(second).u.operatorNumber = aStringSizeBound) and
+			 eNode(eNode(second).sibling).u.operatorNumber = aAt)
+			then
+		    result true
+		else
+		    result IsAddressCastable(second)
+		end if
+
+	    label :
+		case ExpnType(e) of
+		    label tBoolean, tChar, tInt, tNat, tReal, tAddressInt,
+			    tSubrange, tEnumeration, tProcedure, tFunction,
+			    tProcess:
+			result false
+
+		    label tSet:
+			var tp : TreePointer
+
+			ExpnTypeTree(e, tp)
+			result CTypes.NonScalar(tp)
+
+		    label :
+			result true
+		end case
+	end case
+    end IsAddressCastable
+
+
+    forward procedure OutputHash (e : ExpressionPointer, isReference : boolean)
+	import eNode, var Types, OutputVariable, outFile, var CTypes,
+		HashTypeSize, HashVarTypeSize, ExpnType, tNode,
+		OutputExpression, IsAddressCastable, ImplicitReference
+
+
+    forward procedure OutputTypeCheat (e : ExpressionPointer,
+				       isReference : boolean)
+	import eNode, var Types, OutputVariable, outFile, var CTypes,
+		ExpnType, tNode, VariableId, OutputExpression,
+		IsAddressCastable, ImplicitReference, OutputTypeCheatType
+
+
+    /*
+     * arr points to the array name, followed by the subscripts
+     */
+    procedure OutputArrayReference (arr : ExpressionPointer,
+				    isReference : boolean)
+	if eNode(arr).u.operatorNumber = aIdent then
+	    const aKind := Types.GetKind(arr)
+	    if aKind = tParameterArrayParameterString or
+		    aKind = tParameterArrayParameterCharString then
+		/* Punt */
+		variableStack(variableTop) := arr
+		OutputParameterArrayParameter(aKind, arr, isReference)
+		return
+	    end if
+	end if
+	OutputVariable(arr, eNode(arr).u.operatorNumber, isReference)
+	var register e := eNode(arr).sibling
+
+	/* Is this a regular array, or a special case? */
+	const id := variableStack(variableTop)
+	const aKind := Types.GetKind(id)
+	var register arrIndex:= Types.ArrayStringInformation(id)
+	var tExpn : ExpressionPointer
+
+	if aKind = tArray then
+	    /*
+	     * easy case;  just walk through the fields, and output
+	     * [expn-lower] for each one
+	     */
+	    loop
+		exit when e = nil(eNode)
+		put :outFile, "[" ..
+		CheckRange(e, arrIndex, tExpn)
+		OutputExpression(tExpn, noParen)
+		Expression.Free(tExpn)
+		put :outFile, "]" ..
+		e := eNode(e).sibling
+		arrIndex := asNode(arrIndex).next
+	    end loop
+	elsif asNode(asNode(arrIndex).next).u.kind = componentType then
+	    /* this is a one dimensional array;  defaults to above case */
+	    put :outFile, "[" ..
+	    CheckRange(e, arrIndex, tExpn)
+	    OutputExpression(tExpn, false)
+	    Expression.Free(tExpn)
+	    put :outFile, "]" ..
+	    arrIndex := asNode(arrIndex).next
+	else
+	    /*
+	     * this is the hard case;  we must simulate the multi-dimensioned
+	     * array out of a single dimensioned one
+	     */
+	    put :outFile, "[" ..
+	    OutputMultiDimensionalSubscript(e, arrIndex, true)
+	    /* advance to end of the subscript list */
+	    e := eNode(e).sibling
+	    arrIndex := asNode(arrIndex).next
+	    loop
+		exit when e = nil(eNode)
+		put :outFile, ")" ..	/* print the proper number of ')' s*/
+		e := eNode(e).sibling
+		arrIndex := asNode(arrIndex).next
+	    end loop
+	    put :outFile, "]" ..
+	end if
+	variableStack(variableTop) := asNode(arrIndex).u.id
+    end OutputArrayReference
+
+
+    /*
+     *	We must fake the reference by using the address of x[i * size]
+     */
+    body procedure OutputParameterArrayParameter % (aKind : TypeKinds,
+						 % arr : ExpressionPointer,
+						 % isReference : boolean)
+	var register e := eNode(arr).sibling
+	var register arrIndex:= Types.ArrayStringInformation(arr)
+	var tExpn : ExpressionPointer
+
+	if asNode(asNode(arrIndex).next).u.kind = componentType then
+	    put :outFile, "(&" ..
+	    OutputVariable(arr, eNode(arr).u.operatorNumber, isReference)
+	    put :outFile, "[" ..
+	    CheckRange(e, arrIndex, tExpn)
+	    OutputExpression(tExpn, paren)
+	    Expression.Free(tExpn)
+	    put :outFile, " * " ..
+	    arrIndex := asNode(arrIndex).next
+	    const as2 := Types.ArrayStringInformation(asNode(arrIndex).u.id)
+	    OutputExpression(asNode(as2).u.nmStringSize, noParen)
+	    put :outFile, "])" ..
+	else
+	    /*
+	     * this is the hard case;  we must simulate the multi-dimensioned
+	     * array out of a single dimensioned one
+	     */
+	    put :outFile, "(&" ..
+	    OutputVariable(arr, eNode(arr).u.operatorNumber, isReference)
+	    put :outFile, "[(" ..
+	    OutputMultiDimensionalSubscript(e, arrIndex, true)
+	    /* advance to end of the subscript list */
+	    e := eNode(e).sibling
+	    arrIndex := asNode(arrIndex).next
+	    loop
+		exit when e = nil(eNode)
+		put :outFile, ")" ..	/* print the proper number of ')' s*/
+		e := eNode(e).sibling
+		arrIndex := asNode(arrIndex).next
+	    end loop
+	    put :outFile, ") * " ..
+	    const as2 := Types.ArrayStringInformation(asNode(arrIndex).u.id)
+	    OutputExpression(asNode(as2).u.nmStringSize, noParen)
+	    put :outFile, "])" ..
+	end if
+	variableStack(variableTop) := asNode(arrIndex).u.id
+    end OutputParameterArrayParameter
+
+
+    body procedure OutputHash % (e : ExpressionPointer, isReference : boolean)
+	if isReference then
+	    /* MUST be a variable reference */
+	    if eNode(e).u.operatorNumber = aIdent then
+		const indir := Types.Indirection(e)
+		if Types.HasAttribute(e, aaRegister) and
+			indir(inSubprogram) = 0 then
+		    /* this is a #reg var; just output it */
+		    OutputVariable(e, aIdent, true)
+		    return
+		end if
+	    end if
+	    put :outFile, "* (" ..
+	    CTypes.Output(HashVarTypeSize(e), nil(tNode), outFile, 0)
+	    put :outFile, " *) &" ..
+	    OutputVariable(e, eNode(e).u.operatorNumber, true)
+	elsif eNode(e).u.operatorNumber = aIdent then
+	    const indir := Types.Indirection(e)
+	    if Types.HasAttribute(e, aaRegister) and
+		    indir(inSubprogram) = 0 then
+		put :outFile, "(" ..
+		CTypes.Output(HashVarTypeSize(e), nil(tNode), outFile, 0)
+		put :outFile, ") " ..
+		OutputExpression(e, paren)
+	    else
+		put :outFile, "* (" ..
+		CTypes.Output(HashVarTypeSize(e), nil(tNode), outFile, 0)
+		put :outFile, " *) " ..
+		if not ImplicitReference(e) then
+		    put :outFile, "&" ..
+		end if
+		OutputVariable(e, eNode(e).u.operatorNumber, true)
+	    end if
+	else
+	    /* this must be a legal expression for a cast */
+	    if not IsAddressCastable (e) then
+		put :outFile, "(" ..
+		CTypes.Output(HashVarTypeSize(e), nil(tNode), outFile, 0)
+		put :outFile, ") " ..
+		OutputExpression(e, paren)
+	    else
+		put :outFile, "* (" ..
+		CTypes.Output(HashVarTypeSize(e), nil(tNode), outFile, 0)
+		put :outFile, " *) " ..
+		if not ImplicitReference(e) then
+		    put :outFile, "&" ..
+		end if
+		OutputExpression(e, noParen)
+	    end if
+	end if
+    end OutputHash
+
+
+    /* aTypeCheat type variable [ aTypeCheatSize expn ] */
+    body procedure OutputTypeCheat % (e : ExpressionPointer,
+				   %  isReference : boolean)
+	if isReference then
+	    /* MUST be a variable reference */
+	    put :outFile, "(* (" ..
+	    OutputTypeCheatType(eNode(e).u.expnType,
+		eNode(eNode(e).sibling).sibling)
+	    put :outFile, " *) " ..
+	    if not ImplicitReference(eNode(e).sibling) then
+		put :outFile, "&" ..
+	    end if
+	    OutputVariable(eNode(e).sibling,
+		eNode(eNode(e).sibling).u.operatorNumber, true)
+	else
+	    /* this must be a legal expression for a cast */
+	    if IsAddressCastable (eNode(e).sibling) then
+		put :outFile, "(* (" ..
+		OutputTypeCheatType(eNode(e).u.expnType,
+		    eNode(eNode(e).sibling).sibling)
+		put :outFile, " *) " ..
+		if not ImplicitReference(eNode(e).sibling) then
+		    put :outFile, "&" ..
+		end if
+		OutputExpression(eNode(e).sibling, noParen)
+	    else
+		put :outFile, "((" ..
+		OutputTypeCheatType(eNode(e).u.expnType,
+		    eNode(eNode(e).sibling).sibling)
+		put :outFile, ") " ..
+		OutputExpression(eNode(e).sibling, paren)
+	    end if
+	end if
+	put :outFile, ")" ..
+    end OutputTypeCheat
+
+
+    body procedure OutputVariable % (e : ExpressionPointer, lab : int,
+				  %  isReference : boolean)
+	var register first, next : ExpressionPointer
+
+	case lab of
+	    /*
+	     * Subscripts - is subscripting of an array operation. The first
+	     * child is the array expression and the remaining children are
+	     * the subscripts.
+	     */
+	    label aSubs :
+		/* <exp>({,<exp}}) */
+		OutputArrayReference(eNode(e).u.operand, isReference)
+
+
+	    label aCall, aBind :
+		OutputCall(eNode(e).u.operand)
+
+	    label aField :
+		/* <exp> '.' <exp> */
+		first := eNode(e).u.operand
+		if eNode(first).u.operatorNumber = aCollection then
+		    /* this can be written ptr -> field */
+		    next := eNode(first).u.operand
+		    next := eNode(next).sibling
+		    assert eNode(next).u.operatorNumber = aSubs
+		    next := eNode(next).u.operand
+		    OutputVariable(next, eNode(next).u.operatorNumber,
+			isReference)
+		    put : outFile, "->" ..
+		else
+		    OutputVariable (first, eNode(first).u.operatorNumber,
+			isReference)
+		    put : outFile, "." ..
+		end if
+		next := eNode(first).sibling
+		if eNode(next).u.operatorNumber = aTagCheck then
+		    next := eNode(next).sibling
+		end if
+		if Types.HasAttribute(next, aaUnionField) then
+		    put :outFile, "__u", Types.UnionNumber(next), ".",
+				  "__u", Types.UnionFieldNumber(next), "." ..
+		end if
+		OutputVariable (next, eNode(next).u.operatorNumber, isReference)
+
+	    /*
+	     * Subscript a collection.The left child is an expression 
+	     * giving the collection to be called and the right child is a
+	     * tree rooted at aSubs with the subscript.
+	     */
+	    label aCollection :
+		put : outFile, "(*(" ..
+		first := eNode(e).u.operand
+		next := eNode(first).sibling
+		assert eNode(next).u.operatorNumber = aSubs
+		next := eNode(next).u.operand
+		OutputVariable(next, eNode(next).u.operatorNumber, isReference)
+		put : outFile, "))" ..
+
+		/* must set up variableStack properly */
+		var register x := Types.GetType(first)
+		assert tNode(x).operatorNumber = aCollection
+		x := tNode(x).operand
+		if tNode(x).operatorNumber = aForward then
+		    x := tNode(x).operand
+		end if
+		if tNode(x).leaf not= nil(eNode) then
+		    /* we have an id to give */
+		    variableStack(variableTop) := tNode(x).leaf
+		/* else leave the one from above */
+		end if
+
+	    label aIdent:
+		const register indir := Types.Indirection(e)
+		if Types.HasAttribute(e, aaExternalMemoryLocation) then
+		    put :outFile, "(* (" ..
+		    CTypes.Output(Types.GetTree(e), nil(tNode), outFile, 0)
+		    put :outFile, " *)" ..
+		    Expression.Output (e, outFile)
+		    put :outFile, ")" ..
+		elsif indir(inPointer) > 0 then
+		    put :outFile, "(", repeat("*", indir(inPointer)) ..
+		    Expression.Output (e, outFile)
+		    put :outFile, ")" ..
+		else
+		    Expression.Output (e, outFile)
+		end if
+		variableStack(variableTop) := e
+
+	    label aHash:
+		OutputHash(eNode(e).u.operand, isReference)
+
+	    /*
+	     *  A TypeCheat operation, not the left hand side of an assignment.
+	     */
+	    label aTypeCheat :
+		/* type(<exp>,<exp>) */
+
+		/* is this really a type@(expn) ? */
+		next := eNode(e).u.operand
+		const register second := eNode(next).sibling
+		if eNode(second).u.operatorNumber = aAt or
+			((eNode(second).u.operatorNumber = aStorageSize or
+			  eNode(second).u.operatorNumber = aStringSizeBound) and
+			 eNode(eNode(second).sibling).u.operatorNumber = aAt)
+			then
+		    put :outFile, "(* (" ..
+		    OutputTypeCheatType(eNode(next).u.expnType,
+			eNode(eNode(next).sibling).sibling)
+		    put :outFile, " *) " ..
+		    next := second
+		    if eNode(next).u.operatorNumber = aStorageSize or
+			    eNode(next).u.operatorNumber = aStringSizeBound then
+			next := eNode(next).sibling
+		    end if
+		    OutputExpression (eNode(next).u.operand, paren)
+		    put :outFile, ")" ..
+		else
+		    OutputTypeCheat(next, isReference)
+		end if
+		variableStack(variableTop) := eNode(second).sibling
+	    
+	    label :
+		/* thought it was a variable, but really not! */
+		OutputExpression(e, noParen)
+	end case
+    end OutputVariable
+
+
+    function NoParenNecessary (e : ExpressionPointer) : boolean
+	case eNode(e).u.operatorNumber of
+	    label aIdent, aIntegerLit, aStringLit, aRealLit,
+		    aCharLit, aTrue, aFalse , aCall:
+		result true
+
+	    label :
+		result false
+	end case
+    end NoParenNecessary
+
+
+    body procedure OutputPossibleAddressintExpression
+	    % (expn : ExpressionPointer, withParen : boolean)
+	if ExpnType(expn) = tAddressInt then
+	    put :outFile, "(", macdepType(mAddressintAsNat), ") " ..
+	end if
+	OutputExpression(expn, withParen)
+    end OutputPossibleAddressintExpression
+
+
+    procedure OutputPossibleAddressintExpressionList (n : ExpressionPointer)
+	var register next := n
+	var register first := true
+	put : outFile, "(" ..
+	loop
+	    exit when next = nil(eNode)
+	    if not first then
+		put : outFile, ", " ..
+	    else
+		first := false
+	    end if
+	    OutputPossibleAddressintExpression (next, paren)
+	    next := eNode(next).sibling
+	end loop
+	put : outFile, ")" ..
+    end OutputPossibleAddressintExpressionList
+
+
+    /*
+     *  OutputExpression(e) - will output the expression 'e'.
+     */
+    body procedure OutputExpression % (e : ExpressionPointer,
+				    %  outputParen : boolean)
+	var register first, next : ExpressionPointer
+	var register lab : int
+	var oParen := outputParen
+
+	if e not= nil(eNode) then
+	    lab := eNode(e).u.operatorNumber
+	    if outputParen then
+		if not NoParenNecessary(e) then
+		    put : outFile, "(" ..
+		else
+		    oParen := false
+		end if
+	    end if
+	    case lab of
+		/* handle variables specially */
+		label aSubs, aField, aIdent, aCall, aHash, aCollection,
+			aTypeCheat, aBind:
+		    variableTop += 1
+		    OutputVariable(e, lab, false)
+		    variableTop -= 1
+
+		label aComma:
+		    first := eNode(e).u.operand
+		    put :outFile, "(" ..
+		    loop
+			OutputExpression(first, noParen)
+			exit when eNode(first).sibling = nil(eNode)
+			put :outFile, ", " ..
+			first := eNode(first).sibling
+		    end loop
+		    put :outFile, ")" ..
+
+		label aAssign:
+		    first := eNode(e).u.operand
+		    next := eNode(first).sibling
+		    assert eNode(first).u.operatorNumber not= aBits
+		    OutputReference (first)
+		    put : outFile, " = " ..
+		    if ExpnType(first) = tAddressInt then
+			put :outFile, "(", macdepType(mAddressint), ") " ..
+			OutputExpression(next, paren)
+		    else
+			OutputExpression(next, noParen)
+		    end if
+
+		label aType:
+		    /* output a type tree */
+		    CTypes.Output(eNode(e).u.expnType, nil(tNode), outFile, 0)
+
+		label aInfixCompare, aInfixBooleanCompare :
+		    first := eNode(e).u.operand
+
+		    /* normal case */
+		    lab := eNode(first).u.operatorNumber
+		    case lab of
+			label aEqual, aGreater, aGreaterEqual, aLess,
+				aLessEqual, aNotEqual, aSetGreaterEqual,
+				aSetLessEqual :
+			    first := eNode(first).u.operand
+			    next := eNode(first).sibling
+			    OutputPossibleAddressintExpression (first, paren)
+			    put : outFile, " ", TokenToName (lab), " " ..
+			    OutputPossibleAddressintExpression (next, paren)
+			label :
+			    /* this is a set in/not in operation */
+			    var lastExpn : ExpressionPointer
+
+			    next := eNode(first).sibling
+			    lastExpn := eNode(next).sibling
+
+			    /* first operand */
+			    OutputExpression (first, paren)
+
+			    /* in/ not in */
+			    OutputExpression (lastExpn, noParen)
+
+			    /* set operand */
+			    OutputExpression (next, paren)
+		    end case
+
+
+		label aIn, aNotIn :
+		    first := eNode(e).u.operand
+		    next := eNode(first).sibling
+		    put : outFile, " ", TokenToName (lab), " [" ..
+		    OutputExpression (first, noParen)
+		    put : outFile, ".." ..
+		    OutputExpression (next, noParen)
+		    put : outFile, "] " ..
+
+
+		label aInfixOr, aInfixAnd:
+		    first := eNode(e).u.operand
+		    next := eNode(first).sibling
+		    OutputExpression (first, paren)
+		    put : outFile, " ", TokenToName (lab), " " ..
+		    OutputExpression (next, paren)
+
+		label aAbs:
+		    first := eNode(e).u.operand
+		    next := eNode(first).sibling
+		    put : outFile, " ",
+			predefNames(eNode(next).u.funcOrProcNumber), "(" ..
+		    OutputPossibleAddressintExpression (first, paren)
+		    put : outFile, ")" ..
+
+		label aMin, aMax:
+		    first := eNode(e).u.operand
+		    next := eNode(eNode(first).sibling).sibling
+		    if next = nil(eNode) then
+			/* simple case */
+			if lab = aMin then
+			    put : outFile, " ", predefNames(pMin) ..
+			else
+			    put : outFile, " ", predefNames(pMax) ..
+			end if
+			OutputPossibleAddressintExpressionList(first)
+		    else
+			put : outFile, " " ..
+			if lab = aMin then
+			    OutputExpression(next, noParen)
+			    if eNode(next).u.funcOrProcNumber = pIntMin then
+				put : outFile, "(", intCast ..
+				OutputPossibleAddressintExpression(first, paren)
+				put : outFile, ", ", intCast ..
+				OutputPossibleAddressintExpression(
+				    eNode(first).sibling, paren)
+				put : outFile, ")" ..
+			    else
+				put : outFile, "(", realCast ..
+				OutputPossibleAddressintExpression(first, paren)
+				put : outFile, ", ", realCast ..
+				OutputPossibleAddressintExpression(
+				    eNode(first).sibling, paren)
+				put : outFile, ")" ..
+			    end if
+			else
+			    if eNode(next).u.funcOrProcNumber = pIntMin then
+				put : outFile, predefNames(pIntMax),
+				    " (", intCast ..
+				OutputPossibleAddressintExpression(first, paren)
+				put : outFile, ", ", intCast ..
+				OutputPossibleAddressintExpression(
+				    eNode(first).sibling, paren)
+				put : outFile, ")" ..
+			    else
+				put : outFile, predefNames(pRealMax),
+				    "(", realCast ..
+				OutputPossibleAddressintExpression(first, paren)
+				put : outFile, ", ", realCast ..
+				OutputPossibleAddressintExpression(
+				    eNode(first).sibling, paren)
+				put : outFile, ")" ..
+			    end if
+			end if
+		    end if
+
+    /*
+     * Substring operation. This MUST be charstring(xx)!
+     */
+		label aSubstring :
+		    /* <exp>(<exp>) */
+		    next := eNode(e).u.operand
+		    OutputExpression (next, noParen)
+		    put : outFile, "[" ..
+		    next := eNode(next).sibling
+		    OutputPossibleAddressintExpression (next, paren)
+		    next := eNode(next).sibling
+		    assert next = nil(eNode) or
+			(eNode(next).u.operatorNumber = aEndSubstring and
+			    eNode(next).u.substringKind = ssExpn*256 + ssNone)
+		    put : outFile, "]" ..
+
+    /*
+     * Rangecheck operation: The first child is an expression whose value is
+     * to be tested. The next two children specify the lower and upper bound
+     * that the expression must lie in.
+     */
+		label aRangeCheck:
+		    first := eNode(e).u.operand
+		    next := eNode(first).sibling
+		    if eNode(next).u.operatorNumber = aString then
+			put : outFile, " ", predefNames(pRangeCheckString),
+			    "(" ..
+			OutputExpression(first, noParen)
+			put : outFile, ", " ..
+			OutputExpression(eNode(next).sibling, noParen)
+			put : outFile, ", ", currentRangecheck, ")" ..
+		    else
+			put : outFile, " ", predefNames(pRangeCheck)," (" ..
+			OutputExpression(first, noParen)
+			put : outFile, ", " ..
+			OutputExpression(next, noParen)
+			put : outFile, ", " ..
+			OutputExpression(eNode(next).sibling, noParen)
+			put : outFile, ", ", currentRangecheck, ")" ..
+		    end if
+
+		label aRangeCheck2:
+		    /* this isn't done right yet */
+		    OutputExpression (eNode(e).u.operand, noParen)
+
+    /*
+     * Set - specifies a set of elements. It has two children, the first is 
+     * the name of the set type, the second element is a subtree rooted at
+     * aSubs whose children are the elements of the set. 
+     */
+		label aSet :
+		    const oldRangecheck := currentRangecheck
+
+		    currentRangecheck := setElementRangecheck
+		    first := eNode(e).u.operand
+		    assert Types.HasAttribute(first, aaSmallSet)
+		    first := eNode(first).sibling
+		    assert eNode(first).u.operatorNumber = aSubs
+		    first := eNode(first).u.operand
+		    put :outFile, "(" ..
+		    loop
+			exit when first = nil(eNode)
+			OutputExpression(first, false)
+			if eNode(first).sibling not= nil(eNode) then
+			    put :outFile, " | " ..
+			end if
+			first := eNode(first).sibling
+		    end loop
+		    put :outFile, ")" ..
+		    currentRangecheck := oldRangecheck
+
+		label aAliasCheck, aNoAlias, aNoEnclosure :
+		    put : outFile, " ", TokenToName (lab) ..
+		    OutputExpressionList (eNode(e).u.operand)
+
+		label aMinus:
+		    put : outFile, TokenToName (aMinus) ..
+		    OutputPossibleAddressintExpression (eNode(e).u.operand,
+			paren)
+
+		label aPlus:
+		    OutputPossibleAddressintExpression (eNode(e).u.operand,
+			paren)
+
+		label aNot:
+		    /* 2 kinds of not operator in C! */
+		    if ExpnType(eNode(e).u.operand) = tBoolean then
+			put :outFile, "!" ..
+		    else
+			put :outFile, "~" ..
+		    end if
+		    OutputExpression (eNode(e).u.operand, paren)
+
+		label aAdd, aAnd, aConcatenate, aDiv, 
+			aExponentiate, aLogicalAnd, aLogicalOr, aLogicalXor,
+			aMod, aMultiply, aOr, aSetDifference,
+			aSetIntersection, aSetUnion, aSetXor, 
+			aShiftRight, aXor :
+		    next := eNode(e).u.operand
+		    OutputPossibleAddressintExpression (next, paren)
+		    put : outFile, " ", TokenToName (lab), " " ..
+		    OutputPossibleAddressintExpression (eNode(next).sibling,
+			paren)
+
+		label aShiftLeft:
+		    /* cast the left to int, to get correct result */
+		    next := eNode(e).u.operand
+		    put :outFile, intCast ..
+		    OutputPossibleAddressintExpression (next, paren)
+		    put : outFile, " ", TokenToName (lab), " " ..
+		    OutputPossibleAddressintExpression (eNode(next).sibling,
+			paren)
+
+		label aSubtract:
+		    /* try to optimize generated intlit subtracts */
+		    next := eNode(e).u.operand
+		    if eNode(next).u.operatorNumber = aIntegerLit and
+			    eNode(eNode(next).sibling).u.operatorNumber = 
+				aIntegerLit then
+			put :outFile, eNode(next).u.integerValue -
+			    eNode(eNode(next).sibling).u.integerValue ..
+		    else
+			OutputPossibleAddressintExpression (next, paren)
+			put : outFile, " - " ..
+			OutputPossibleAddressintExpression (eNode(next).sibling,
+			    paren)
+		    end if
+
+		label aDivideReal:
+		    /* must cast operands to real !! */
+		    next := eNode(e).u.operand
+		    put : outFile, "(", realCast ..
+		    OutputPossibleAddressintExpression (next, paren)
+		    put : outFile, ") ", TokenToName (aDivideReal),
+			" (", realCast ..
+		    OutputPossibleAddressintExpression (eNode(next).sibling,
+			paren)
+		    put : outFile, ")" ..
+
+		label aIntegerLit, aStringLit, aRealLit,
+		    aPredefinedId, aEndSubstring :
+		    Expression.Output (e, outFile)
+
+		label aCharLit:
+		    /* char lits may be signed!! */
+		    if eNode(e).u.charLen = 1 and
+			    ord (strings(eNode(e).u.charValue)(1)) > 127 then
+			put :outFile, "(", macdepType(mChar), ") " ..
+		    end if
+		    Expression.Output (e, outFile)
+
+		label aTrue:
+		    put :outFile, "1" ..
+
+		label aFalse:
+		    put :outFile, "0" ..
+
+		label aNil:
+		    put :outFile, "(" ..
+		    CTypes.Output(
+			Types.CollectionInformation(eNode(e).u.operand),
+			nil(tNode), outFile, 0)
+		    put :outFile, ") 0" ..
+
+		label :
+		    put : outFile, " ", TokenToName (lab), " " ..
+	    end case
+	    if oParen then
+		put : outFile, ")" ..
+	    end if
+	end if
+    end OutputExpression
+
+
+    body procedure OutputFunctionId % (id : ExpressionPointer)
+	const register indir := Types.Indirection(id)
+
+	if Types.HasAttribute(id, aaSubprogramVariable) then
+	    put :outFile, "(", repeat("*", indir(inSubprogram)) ..
+	    Expression.Output (id, outFile)
+	    put :outFile, ")" ..
+	else
+	    Expression.Output (id, outFile)
+	end if
+	if Types.HasAttribute(id, aaResetIndirection) then
+	    Types.ResetIndirection(id)
+	end if
+    end OutputFunctionId
+
+
+    body procedure OutputExpressionList % (n : ExpressionPointer)
+	var register next := n
+	var register first := true
+	put : outFile, "(" ..
+	loop
+	    exit when next = nil(eNode)
+	    if not first then
+		put : outFile, ", " ..
+	    else
+		first := false
+	    end if
+	    OutputExpression (next, noParen)
+	    next := eNode(next).sibling
+	end loop
+	put : outFile, ")" ..
+    end OutputExpressionList
+
+
+    body procedure OutputReference % (e : ExpressionPointer)
+	variableTop += 1
+	OutputVariable(e, eNode(e).u.operatorNumber, true)
+	variableTop -= 1
+    end OutputReference
+
+end OutputExpn

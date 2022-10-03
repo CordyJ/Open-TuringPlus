@@ -1,0 +1,2 @@
+#!/bin/sh
+../usr/local/bin/tpc -L ../usr/local/lib/tplus -i ../usr/local/include/tplus $*

@@ -1,0 +1,192 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+%
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+%
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+const *MaxNat4Value	: nat4	:=  4294967295
+const *MaxInt4Value	: nat4	:=  2147483647
+const *MaxNat2Value	: nat2	:=       65535
+const *MaxInt2Value	: nat2	:=       32767
+const *MaxNat1Value	: nat1	:=         255
+const *MaxInt1Value	: nat1	:=         127
+const *MinInt1Value	: int1	:=        -128
+const *MinInt2Value	: int2	:=      -32768
+const *MinInt4Value	: int4	:= -2147483648
+
+
+%
+% number of independent and repeatable sequences of pseudo random numbers
+% This does not include sequence 0 which is used by rand and randint
+%
+const *MaxRandSequence	:= 10
+%
+% initial random number that all sequences start with
+%
+const *RandomNumber	:= 1664525
+
+
+const *DegreesToRadians	:= 0.0174532925199432957692366
+const *RadiansToDegrees	:= 57.295779513082320876798946
+
+
+#if IEEE then
+    %
+    % IEEE real numbers have the following format:
+    %
+    % real8
+    %		sign:		bit  63		(1 bit)
+    %		exponent:	bits 62->52	(11 bits)
+    %		mantissa:	bits 51->0	(52 bits)
+    %
+    %	If the sign bit is on, the value is -ve; else the value is +ve.
+    %	The exponent is stored as a 1023-bias number.
+    %	The mantissa has an implicit 1 in front of the decimal place
+    %	[ie. the value is actually 1.<mantissa> * 2^(exponent+1023) ].
+    %	A 0 value is stored with mantissa = exponent = 0.
+    %	Since the Turing model of a real number is of the form
+    %		0.<mantissaT> * 2^(exponentT)
+    %	the value of exponentT can be found by taking the real exponent
+    %	and adding in 1023-1.
+    %	An exponent value of 2047 (all 1's) designates a "special" value:
+    %		mantissa == 0, sign == 0	=> +Inf
+    %		mantissa == 0, sign == 1	=> -Inf
+    %		mantissa ~= 0			=> NaN
+    %
+    % real4
+    %		sign:		bit  31		(1 bit)
+    %		exponent:	bits 30->23	(8 bits)
+    %		mantissa:	bits 22->0	(23 bits)
+    %
+    %	The sign and mantissa are in the same form as real8's.
+    %	The exponent is stored as a 127-bias number (or a Turing
+    %	126-offset value).
+    %	An exponent value of 255 (all 1's) designates a "special" value,
+    %	as specified in real8's.
+    %
+    %
+    % A real4 can be examined by treating it as a nat4.
+    % A real8 is more of a problem, since the order of the two
+    % longwords is, in general, arbitrary.  However, it can be determined
+    % at runtime (see TLA.var).  The TLAV8D and TLAVD8 routines separate a
+    % real into its high- and low-order longwords using this runtime check.
+    %
+    type *Real4SignBit		: 31 .. 31
+    type *Real4ExponentBits	: 23 .. 30
+    type *Real4MantissaBits	:  0 .. 22
+    const *Real4ExponentBias	:= 127
+    const *Real4IllegalExponent	:= 255
+    const *Real4MantissaSize	:= 23
+
+    type *Real8SignBit		: 31 .. 31	% In the correct nat4
+    type *Real8ExponentBits	: 20 .. 30	% In the correct nat4
+    type *Real8MantissaBits	:  0 .. 19	% And all of the other nat4
+    const *Real8ExponentBias	:= 1023
+    const *Real8IllegalExponent	:= 2047
+    const *Real8MantissaSize	:= 20		% And all of the other nat4
+
+
+#elsif VAXFLOAT then
+    %
+    % VAX real numbers have the following format:
+    %
+    % real8	(VAX D format)
+    %		sign:		bit  15		(1 bit)
+    %		exponent:	bits 14->7	(8 bits)
+    %		mantissa:	bits 6->0	(7 bits)
+    %				bits 63->16	(48 bits)
+    %
+    %	If the sign bit is on, the value is -ve; else the value is +ve.
+    %	The exponent is stored as a excess-128.
+    %	The mantissa has an implicit 1 in front of the decimal place
+    %	[ie. the value is actually .1<mantissa> * 2^(exponent-128) ].
+    %	A 0 value is stored with mantissa = exponent = 0.
+    %	Since the Turing model of a real number is of the form
+    %		0.<mantissaT> * 2^(exponentT)
+    %	the value of exponentT can be found by taking the real exponent
+    %	and subtracting 128.
+    %
+    % real4	(VAX F format)
+    %		sign:		bit  15		(1 bit)
+    %		exponent:	bits 14->7	(8 bits)
+    %		mantissa:	bits 6->0	(7 bits)
+    %				bits 31->16	(16 bits)
+    %
+    %	The sign and mantissa are in the same form as real8's.
+    %
+    %
+    % A real4 can be examined by treating it as a nat4.
+    % A real8 is more of a problem, since the order of the two
+    % longwords is, in general, arbitrary.  The TLAV8D and TLAVD8
+    % machine-dependent routines separate a real into its high-
+    % and low-order longwords.
+    %
+    type *Real4SignBit		: 15 .. 15
+    type *Real4ExponentBits	: 7 .. 14
+    const *Real4ExponentBias	:= 128
+
+    type *Real8SignBit		: 15 .. 15	% In the correct nat4
+    type *Real8ExponentBits	: 7 .. 14	% In the correct nat4
+    const *Real8ExponentBias	:= 128
+    const *Real8MantissaMask	:= 16#ffff00ff	% In the correct nat4
+
+
+#elsif IBMFLOAT then
+    %
+    % IBM real numbers have the following format:
+    %
+    % real8	(IBM long real format)
+    %		sign:		bit  63		(1 bit)
+    %		exponent:	bits 62->56	(7 bits)
+    %		mantissa:	bits 55->0	(56 bits)
+    %
+    %	If the sign bit is on, the value is -ve; else the value is +ve.
+    %	The exponent is stored as a excess-64.
+    %	A 0 value is stored with mantissa = exponent = 0.
+    %	Since the Turing model of a real number is of the form
+    %		0.<mantissaT> * 2^(exponentT)
+    %	the value of exponentT can be found by taking the real exponent
+    %	and subtracting 64.
+    %
+    % real4	(IBM real format)
+    %		sign:		bit  31		(1 bit)
+    %		exponent:	bits 30->24	(7 bits)
+    %		mantissa:	bits 23->0	(24 bits)
+    %
+    %	The sign and mantissa are in the same form as real8's.
+    %
+    %
+    % A real4 can be examined by treating it as a nat4.
+    % A real8 is more of a problem, since the order of the two
+    % longwords is, in general, arbitrary.  The TLAV8D and TLAVD8
+    % machine-dependent routines separate a real into its high-
+    % and low-order longwords.
+    %
+    type *Real4SignBit		: 31 .. 31
+    type *Real4ExponentBits	: 24 .. 30
+    type *Real4MantissaBits	:  0 .. 23
+    const *Real4ExponentBias	:= 64
+    const *Real4IllegalExponent	:= 127
+    const *Real4MantissaSize	:= 24
+
+    type *Real8SignBit		: 31 .. 31	% In the correct nat4
+    type *Real8ExponentBits	: 24 .. 30	% In the correct nat4
+    type *Real8MantissaBits	:  0 .. 23	% And all of the other nat4
+    const *Real8ExponentBias	:= 64
+    const *Real8IllegalExponent	:= 127
+    const *Real8MantissaSize	:= 24		% And all of the other nat4
+
+
+#end if

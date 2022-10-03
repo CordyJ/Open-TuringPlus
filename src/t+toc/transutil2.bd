@@ -1,0 +1,1765 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+% 
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+% 
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+body "transutil2.st" module Utility2
+
+    /*
+     * aBind [aVar] [aRegister] variable expn
+     */
+    body procedure TransformBind % (t : TreePointer)
+	const origSibling := tNode(t).sibling
+	const lineNumber := tNode(t).lineNumber
+	const fileNumber := tNode(t).fileNumber
+	var register bNode := tNode(t).operand
+	var register tp : TreePointer
+	var firstTime := true
+	var isRegister : boolean
+
+	loop
+	    exit when bNode = nil(tNode)
+
+	    if tNode(bNode).operatorNumber = aVar then
+		bNode := tNode(bNode).sibling
+	    end if
+
+	    if tNode(bNode).operatorNumber = aRegister then
+		bNode := tNode(bNode).sibling
+		isRegister := true
+	    else
+		isRegister := false
+	    end if
+	    const bindVar := tNode(bNode).leaf
+	    const bindExpn := tNode(tNode(bNode).sibling).leaf
+
+	    /* create the predefined declaration & assignment */
+
+	    var register e : ExpressionPointer
+
+	    /*
+	     * Must do the assignment first, to get the TransExpn
+	     * in the right place
+	     */
+
+	    /*
+	     * Create an assignment to initialize the variable
+	     * Assign the addresses !!!!
+	     */
+	    if firstTime then
+		tp := t
+		firstTime := false
+	    else
+		/* must locate the end of the chain */
+		tp := t
+		loop
+		    exit when tNode(tp).sibling = nil(tNode)
+		    tp := tNode(tp).sibling
+		end loop
+		    
+		new tNode, tNode(tp).sibling
+		tp := tNode(tp).sibling
+	    end if
+	    tNode(tp).operatorNumber := aAssign
+	    tNode(tp).nodeKind := NodeKinds.OperatorNode
+	    tNode(tp).leaf := nil(eNode)
+	    tNode(tp).sibling := nil(tNode)	/* end the chain */
+	    tNode(tp).transformed := true
+	    tNode(t).lineNumber := lineNumber
+	    tNode(t).fileNumber := fileNumber
+	    const assignNode := tp
+
+	    new tNode, tNode(tp).operand
+	    tp := tNode(tp).operand
+	    tNode(tp).nodeKind := NodeKinds.ExpressionLeaf
+	    tNode(tp).operatorNumber := 0
+	    tNode(tp).operand := nil(tNode)
+	    tNode(tp).transformed := true
+	    tNode(tp).lineNumber := 0
+
+	    /* use addr(bindVar) to get proper behaviour */
+	    new eNode, tNode(tp).leaf
+	    e := tNode(tp).leaf
+
+	    tag eNode(e).u, aCall
+	    eNode(e).sibling := nil(eNode)
+	    
+	    new eNode, eNode(e).u.operand
+	    e := eNode(e).u.operand
+	    tag eNode(e).u, aPredefinedId
+	    eNode(e).u.funcOrProcNumber := pIgnoreOneIndirection
+	    
+	    new eNode, eNode(e).sibling
+	    e := eNode(e).sibling
+
+	    tag eNode(e).u, aSubs
+	    eNode(e).sibling := nil(eNode)
+	    eNode(e).u.operand := bindVar
+
+	    new tNode, tNode(tp).sibling
+	    tp := tNode(tp).sibling
+	    tNode(tp).nodeKind := NodeKinds.ExpressionLeaf
+	    tNode(tp).operatorNumber := 0
+	    tNode(tp).operand := nil(tNode)
+	    tNode(tp).sibling := nil(tNode)
+	    tNode(tp).transformed := true
+	    tNode(tp).lineNumber := 0
+
+	    /* right side == addr (bindTo) */
+	    new eNode, tNode(tp).leaf
+	    e := tNode(tp).leaf
+
+	    tag eNode(e).u, aCall
+	    eNode(e).sibling := nil(eNode)
+	    
+	    new eNode, eNode(e).u.operand
+	    e := eNode(e).u.operand
+	    tag eNode(e).u, aPredefinedId
+	    eNode(e).u.funcOrProcNumber := pInternalAddr
+	    
+	    new eNode, eNode(e).sibling
+	    e := eNode(e).sibling
+
+	    tag eNode(e).u, aSubs
+	    eNode(e).sibling := nil(eNode)
+	    eNode(e).u.operand := bindExpn
+
+	    /* transform the expression */
+	    TransExpn.TransExpn(assignNode, bindExpn, nil(eNode))
+
+	    /* now the BIND */
+
+	    /* must locate the end of the chain */
+	    tp := t
+	    loop
+		exit when tNode(tp).sibling = nil(tNode)
+		tp := tNode(tp).sibling
+	    end loop
+
+	    new tNode, tNode(tp).sibling
+	    tp := tNode(tp).sibling
+	    tNode(tp).operatorNumber := aBind
+	    tNode(tp).nodeKind := NodeKinds.ExpressionLeaf
+	    tNode(tp).operand := nil(tNode)
+	    tNode(tp).sibling := nil(tNode)	/* end the chain */
+	    tNode(tp).transformed := true
+	    tNode(tp).lineNumber := 0
+	    new eNode, tNode(tp).leaf
+	    e := tNode(tp).leaf
+	    tag eNode(e).u, aCall
+	    eNode(e).sibling := nil(eNode)
+	    
+	    new eNode, eNode(e).u.operand
+	    e := eNode(e).u.operand
+	    tag eNode(e).u, aPredefinedId
+	    if isRegister then
+		eNode(e).u.funcOrProcNumber := pBindRegister
+	    else
+		eNode(e).u.funcOrProcNumber := pBind
+	    end if
+	    
+	    new eNode, eNode(e).sibling
+	    e := eNode(e).sibling
+
+	    tag eNode(e).u, aSubs
+	    eNode(e).sibling := nil(eNode)
+	    Expression.Copy(bindVar, eNode(e).u.operand)
+	    e := eNode(e).u.operand
+	    bNode := tNode(bNode).sibling
+
+	    new eNode, eNode(e).sibling
+	    e := eNode(e).sibling
+	    eNode(e).sibling := nil(eNode)
+	    tag eNode(e).u, aType
+#if DEBUG then
+	    eNode(e).u.expnType := nil(tNode)
+#end if
+
+	    /* Get the type of the variable */
+	    /* try to get the best type name */
+	    const varId := VariableId(bindExpn)
+	    var register variableType : TreePointer
+
+	    if Types.HasAttribute(varId, aaTypeName) then
+		/* the varId is the best type name */
+		new tNode, variableType
+		tNode(variableType).nodeKind := NodeKinds.ExpressionLeaf
+		tNode(variableType).operatorNumber := 0
+		tNode(variableType).operand := nil(tNode)
+		tNode(variableType).sibling := nil(tNode)
+		tNode(variableType).leaf := varId
+		tNode(variableType).transformed := true
+		tNode(variableType).lineNumber := 0
+	    else
+		variableType := Types.GetTree(varId)
+	    end if
+		
+	    Types.SetType(bindVar, variableType)
+	    Types.TransferTypeInfo(varId, bindVar)
+	    Types.IncreaseIndirection(bindVar, inPointer)
+
+	    eNode(e).u.expnType := variableType
+
+	    bNode := tNode(bNode).sibling
+	end loop
+
+	/*
+	 * Now relink the chain into the main stream
+	 */
+	tp := t
+	loop
+	    exit when tNode(tp).sibling = nil(tNode)
+	    tp := tNode(tp).sibling
+	end loop
+	tNode(tp).sibling := origSibling
+    end TransformBind
+
+
+    /*
+     * replace all named subrange types by their equivalent
+     * tree: aType *ident* *type*
+     */
+    body procedure TransformType % (t : TreePointer)
+	pre tNode(t).operatorNumber = aType
+	const typeName := tNode(tNode(t).operand).leaf
+	var register ty := tNode(tNode(t).operand).sibling
+
+	if tNode(ty).nodeKind = NodeKinds.ExpressionLeaf then
+	    /* this is a named type;  replace it by its type */
+	    ty := Types.GetType(tNode(ty).leaf)
+	    % don't expand definitions (??)
+	    % tNode(tNode(t).operand).sibling := ty
+	    Types.EnterAttribute(typeName, aaTypeNameRenames)
+	end if
+
+	if prefixRecordUnion then
+	    Identifier.PushBoundary
+	    Identifier.PushName(eNode(typeName).u.referenceValue)
+	end if
+
+	Types.EnterAttribute(typeName, aaTypeName)
+	if tNode(ty).operatorNumber = aProcedure then
+	    varTransformProcedure(t, ty, true, false)
+	    Types.SetType(typeName, ty)
+	elsif tNode(ty).operatorNumber = aFunction then
+	    varTransformFunction(t, ty, false)
+	    Types.SetType(typeName, ty)
+
+	    /* get the correct indirection for the function */
+	    var register x := tNode(ty).operand
+
+	    loop
+		exit when tNode(x).operatorNumber = aType
+		x := tNode(x).sibling
+	    end loop
+
+	    x := tNode(x).operand
+	    SetIndirection(typeName, CTypes.TypeKind(x), x)
+	end if
+
+	case CTypes.TypeKind(ty) of
+	    label tRecord:
+		TransformRecordType(t, ty, 0, 0)
+
+	    label tUnion:
+		TransformUnionType(t, ty)
+
+	    label tArray:
+		TransformArrayType(t, tNode(tNode(t).operand).sibling)
+
+	    label tSet, tString, tChar, tCharString:
+		Types.EnterTypeInfo(typeName)
+
+	    label tPointer:
+		/*
+		** Pointer symbol types are not emitted, since
+		** pointers to forward collections cause problems.
+		*/
+		tNode(t).operatorNumber := aNoOp
+		if Types.HasAttribute(
+			tNode(tNode(ty).operand).leaf, aaForward) then
+		    /* mark the type as forward pointer */
+		    Types.EnterAttribute(typeName, aaForward)
+		end if
+		Types.EnterTypeInfo(typeName)
+
+	    label :
+	end case
+	if prefixRecordUnion then
+	    Identifier.PopName
+	    Identifier.PopName
+	end if
+    end TransformType
+
+
+    /*
+     * split var declarations with assigments to:
+     *	var [register] a, b : x
+     *	a := expn
+     *	b := a ...
+     */
+    procedure SplitVarAssignment(var varNode : TreePointer,
+				  tipe, expn : TreePointer)
+	assert tNode(expn).operatorNumber = aVarInit
+	const lineNumber := tNode(varNode).lineNumber
+	const fileNumber := tNode(varNode).fileNumber
+
+	var register x, y : TreePointer
+	var firstId : TreePointer
+
+	/* make a node for the first assignment */
+	new tNode, y
+	tNode(y).nodeKind := NodeKinds.OperatorNode
+	tNode(y).operatorNumber := aAssign
+	tNode(y).lineNumber := lineNumber
+	tNode(y).fileNumber := fileNumber
+	tNode(y).leaf := nil(eNode)
+	tNode(y).transformed := true
+
+	/* link it into the chain */
+	tNode(y).sibling := tNode(varNode).sibling
+	tNode(varNode).sibling := y
+
+	/* create a node for the first id */
+	new tNode, tNode(y).operand
+	x := tNode(y).operand
+
+	if tNode(tNode(varNode).operand).operatorNumber = aRegister then
+	    firstId := tNode(tNode(varNode).operand).sibling
+	else
+	    firstId := tNode(varNode).operand
+	end if
+	tNode(x).nodeKind := NodeKinds.ExpressionLeaf
+	tNode(x).operatorNumber := 0
+	tNode(x).leaf := tNode(firstId).leaf
+	tNode(x).transformed := true
+	tNode(x).lineNumber := 0
+
+	/* create a node for the expression */
+	new tNode, tNode(x).sibling
+	x := tNode(x).sibling
+	tNode(x).nodeKind := NodeKinds.ExpressionLeaf
+	tNode(x).operatorNumber := 0
+	tNode(x).leaf := tNode(tNode(expn).operand).leaf
+	tNode(x).sibling := nil(tNode)
+	tNode(x).transformed := true
+	tNode(x).lineNumber := 0
+
+	/* Allow the transform of the assignment */
+	Types.EnterTypeInfo(tNode(firstId).leaf)
+	TransformAssignment.TransformAssign(y)
+	tNode(y).transformed := true
+
+	/* now remove the aVarInit */
+	tNode(tipe).sibling := nil(tNode)
+
+	/* now assign the first variable to all the other variables */
+
+	var register id := tNode(firstId).sibling
+
+	varNode := y
+	loop
+	    exit when tNode(id).nodeKind not= NodeKinds.ExpressionLeaf
+	    
+	    /* make a node for the next assignment */
+	    new tNode, y
+	    const assignNode := y
+	    tNode(y).nodeKind := NodeKinds.OperatorNode
+	    tNode(y).operatorNumber := aAssign
+	    tNode(y).lineNumber := lineNumber
+	    tNode(y).fileNumber := fileNumber
+	    tNode(y).transformed := true
+
+	    /* link it into the chain */
+	    tNode(y).sibling := tNode(varNode).sibling
+	    tNode(varNode).sibling := y
+	    varNode := y
+
+	    /* create a node for this id */
+	    new tNode, tNode(y).operand
+	    x := tNode(y).operand
+
+	    tNode(x).nodeKind := NodeKinds.ExpressionLeaf
+	    tNode(x).leaf := tNode(id).leaf
+	    tNode(x).operatorNumber := 0
+	    tNode(x).transformed := true
+	    tNode(x).lineNumber := 0
+
+	    /* create a node for the expression */
+	    new tNode, tNode(x).sibling
+	    x := tNode(x).sibling
+
+	    tNode(x).nodeKind := NodeKinds.ExpressionLeaf
+	    tNode(x).operatorNumber := 0
+	    tNode(x).leaf := tNode(firstId).leaf
+	    tNode(x).sibling := nil(tNode)
+	    tNode(x).transformed := true
+	    tNode(x).lineNumber := 0
+
+	    /* Transform the assignment */
+	    Types.EnterTypeInfo(tNode(id).leaf)
+	    TransformAssignment.TransformAssign(assignNode)
+
+	    id := tNode(id).sibling
+	end loop
+    end SplitVarAssignment
+
+
+    procedure DeclareInteger (t : TreePointer, id : ExpressionPointer)
+	var register x : TreePointer
+
+	new tNode, x
+	tNode(x).nodeKind := NodeKinds.OperatorNode
+	tNode(x).operatorNumber := aVar
+	tNode(x).sibling := tNode(t).sibling
+	tNode(x).leaf := nil(eNode)
+	tNode(x).transformed := true
+	tNode(x).lineNumber := 0
+
+	/* link it into the tree */
+	tNode(t).sibling := x
+
+	new tNode, tNode(x).operand
+	x := tNode(x).operand
+	tNode(x).nodeKind := NodeKinds.ExpressionLeaf
+	tNode(x).operatorNumber := 0
+	tNode(x).operand := nil(tNode)
+	tNode(x).leaf := id
+	tNode(x).transformed := true
+	tNode(x).lineNumber := 0
+
+	/* share the int type */
+	tNode(x).sibling := predtree(pWithType, pInt4)
+    end DeclareInteger
+
+
+    procedure CreateDynAssignment(t : TreePointer,
+		    variable, expn : ExpressionPointer,
+		    var assign : TreePointer)
+	var register x : TreePointer
+	var register y : ExpressionPointer
+
+	new tNode, x
+	assign := x
+
+	tNode(x).nodeKind := NodeKinds.OperatorNode
+	tNode(x).operatorNumber := aAssign
+	tNode(x).sibling := tNode(t).sibling
+	tNode(x).leaf := nil(eNode)
+	tNode(x).transformed := true
+	tNode(x).lineNumber := 0
+
+	/* link it into the tree */
+	tNode(t).sibling := x
+
+	new tNode, tNode(x).operand
+	x := tNode(x).operand
+	tNode(x).nodeKind := NodeKinds.ExpressionLeaf
+	tNode(x).operatorNumber := 0
+	tNode(x).operand := nil(tNode)
+	tNode(x).leaf := variable
+	tNode(x).transformed := true
+	tNode(x).lineNumber := 0
+
+	new tNode, tNode(x).sibling
+	x := tNode(x).sibling
+	tNode(x).nodeKind := NodeKinds.ExpressionLeaf
+	tNode(x).operatorNumber := 0
+	tNode(x).operand := nil(tNode)
+	tNode(x).sibling := nil(tNode)
+	tNode(x).transformed := true
+	tNode(x).lineNumber := 0
+
+	new eNode, tNode(x).leaf
+	y := tNode(x).leaf
+
+	/* create a call to pDynamicArrayRangeCheck */
+	tag eNode(y).u, aCall
+	eNode(y).sibling := nil(eNode)
+
+	new eNode, eNode(y).u.operand
+	y := eNode(y).u.operand
+	tag eNode(y).u, aPredefinedId
+	eNode(y).u.funcOrProcNumber := pDynamicArrayRangeCheck
+
+	/* aSubs */
+	new eNode, eNode(y).sibling
+	y := eNode(y).sibling
+	tag eNode(y).u, aSubs
+	eNode(y).sibling := nil(eNode)
+
+	/* size */
+	eNode(y).u.operand := expn
+    end CreateDynAssignment
+
+
+    procedure CreateAllocation(t : TreePointer,
+		    variable, expn : ExpressionPointer)
+	var register x : TreePointer
+	var register y : ExpressionPointer
+
+	new tNode, x
+	tNode(x).nodeKind := NodeKinds.ExpressionLeaf
+	tNode(x).operatorNumber := aCall
+	tNode(x).sibling := tNode(t).sibling
+	tNode(x).operand := nil(tNode)
+	tNode(x).leaf := nil(eNode)
+	tNode(x).transformed := true
+	tNode(x).lineNumber := 0
+
+	/* link it into the tree */
+	tNode(t).sibling := x
+
+	/* aCall */
+	new eNode, tNode(x).leaf
+	y := tNode(x).leaf
+
+	tag eNode(y).u, aCall
+	eNode(y).sibling := nil(eNode)
+
+	/* Allocate */
+	new eNode, eNode(y).u.operand
+	y := eNode(y).u.operand
+	tag eNode(y).u, aPredefinedId
+	eNode(y).u.funcOrProcNumber := pAllocate
+
+	/* aSubs */
+	new eNode, eNode(y).sibling
+	y := eNode(y).sibling
+	tag eNode(y).u, aSubs
+	eNode(y).sibling := nil(eNode)
+
+	/* size */
+	Expression.Copy(expn, eNode(y).u.operand)
+
+	/* variable */
+	Expression.Copy(variable, eNode(eNode(y).u.operand).sibling)
+
+	/* remember that we allocated this */
+	if flexTop < maxFlexDepth then
+	    flexTop += 1
+	    flexStack(flexTop) := variable
+	else
+	    Error(eTooManyDynamicArrays, t, fatalError)
+	end if
+    end CreateAllocation
+
+
+    procedure CreateFlexArrayAllocation(assign : TreePointer,
+					    id : ExpressionPointer)
+	var register e : ExpressionPointer
+	var register as := Types.ArrayStringInformation(id)
+
+	/* create the first "*" node */
+	new eNode, e
+	const expn := e
+	tag eNode(e).u, aMultiply
+	eNode(e).sibling := nil(eNode)
+
+	loop
+	    exit when asNode(as).u.kind = componentType
+	    if asNode(as).u.kind = manifestUpperBound then
+		new eNode, eNode(e).u.operand
+		e := eNode(e).u.operand
+		tag eNode(e).u, aIntegerLit
+		eNode(e).u.integerKind := iInteger
+		eNode(e).u.integerValue :=
+		    asNode(as).u.mUpper - asNode(as).u.mLower + 1
+	    else
+		Expression.Copy(asNode(as).u.nmUpper, eNode(e).u.operand)
+		e := eNode(e).u.operand
+	    end if
+
+	    /* now create the next "*" node */
+	    new eNode, eNode(e).sibling
+	    e := eNode(e).sibling
+	    tag eNode(e).u, aMultiply
+	    eNode(e).sibling := nil(eNode)
+
+	    as := asNode(as).next
+	end loop
+	/* now mulitply by the component size */
+	CTypes.EnterTypeSize(eNode(e), asNode(as).u.component, false)
+	CreateAllocation(assign, id, expn)
+    end CreateFlexArrayAllocation
+
+
+    body procedure PossibleDynamicVar %(t : TreePointer, id : ExpressionPointer)
+	const idKind := Types.GetKind(id)
+	var register x : TreePointer
+
+	if idKind = tFlexCharString then
+	    /* declare the variable holding the size */
+	    var register idSize :=
+		asNode(Types.ArrayStringInformation(id)).u.nmStringUpper
+
+	    DeclareInteger(t, idSize)
+
+	    /* assign the variable holding the size */
+	    x := Types.GetType(id)
+	    assert tNode(x).operatorNumber = aChar
+
+	    x := tNode(x).operand
+	    assert tNode(x).operatorNumber = aStringSizeBound
+
+	    x := tNode(x).operand
+	    assert tNode(x).operatorNumber = aNonManifest
+
+	    var assign : TreePointer
+	    CreateDynAssignment(t, idSize, tNode(tNode(x).operand).leaf, assign)
+
+	    TransExpn.TransExpn(assign, tNode(tNode(x).operand).leaf,
+		nil(eNode))
+
+	    /* call allocation routine */
+	    CreateAllocation(assign, id, idSize)
+	elsif idKind = tFlexArray then
+	    var register as := Types.ArrayStringInformation(id)
+
+	    x := Types.GetType(id)
+	    assert tNode(x).operatorNumber = aArray
+
+	    var assign : TreePointer := t
+
+	    x := tNode(x).operand
+	    
+	    /* walk through, and assign all the manifest expressions */
+	    loop
+		exit when asNode(as).u.kind = componentType
+		if asNode(as).u.kind = nonManifestUpperBound then
+		    DeclareInteger(assign, asNode(as).u.nmUpper)
+		    if asNode(as).u.nmLower = 1 then
+			CreateDynAssignment(assign, asNode(as).u.nmUpper,
+				tNode(tNode(tNode(tNode(x
+				    ).operand).sibling).operand).leaf, assign)
+			TransExpn.TransExpn(assign, tNode(tNode(tNode(tNode(x
+				).operand).sibling).operand).leaf, nil(eNode))
+
+		    else
+			/*
+			 * must make an expression with the number of elements
+			 */
+			var register e : ExpressionPointer
+
+			/* num elems = upper bound - (lower - 1) */
+			new eNode, e
+			const expnNode := e
+			tag eNode(e).u, aSubtract
+			eNode(e).sibling := nil(eNode)
+
+			Expression.Copy(tNode(tNode(tNode(tNode(
+					    x).operand).sibling).operand).leaf,
+					eNode(e).u.operand)
+
+			e := eNode(e).u.operand
+
+			new eNode, eNode(e).sibling
+			e := eNode(e).sibling
+
+			tag eNode(e).u, aIntegerLit
+			eNode(e).sibling := nil(eNode)
+			eNode(e).u.integerValue := asNode(as).u.nmLower - 1
+			eNode(e).u.integerKind := iInteger 
+
+			CreateDynAssignment(assign, asNode(as).u.nmUpper,
+				expnNode, assign)
+			TransExpn.TransExpn(assign, expnNode, nil(eNode))
+
+		    end if
+		end if
+		as := asNode(as).next
+		x := tNode(x).sibling
+	    end loop
+	    SetIndirection(id, CTypes.TypeKind(asNode(as).u.component),
+		asNode(as).u.component)
+	    CreateFlexArrayAllocation(assign, id)
+	end if
+    end PossibleDynamicVar
+
+
+    /*
+     * split up a var declaration into many declaration
+     * handle register vars!
+     */
+    procedure SplitDeclarationAndDoGrant (t, tipe : TreePointer)
+	var register x, y, varNode : TreePointer
+	var isRegister := false
+	const typeKind := CTypes.TypeKind(tipe)
+
+	/* first, find the declaration */
+	varNode := t
+	loop
+	    exit when tNode(varNode).operatorNumber = aVar
+	    varNode := tNode(varNode).sibling
+	end loop
+
+	y := varNode
+	x := tNode(varNode).operand
+	if tNode(x).operatorNumber = aRegister then
+	    if CTypes.NonScalar(tipe) then
+		x := tNode(x).sibling
+		tNode(varNode).operand := x
+	    else
+		isRegister := true
+		x := tNode(x).sibling
+	    end if
+	end if
+	const firstId := x
+
+	if isRegister then
+	    Types.EnterAttribute(tNode(firstId).leaf, aaRegister)
+	end if
+
+	/* Is there more than one id? */
+	if tNode(tNode(x).sibling).operatorNumber not= aType then
+	    /* force the proper indirection */
+	    SetIndirection(tNode(firstId).leaf, typeKind, tNode(tipe).operand)
+
+	    /* set the array/string information */
+	    Types.EnterTypeInfo(tNode(firstId).leaf)
+
+	    PossibleDynamicVar(t, tNode(firstId).leaf)
+
+	    x := tNode(x).sibling	/* skip the first id */
+	    loop
+		exit when tNode(x).operatorNumber = aType
+		/* create a new node, similar to "varNode" */
+		var temp : TreePointer
+
+		new tNode, temp
+		tNode(temp) := tNode(y)
+		tNode(temp).transformed := true
+
+		/* link it behind varNode */
+		tNode(y).sibling := temp
+		y := temp
+
+		if isRegister then
+		    /* create a register node */
+		    new tNode, tNode(temp).operand
+		    temp := tNode(temp).operand
+		    tNode(temp).nodeKind := NodeKinds.OperatorNode
+		    tNode(temp).operatorNumber := aRegister
+		    tNode(temp).operand := nil(tNode)
+		    tNode(temp).transformed := true
+		    tNode(temp).lineNumber := 0
+
+		    /* create the id for the declaration */
+		    new tNode, tNode(temp).sibling
+		    temp := tNode(temp).sibling
+		else
+		    /* create the id for the declaration */
+		    new tNode, tNode(temp).operand
+		    temp := tNode(temp).operand
+		end if
+		tNode(temp) := tNode(x)
+		tNode(temp).sibling := tipe
+		tNode(temp).transformed := true
+
+		/* force the proper indirection */
+		SetIndirection(tNode(x).leaf, typeKind, tNode(tipe).operand)
+
+		/* set the array/string information */
+		Types.EnterTypeInfo(tNode(x).leaf)
+		if isRegister then
+		    Types.EnterAttribute(tNode(x).leaf, aaRegister)
+		end if
+
+		/* fix the names for granted symbols */
+		if Types.HasAttribute(tNode(x).leaf, aaGrant) and
+			not Types.HasAttribute(tNode(firstId).leaf, aaExternal)
+			    then
+		    /* tranform the name */
+		    Identifier.EnterName(eNode(tNode(x).leaf).u.referenceValue)
+		end if
+
+		/* handle dynamic arrays/chars */
+		PossibleDynamicVar(t, tNode(x).leaf)
+
+		const oldX := x
+		x := tNode(x).sibling
+
+		tNode(oldX).sibling := x
+	    end loop
+
+	    /* fix up the first node */
+	    tNode(firstId).sibling := tipe
+	else
+	    /* force the proper indirection */
+	    SetIndirection(tNode(firstId).leaf, typeKind, tNode(tipe).operand)
+
+	    /* set the array/string information */
+	    Types.EnterTypeInfo(tNode(firstId).leaf)
+
+	    if isRegister then
+		Types.EnterAttribute(tNode(x).leaf, aaRegister)
+	    end if
+
+	    /* fix the names for granted symbols */
+	    if Types.HasAttribute(tNode(firstId).leaf, aaGrant) and
+		    not Types.HasAttribute(tNode(firstId).leaf, aaExternal) then
+		/* tranform the name */
+		Identifier.EnterName(
+		    eNode(tNode(firstId).leaf).u.referenceValue)
+	    end if
+
+	    PossibleDynamicVar(t, tNode(firstId).leaf)
+	end if
+    end SplitDeclarationAndDoGrant
+
+
+    procedure TransformCollectionVar(t, col : TreePointer)
+	var register x : TreePointer
+
+	/* get rid of the declaration! */
+	tNode(t).operatorNumber := aNoOp
+
+	x := tNode(t).operand
+	/* set the forward attribute on the collection if necessary */
+	if tNode(tNode(col).operand).nodeKind = NodeKinds.OperatorNode and
+		tNode(tNode(col).operand).operatorNumber = aForward then
+	    loop
+		exit when x = col
+		Types.EnterAttribute(tNode(x).leaf, aaForward)
+		Types.EnterTypeInfo(tNode(x).leaf)
+		x := tNode(x).sibling
+	    end loop
+	else
+	    loop
+		exit when x = col
+		Types.EnterTypeInfo(tNode(x).leaf)
+		x := tNode(x).sibling
+	    end loop
+	end if
+
+	/*
+	 * if the collection is of the form:
+	 *	var c : collection of pointer to c
+	 * or
+	 *	var c : collection of forward t
+	 *	type t: pointer to c
+	 * then we cannot represent this in C.  The closest that we could
+	 * come is "struct c { struct c *p;}", but...
+	 */
+	x := tNode(col).operand		/* the collection type */
+	if tNode(x).nodeKind not= NodeKinds.OperatorNode then
+	    /*
+	     * this cannot be a pointer to this collection or a forward
+	     * type.  Therefore it is safe
+	     */
+	    if not SimpleType(x) then
+		var register y := tNode(t).operand
+		SimplifyType(t, tNode(col).operand)
+
+		loop
+		    exit when y = col
+		    Types.SetType(tNode(y).leaf, col)
+		    Types.EnterTypeInfo(tNode(y).leaf)
+		    y := tNode(y).sibling
+		end loop
+	    end if
+	    return
+	end if
+	if tNode(x).operatorNumber = aForward then
+	    /* get the type of the forward type */
+	    const tyName := tNode(tNode(x).operand).leaf
+
+	    x := Types.GetType(tyName)
+	    if x = nil(tNode) then
+		/*
+		 *  - the forward type has not been declared
+		 *  - this can't be the harmful case
+		 */
+		var register y : TreePointer
+
+		new tNode, y
+		tNode(y).nodeKind := NodeKinds.SimpleLeaf
+		tNode(y).operatorNumber := aForward
+		tNode(y).sibling := nil(tNode)
+		tNode(y).operand := nil(tNode)
+		tNode(y).leaf := nil(eNode)
+		tNode(y).transformed := true
+		tNode(y).lineNumber := 0
+
+		Types.SetType(tyName, y)
+		Types.EnterTypeInfo(tyName)
+		return
+	    elsif tNode(x).nodeKind not= NodeKinds.OperatorNode then
+		return
+	    end if
+	else
+	    if not SimpleType(x) then
+		var register y := tNode(t).operand
+		SimplifyType(t, tNode(col).operand)
+
+		loop
+		    exit when y = col
+		    Types.SetType(tNode(y).leaf, col)
+		    Types.EnterTypeInfo(tNode(y).leaf)
+		    y := tNode(y).sibling
+		end loop
+	    end if
+	end if
+	if tNode(x).operatorNumber = aPointer then
+	    /*
+	     * either this names one of our collection variables directly,
+	     * or is okay
+	     */
+	    const name := eNode(tNode(tNode(x).operand).leaf).u.referenceValue
+	    x := tNode(t).operand
+	    loop
+		exit when x = col
+		if name = eNode(tNode(x).leaf).u.referenceValue then
+		    Error(eSelfReferentialCollection, t, fatalError)
+		end if
+		x := tNode(x).sibling
+	    end loop
+	end if
+    end TransformCollectionVar
+
+
+    /*
+     * Replace the aInit by  constant aInit, and a reference to the const
+     */
+    procedure ChangeVariableInitToVarInit(var varNode : TreePointer,
+						 tipe : TreePointer)
+	pre tNode(tNode(tipe).sibling).operatorNumber = aInit
+	var register t : TreePointer
+
+	new tNode, t
+	/* transfer varnode to new node */
+	tNode(t) := tNode(varNode)
+
+	tNode(varNode).sibling := t
+	const oldNode := varNode
+	varNode := t
+
+	/* remake the old node into a const */
+	t := oldNode
+	tNode(t).operatorNumber := aConst
+
+	var newId : ExpressionPointer
+	Expression.CreateUniqueIdentifier(newId)
+	Types.SetType(newId, tNode(tipe).operand)
+	Types.EnterTypeInfo(newId)
+	SetIndirection(newId, CTypes.TypeKind(tNode(tipe).operand),
+	    tNode(tipe).operand)
+	Types.EnterAttribute(newId, aaConstStatic)
+
+	new tNode, tNode(t).operand
+	t := tNode(t).operand
+
+	tNode(t).nodeKind := NodeKinds.ExpressionLeaf
+	tNode(t).leaf := newId
+	tNode(t).operand := nil(tNode)
+	tNode(t).transformed := true
+	tNode(t).lineNumber := 0
+
+	assert tNode(tipe).operatorNumber = aType
+	Tree.Copy(tipe, tNode(t).sibling)
+	t := tNode(t).sibling
+
+	assert tNode(tNode(tipe).sibling).operatorNumber = aInit
+	Tree.Copy(tNode(tipe).sibling, tNode(t).sibling)
+	t := tNode(t).sibling
+	tNode(t).sibling := nil(tNode)
+
+	new tNode, tNode(tipe).sibling
+	t := tNode(tipe).sibling
+
+	tNode(t).nodeKind := NodeKinds.OperatorNode
+	tNode(t).operatorNumber := aVarInit
+	tNode(t).sibling := nil(tNode)
+	tNode(t).leaf := nil(eNode)
+	tNode(t).transformed := true
+	tNode(t).lineNumber := 0
+
+	new tNode, tNode(t).operand
+	t := tNode(t).operand
+	tNode(t).nodeKind := NodeKinds.ExpressionLeaf
+	tNode(t).operatorNumber := 0
+	tNode(t).sibling := nil(tNode)
+	tNode(t).operand := nil(tNode)
+	tNode(t).leaf := newId
+	tNode(t).transformed := true
+	tNode(t).lineNumber := 0
+    end ChangeVariableInitToVarInit
+
+
+    /*
+     * Replace all unnamed types by a new named type.
+     * Create a new type definition 
+     * Split up var statements to individual aVar statements
+     * Also split aVarInits and aInits to multiple assigments
+     *
+     * aVar [aRegister] id, id, id [ aCollection | aType ] [ aInit | aVarInit ]
+     */
+    body procedure TransformVar % (t : TreePointer)  
+	pre tNode(t).operatorNumber = aVar
+	var varNode := t
+
+	/* find the type */
+	var register tipe := tNode(t).operand
+	loop
+	    exit when tNode(tipe).operatorNumber = aType
+	    if tNode(tipe).operatorNumber = aCollection then
+		TransformCollectionVar(t, tipe)
+		return
+	    end if
+	    tipe := tNode(tipe).sibling
+	end loop
+
+	if tNode(tNode(tipe).operand).operatorNumber = aNonScalar then
+	    VariableType(tNode(tNode(tNode(tipe).sibling).operand).leaf,
+		tNode(tipe).operand)
+	    ResetVarType(varNode, tNode(tipe).operand)
+	end if
+
+	if CTypes.TypeKind(tNode(tipe).operand) = tFlexArray then
+	    /*
+	     * this is not a simple type (by definition of SimpleType).
+	     * Simplify its component type, if necessary
+	     */
+	    var register tt := tNode(tipe).operand
+	    var register tp : TreePointer
+
+	    assert tNode(tt).operatorNumber = aArray
+	    tt := tNode(tt).operand
+	    var lastTt := tt
+	    loop
+		exit when tNode(tt).sibling = nil(tNode)
+		lastTt := tt
+		tt := tNode(tt).sibling
+	    end loop
+
+	    if not SimpleType(tt) then
+		SimplifyType(t, tNode(lastTt).sibling)
+
+		/* we must now find the variable definition again */
+		varNode := tNode(t).sibling
+		loop
+		    exit when tNode(varNode).operatorNumber = aVar
+		    varNode := tNode(varNode).sibling
+		end loop
+		assert tNode(tNode(varNode).operand).nodeKind =
+			    NodeKinds.ExpressionLeaf or
+		       tNode(tNode(varNode).operand).operatorNumber = aRegister
+
+		ResetVarType(varNode, tNode(tipe).operand)
+	    end if
+	elsif not SimpleType(tNode(tipe).operand) then
+	    SimplifyType(t, tNode(tipe).operand)
+
+	    /* we must now find the variable definition again */
+	    varNode := t
+	    loop
+		exit when tNode(varNode).operatorNumber = aVar
+		varNode := tNode(varNode).sibling
+	    end loop
+	    assert tNode(tNode(varNode).operand).nodeKind =
+			NodeKinds.ExpressionLeaf or
+		   tNode(tNode(varNode).operand).operatorNumber = aRegister
+
+	    ResetVarType(varNode, tNode(tipe).operand)
+	end if
+
+	if tNode(tipe).sibling not= nil(tNode) then
+	    if tNode(tNode(tipe).sibling).operatorNumber = aInit then
+		ChangeVariableInitToVarInit(varNode, tipe)
+	    end if
+	    SplitVarAssignment(varNode, tipe, tNode(tipe).sibling)
+	end if
+
+	SplitDeclarationAndDoGrant(t, tipe)
+    end TransformVar
+
+
+    body procedure TransformConditionVar % (t : TreePointer)  
+	var register tp := tNode(t).operand
+	const origSibling := tNode(t).sibling
+	var register lastT := t
+
+	TransformVar(tp)
+	
+	/* loop through all the conditions initializing them */
+	loop
+	    exit when tp = nil(tNode)
+	    if tNode(tp).operatorNumber = aVar then
+		case Types.GetKind(tNode(tNode(tp).operand).leaf) of
+		    label tCondition, tTimeoutCondition, tPriorityCondition,
+			    tDeferredCondition, tArray, tFlexArray:
+			new tNode, tNode(lastT).sibling
+			lastT := tNode(lastT).sibling
+			tNode(lastT).sibling := origSibling
+			tNode(lastT).operatorNumber := aCall
+			tNode(lastT).nodeKind := NodeKinds.ExpressionLeaf
+			tNode(lastT).operand := nil(tNode)
+			tNode(lastT).transformed := true
+			tNode(lastT).lineNumber := 0
+
+			new eNode, tNode(lastT).leaf
+			var register e := tNode(lastT).leaf
+
+			tag eNode(e).u, aCall
+			eNode(e).sibling := nil(eNode)
+
+			new eNode, eNode(e).u.operand
+			e := eNode(e).u.operand
+
+			tag eNode(e).u, aPredefinedId
+			eNode(e).u.funcOrProcNumber := pConditionInitialize
+
+			new eNode, eNode(e).sibling
+			e := eNode(e).sibling
+
+			tag eNode(e).u, aSubs
+			eNode(e).sibling := nil (eNode)
+			eNode(e).u.operand := tNode(tNode(tp).operand).leaf
+		    
+		    label :
+		end case
+	    end if
+	    tp := tNode(tp).sibling
+	end loop
+
+	/* now bring the condition declaration up one level */
+	tp := tNode(t).operand
+	loop
+	    exit when tNode(tp).sibling = nil(tNode)
+	    tp := tNode(tp).sibling
+	end loop
+	tNode(tp).sibling := tNode(t).sibling
+	tNode(t) := tNode(tNode(t).operand)
+    end TransformConditionVar
+
+
+    /*
+     * Replace all unamed types by a new named type.
+     * Create a new type definition 
+     */
+    body procedure TransformConst % (t : TreePointer)  
+	pre tNode(t).operatorNumber = aConst
+	const lineNumber := tNode(t).lineNumber
+	const fileNumber := tNode(t).fileNumber
+	var register x, y : TreePointer
+
+	x := tNode(t).operand
+	if tNode(x).operatorNumber = aPervasive then
+	    x := tNode(x).sibling
+	    tNode(t).operand := x
+	    if tNode(x).operatorNumber = aRegister then
+		x := tNode(x).sibling
+	    end if
+	    Types.EnterAttribute(tNode(x).leaf, aaGrant)
+	else
+	    if tNode(x).operatorNumber = aRegister then
+		x := tNode(x).sibling
+	    end if
+	end if
+
+	/* x now points to the constant id */
+
+	const register tipe := tNode(x).sibling
+	const register idNode := x
+
+	if tNode(tNode(tipe).operand).operatorNumber = aNonScalar then
+	    VariableType(tNode(tNode(tNode(tipe).sibling).operand).leaf,
+		tNode(tipe).operand)
+	    Types.SetType(tNode(idNode).leaf, tNode(tipe).operand)
+	end if
+
+	if tNode(tNode(t).operand).operatorNumber = aRegister then
+	    if CTypes.NonScalar(tipe) then
+		/* remove the register */
+		tNode(t).operand := tNode(tNode(t).operand).sibling
+	    else
+		Types.EnterAttribute(tNode(idNode).leaf, aaRegister)
+	    end if
+	end if
+
+	if not SimpleType(tNode(tipe).operand) then
+	    SimplifyType(t, tNode(tipe).operand)
+	    Types.SetType(tNode(idNode).leaf, tNode(tipe).operand)
+	end if
+	Types.EnterTypeInfo(tNode(idNode).leaf)
+
+	/* force the proper indirection */
+	SetIndirection(tNode(idNode).leaf, 
+	    CTypes.TypeKind(tNode(tipe).operand), tNode(tipe).operand)
+
+	if tNode(tipe).sibling not= nil(tNode) then
+	    if tNode(tNode(tipe).sibling).operatorNumber = aConstInit then
+		/*
+		 * split this to:
+		 *	const a : x
+		 *	a := expn
+		 */
+
+		/* make a node for the assignment */
+		new tNode, y
+		tNode(y).nodeKind := NodeKinds.OperatorNode
+		tNode(y).operatorNumber := aAssign
+		tNode(y).lineNumber := lineNumber
+		tNode(y).fileNumber := fileNumber
+		tNode(y).leaf := nil(eNode)
+		tNode(y).transformed := true
+
+		/* link it into the chain */
+		tNode(y).sibling := tNode(t).sibling
+		tNode(t).sibling := y
+
+		/* create a node for the first id */
+		new tNode, tNode(y).operand
+		x := tNode(y).operand
+
+		tNode(x).nodeKind := NodeKinds.ExpressionLeaf
+		tNode(x).operatorNumber := 0
+		tNode(x).leaf := tNode(idNode).leaf
+		tNode(x).transformed := true
+		tNode(x).lineNumber := 0
+
+		/* create a node for the expression */
+		new tNode, tNode(x).sibling
+		x := tNode(x).sibling
+		tNode(x).nodeKind := NodeKinds.ExpressionLeaf
+		tNode(x).operatorNumber := 0
+		tNode(x).leaf := tNode(tNode(tNode(tipe).sibling).operand).leaf
+		tNode(x).sibling := nil(tNode)
+		tNode(x).transformed := true
+		tNode(x).lineNumber := 0
+
+		/* Allow the transform of the assignment */
+		Types.EnterTypeInfo(tNode(idNode).leaf)
+		TransformAssignment.TransformAssign(y)
+		tNode(y).transformed := true
+
+		/* now remove the aConstInit */
+		tNode(tipe).sibling := nil(tNode)
+	    else
+		assert tNode(tNode(tipe).sibling).operatorNumber = aInit
+
+		/* leave the init there */
+		Types.EnterTypeInfo(tNode(idNode).leaf)
+		Types.EnterAttribute(tNode(idNode).leaf, aaConstStatic)
+	    end if
+	end if
+    end TransformConst
+
+
+    body procedure TransformAsm % (t : TreePointer)
+	var register tp := tNode(t).operand
+
+	if tNode(tp).operatorNumber = aLabel then
+	    tp := tNode(tp).sibling
+	end if
+
+	tp := tNode(tp).sibling
+
+	assert tNode(tp).operatorNumber = aBeginAsm
+	tp := tNode(tp).operand
+
+	loop
+	    exit when tp = nil(tNode)
+	    TransExpn.TransExpn(t, tNode(tp).leaf, nil(eNode))
+	    tp := tNode(tp).sibling
+	end loop
+    end TransformAsm
+
+
+    body procedure TransformGrant % (t : TreePointer)
+	var register tp := tNode(t).operand
+	loop
+	    exit when tp = nil(tNode)
+	    Types.EnterAttribute(tNode(tp).leaf, aaGrant)
+	    tp := tNode(tp).sibling
+	end loop
+	tNode(t).operatorNumber := aNoOp
+    end TransformGrant
+
+
+    /*
+     * Handle new or free	aNew|aFree collection reference
+     *		just tranform the reference -- let output handle it
+     */
+    body procedure TransformCollection % (t : TreePointer)
+	TransExpn.TransExpn(t, 
+	    tNode(tNode(tNode(t).operand).sibling).leaf, nil(eNode))
+    end TransformCollection
+
+
+    procedure MakeTemporaryExpression (t : TreePointer,
+				var expn : ExpressionPointer) 
+	/* need a temporary for the stream number */
+	var newStmt, variableType : TreePointer
+	var newId : ExpressionPointer
+	var register x : TreePointer
+
+	ExpnTypeTree (expn, variableType)
+	CreateBeginBlock (t, newStmt)
+	Expression.CreateUniqueIdentifier(newId)
+	Types.SetType(newId, variableType)
+	Types.EnterTypeInfo(newId)
+	if tNode(variableType).operatorNumber = aType then
+	    variableType := tNode(variableType).operand
+	end if
+
+	/* declare the temporary */
+	x := newStmt
+	const oldSibling := tNode(x).sibling
+
+	tNode(x).nodeKind := NodeKinds.OperatorNode
+	tNode(x).operatorNumber := aVar
+	tNode(x).leaf := nil(eNode)
+	tNode(x).transformed  := true
+	tNode(x).fileNumber := 0
+	tNode(x).lineNumber := 0
+
+	var register y := x
+
+	/* create the node for the id */
+	new tNode, tNode(x).operand
+	y := tNode(x).operand
+	tNode(y).nodeKind := NodeKinds.ExpressionLeaf
+	tNode(y).operand := nil(tNode)
+	tNode(y).leaf := newId
+	tNode(y).transformed := true
+	tNode(y).lineNumber := 0
+
+	new tNode, tNode(y).sibling
+	y := tNode(y).sibling
+	tNode(y).nodeKind := NodeKinds.OperatorNode
+	tNode(y).operatorNumber := aType
+	tNode(y).sibling := nil(tNode)
+	tNode(y).leaf := nil(eNode)
+	tNode(y).transformed := true
+	tNode(y).lineNumber := 0
+	Tree.Copy (variableType, tNode(y).operand)
+
+	/* assign the expression to the temp */
+	new tNode, tNode(x).sibling
+	x := tNode(x).sibling
+	tNode(x).nodeKind := NodeKinds.OperatorNode
+	tNode(x).operatorNumber := aAssign
+	tNode(x).leaf := nil(eNode)
+	tNode(x).sibling := oldSibling
+	tNode(x).transformed  := true
+	tNode(x).lineNumber := 0
+
+	new tNode, tNode(x).operand
+	x := tNode(x).operand
+	tNode(x).nodeKind := NodeKinds.ExpressionLeaf
+	tNode(x).operand := nil(tNode)
+	tNode(x).leaf := newId
+	tNode(x).transformed := true
+	tNode(x).lineNumber := 0
+
+	new tNode, tNode(x).sibling
+	x := tNode(x).sibling
+	tNode(x).nodeKind := NodeKinds.ExpressionLeaf
+	tNode(x).operand := nil(tNode)
+	tNode(x).sibling := nil(tNode)
+	tNode(x).leaf := expn
+	tNode(x).transformed := true
+	tNode(x).lineNumber := 0
+
+	/* replace the expression by the temp */
+	expn := newId
+    end MakeTemporaryExpression
+
+
+    procedure TransformPut(t : TreePointer)
+	var register tp := tNode(t).operand
+
+	loop
+	    exit when tp = nil(tNode)
+	    if tNode(tp).nodeKind = NodeKinds.ExpressionLeaf then
+		TransExpn.TransExpn(t, tNode(tp).leaf, nil(eNode))
+	    else
+		case tNode(tp).operatorNumber of
+		    label aStreamNumber:
+			TransExpn.TransExpn(t, 
+			    tNode(tNode(tp).operand).leaf, nil(eNode))
+			if not SimpleExpression(
+				tNode(tNode(tp).operand).leaf) then
+			    MakeTemporaryExpression (t, 
+				tNode(tNode(tp).operand).leaf)
+			end if
+
+		    label aString:
+			tp := tNode(tp).sibling
+			TransExpn.TransExpn(t, tNode(tp).leaf, nil(eNode))
+			TransExpn.ToString(t, tNode(tp).leaf)
+
+		    label aChar:
+			tp := tNode(tp).sibling
+			TransExpn.TransExpn(t, tNode(tp).leaf, nil(eNode))
+			TransExpn.ToCharString(t, tNode(tp).leaf)
+
+		    label aColon:
+			var register tpp := tNode(tp).operand
+			loop
+			    TransExpn.TransExpn(t, tNode(tpp).leaf, nil(eNode))
+			    exit when tNode(tpp).sibling = nil(tNode)
+			    tpp := tNode(tNode(tpp).sibling).operand
+			end loop
+
+		    label aInt, aReal, aNat:
+			tp := tNode(tp).sibling
+			TransExpn.TransExpn(t, tNode(tp).leaf, nil(eNode))
+
+		    label :
+		end case
+	    end if
+	    tp := tNode(tp).sibling
+	end loop
+    end TransformPut
+
+
+    procedure TransformGet (t : TreePointer)
+	var register tp := tNode(t).operand
+
+	loop
+	    exit when tp = nil(tNode)
+	    case tNode(tp).operatorNumber of
+		label aStreamNumber:
+		    TransExpn.TransExpn(t, tNode(tNode(tp).operand).leaf,
+			nil(eNode))
+		    if not SimpleExpression(tNode(tNode(tp).operand).leaf) then
+			MakeTemporaryExpression (t, 
+			    tNode(tNode(tp).operand).leaf)
+		    end if
+
+		label aString, aReal, aInt, aNat, aChar:
+		    TransExpn.TransExpn(t, 
+			tNode(tNode(tp).operand).leaf, nil(eNode))
+
+		    const register tpp := tNode(tNode(tp).operand).sibling
+
+		    if tpp not= nil(tNode) and
+			    tNode(tpp).operatorNumber = aColon and
+			    tNode(tpp).nodeKind = NodeKinds.ExpressionLeaf then
+			TransExpn.TransExpn(t,
+			    tNode(tNode(tpp).operand).leaf, nil(eNode))
+		    end if
+
+		label aSubrange:
+		    var register tpp := tNode(tp).operand
+
+		    if tNode(tpp).nodeKind = NodeKinds.SimpleLeaf and
+			    tNode(tpp).operatorNumber = aChar then
+			tpp := tNode(tpp).sibling
+		    end if
+
+		    TransExpn.TransExpn(t, tNode(tpp).leaf, nil(eNode))
+
+		label :
+	    end case
+	    tp := tNode(tp).sibling
+	end loop
+    end TransformGet
+
+
+    body procedure TransformIo % (t : TreePointer)
+	var register tp := tNode(t).operand
+
+	var streamExpnSeen := false
+
+	case tNode(t).operatorNumber of
+	    label aPut:
+		TransformPut(t)
+		return
+	    label aGet:
+		TransformGet(t)
+		return
+	    
+	    label aOpen, aClose:
+		streamExpnSeen := true
+
+	    label :
+	end case
+
+	loop
+	    exit when tp = nil(tNode)
+	    if tNode(tp).nodeKind = NodeKinds.ExpressionLeaf then
+		TransExpn.TransExpn(t, tNode(tp).leaf, nil(eNode))
+		if not streamExpnSeen then
+		    if not SimpleExpression (tNode(tp).leaf) then
+			MakeTemporaryExpression (t, tNode(tp).leaf)
+		    end if
+		    streamExpnSeen := true
+		end if
+	    else
+		case tNode(tp).operatorNumber of
+		    label aReadWriteSize:
+			TransExpn.TransExpn(t, 
+			    tNode(tNode(tp).operand).leaf, nil(eNode))
+
+		    label aReadWriteStatus:
+			TransExpn.TransExpn(t, 
+			    tNode(tNode(tp).operand).leaf, nil(eNode))
+
+		    label aColon:
+			var register tpp := tNode(tp).operand
+			loop
+			    TransExpn.TransExpn(t, 
+				tNode(tpp).leaf, nil(eNode))
+			    exit when tNode(tpp).sibling = nil(tNode)
+			    tpp := tNode(tNode(tpp).sibling).operand
+			end loop
+
+		    label :
+		end case
+	    end if
+	    tp := tNode(tp).sibling
+	end loop
+    end TransformIo
+
+
+    body procedure TransformQuit % (t : TreePointer)
+	var register tp := tNode(t).operand
+	if tp not= nil(tNode) then
+	    if tNode(tp).operatorNumber not= aQuitReason then
+		tp := tNode(tp).sibling
+	    end if
+	    if tp not= nil(tNode) then
+		TransExpn.TransExpn(t, tNode(tNode(tp).operand).leaf,
+		    nil(eNode))
+	    end if
+	end if
+    end TransformQuit
+
+
+    /*
+     * Must change this to an assigment of the tag variable
+     */
+    body procedure TransformTag % (tp : TreePointer)
+	var register t := tp
+	var register e : ExpressionPointer
+	
+	tNode(t).operatorNumber := aAssign
+
+	t := tNode(t).operand
+	const oldLeaf := tNode(t).leaf
+	new eNode, tNode(t).leaf
+	e := tNode(t).leaf
+
+	tag eNode(e).u, aField
+	eNode(e).u.operand := oldLeaf
+	e := oldLeaf
+
+	/* put the tag variable into the field */
+	new eNode, eNode(e).sibling
+	e := eNode(e).sibling
+
+	const unionNode := Types.GetType(VariableId(oldLeaf))
+	eNode(e).u := eNode(tNode(tNode(unionNode).operand).leaf).u
+	eNode(e).sibling := nil(eNode)
+
+	/* now transform the expressions */
+	TransExpn.TransExpn(tp, tNode(t).leaf, nil(eNode))
+	TransExpn.TransExpn(tp, tNode(tNode(t).sibling).leaf, nil(eNode))
+    end TransformTag
+
+
+    /*
+     *aFork EXPN [ aForkStatus EXPN [ aForkAddress EXPN [ aForkStackSize EXPN]]]
+     */
+    body procedure TransformFork % (t : TreePointer)
+	var register tp := tNode(t).operand
+
+	TransExpn.TransExpn (t, tNode(tp).leaf, nil(eNode))
+	tp := tNode(tp).sibling
+	if tp not= nil(tNode) then
+	    TransExpn.TransExpn(t, tNode(tNode(tp).operand).leaf, nil(eNode))
+	    tp := tNode(tNode(tp).operand).sibling
+	    if tp not= nil(tNode) then
+		TransExpn.TransExpn(t, tNode(tNode(tp).operand).leaf,
+		    nil(eNode))
+		tp := tNode(tNode(tp).operand).sibling
+		if tp not= nil(tNode) then
+		    TransExpn.TransExpn(t, tNode(tNode(tp).operand).leaf, 
+		        nil(eNode))
+		end if
+	    end if
+	end if
+    end TransformFork
+
+
+    /*
+     * aProcessInit {id TYPE EXPN}+ -- change to decls, assigns, no-op init
+     */
+    body procedure TransformInit % (t : TreePointer)
+	pre tNode(t).operatorNumber = aProcessInit
+	const lineNumber := tNode(t).lineNumber
+	const fileNumber := tNode(t).fileNumber
+	var register tp := tNode(t).operand
+	const origSibling := tNode(t).sibling
+	var lastT := t
+	var register temp : TreePointer
+
+	tNode(t).operatorNumber := aNoOp
+	loop
+	    exit when tp = nil(tNode)
+
+	    /* create the const decl */
+	    new tNode, tNode(lastT).sibling
+	    temp := tNode(lastT).sibling
+	    lastT := temp
+
+	    tNode(temp).sibling := origSibling
+	    tNode(temp).operatorNumber := aConst
+	    tNode(temp).nodeKind := NodeKinds.OperatorNode
+	    tNode(temp).operand := tp
+	    tNode(temp).leaf := nil(eNode)
+	    tNode(temp).transformed := true
+	    tNode(temp).lineNumber := 0
+
+	    const fcnId := tNode(tp).leaf
+
+	    assert tNode(tNode(tp).sibling).operatorNumber = aType
+	    tp := tNode(tp).sibling
+	    Types.SetType(fcnId, tp)
+
+	    /* isolate the chain after the type definition */
+	    temp := tNode(tp).sibling
+	    tNode(tp).sibling := nil(tNode)
+	    tp := temp
+
+	    /* now create an assignment node */
+	    new tNode, tNode(lastT).sibling
+	    temp := tNode(lastT).sibling
+	    lastT := temp
+
+	    tNode(temp).sibling := origSibling
+	    tNode(temp).operatorNumber := aAssign
+	    tNode(temp).nodeKind := NodeKinds.OperatorNode
+	    tNode(temp).leaf := nil(eNode)
+	    tNode(temp).lineNumber := lineNumber
+	    tNode(temp).fileNumber := fileNumber
+	    tNode(temp).transformed := true
+
+	    new tNode, tNode(temp).operand
+	    temp := tNode(temp).operand
+	    tNode(temp).operatorNumber := 0
+	    tNode(temp).nodeKind := NodeKinds.ExpressionLeaf
+	    tNode(temp).operand := nil(tNode)
+	    tNode(temp).leaf := fcnId
+	    tNode(temp).sibling := tp
+	    tNode(temp).transformed := true
+	    tNode(temp).lineNumber := 0
+
+	    /* isolate the right hand side */
+	    temp := tNode(tp).sibling
+	    tNode(tp).sibling := nil(tNode)
+	    tp := temp
+	end loop
+    end TransformInit
+
+
+    body procedure TransformExternal % (t : TreePointer)
+	var register tp := tNode(t).operand
+
+	case tNode(tp).operatorNumber of
+	    label aExternalAddress:
+		const newName := tNode(tNode(tp).operand).leaf
+		const oldSibling := tNode(t).sibling
+
+		tp := tNode(tp).sibling
+		assert tNode(tp).operatorNumber = aVar
+		tNode(t) := tNode(tp)
+		tNode(t).sibling := oldSibling
+		tp := t
+
+		const id := tNode(tNode(tp).operand).leaf
+		Types.EnterAttribute(id, aaExternal)
+		if eNode(newName).u.operatorNumber = aStringLit then
+		    Identifier.OverrideIdentText(eNode(id).u.referenceValue,
+					strings(eNode(newName).u.stringValue),
+					eNode(newName).u.stringLen)
+		    TransformVar(tp)
+		else
+		    assert eNode(newName).u.operatorNumber = aIntegerLit
+		    Types.EnterAttribute(id, aaExternalMemoryLocation)
+
+		    var tmp: string(21) := intstr(eNode(newName).u.integerValue)
+		    var tempChar: TokenString
+
+		    strmove(tempChar, tmp, 1)
+		    Identifier.OverrideIdentText(eNode(id).u.referenceValue,
+					tempChar, length(tmp))
+		    TransformVar(tp)
+		    tNode(t).operatorNumber := aNoOp
+		end if
+
+	    label aVar:
+		const oldSibling := tNode(t).sibling
+
+		tNode(t) := tNode(tp)
+		tNode(t).sibling := oldSibling
+		tp := tNode(t).operand
+		loop
+		    Types.EnterAttribute(tNode(tp).leaf, aaExternal)
+		    tp := tNode(tp).sibling
+		    exit when tNode(tp).operatorNumber = aType or
+			    tNode(tp).operatorNumber = aCollection
+		end loop
+		TransformVar(t)
+
+	    label aProcedure:
+		/* remove the aExternal */
+		const oldSibling := tNode(t).sibling
+
+		tNode(t) := tNode(tp)
+		tNode(t).sibling := oldSibling
+		Types.EnterAttribute(tNode(tNode(tp).operand).leaf, aaExternal)
+		Types.EnterAttribute(tNode(tNode(tp).operand).leaf,
+		    aaDontTouchName)
+		varTransformProcedure(t, tp, true, true)
+
+	    label aFunction:
+		/* remove the aExternal */
+		const oldSibling := tNode(t).sibling
+
+		tNode(t) := tNode(tp)
+		tNode(t).sibling := oldSibling
+		Types.EnterAttribute(tNode(tNode(tp).operand).leaf, aaExternal)
+		Types.EnterAttribute(tNode(tNode(tp).operand).leaf,
+		    aaDontTouchName)
+		varTransformFunction(t, tp, true)
+	end case
+    end TransformExternal
+
+
+    body procedure TransformForward % (t : TreePointer)
+	var register tp := tNode(t).operand
+	const oldSibling := tNode(t).sibling
+
+	/* remove the aForward */
+	tNode(t) := tNode(tp)
+	tNode(t).sibling := oldSibling
+	Types.EnterAttribute(tNode(tNode(tp).operand).leaf, aaForward)
+	NewFlexScope(fsRoutine)
+	case tNode(tp).operatorNumber of
+	    label aProcedure:
+		varTransformProcedure(t, tp, true, true)
+
+	    label aFunction:
+		varTransformFunction(t, tp, true)
+	end case
+	PopFlexScope
+    end TransformForward
+
+end Utility2

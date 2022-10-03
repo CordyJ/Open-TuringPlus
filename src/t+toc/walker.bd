@@ -1,0 +1,259 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+% 
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+% 
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+/*
+ *    Turing Plus to C translator
+ *    Module: Walker - walks stream and builds a parse tree,
+ *    By    : Mark Mendell
+ *    Date  : 23 Oct 1986
+ *    From  : 
+ *	Turing Souce Level Global Optimizer
+ *	Module: Walker - walks stream and builds a parse tree,
+ *	By    : Peter Ashwood-Smith,
+ */
+
+body "walker.st" module Walker
+    const  *firstTableOperation := 0
+    const  *firstPrimitiveOperation := 0
+    const  *oCall := 0
+    const  *oReturn := 1
+    const  *oRuleEnd := 2
+    const  *oJump:= 3
+    const  *oInput := 4
+    const  *oInputAny := 5
+    const  *oInputChoice := 6
+    const  *oEmit := 7
+    const  *oError := 8
+    const  *oChoice := 9
+    const  *oChoiceEnd := 10
+    const  *oSetParameter := 11
+    const  *oSetResult := 12
+    const  *oSetResultFromInput := 13
+    const  *lastPrimitiveOperation := 13
+
+/*
+ * This is where the majority of the information from the walker.ssl file
+ * is loaded. walker.sst.t is the actual parse table which the walker will
+ * interpret.
+ */
+    include "walker.sst.t"       
+
+    include "%system"       
+
+/* 
+ * These are definitions needed by the table walker. They are standard
+ * in any S/SL walker. See the sslskel.t program for descriptions.
+ */
+    const sslStackSize	:= 500
+
+    var sslPointer:		int := 0
+    var operation:		int
+    var sslStack:		array 1 .. sslStackSize of int
+
+    var parameterValue:		int
+    var resultValue:		int
+
+/*
+ * These are input/output items. The Input Stream, current token, and
+ * next token from that stream these all come from the Token module.
+ */
+    var inStream:	int
+    var nextToken:	Token.TokenType
+    var inputToken:	Token.TokenType
+    
+
+/*
+ * These are the procedures called by S/SL to get the next token, emit
+ * a token. Also is a priming function. Basically inputToken is the current
+ * input token and nextToken is the next input token.
+ * The token number of each token is stored in 
+ * the 'Number' field of the TokenType. (See Token module). Note that we
+ * never emit when building the parse tree so any calls to EmitToken are
+ * wrong so we die if this happens.
+ */
+
+    procedure AcceptInputToken
+	inputToken := nextToken
+	Token.In (nextToken, inStream)
+	if debugLevel > 1 then
+	   put :debugFile, "Line ", currentLineNumber,
+		" Input token accepted " ..
+	   Token.Dump (inputToken, debugFile)
+	   put :debugFile, "\tNext input token " ..
+	   Token.Dump (nextToken, debugFile)
+        end if
+    end AcceptInputToken
+
+/*
+ * SslTrace : Checks to see if the debugLevel is high enough to spit out
+ * its info, if it is it will spit out table, and state info to debugFile
+ */
+    procedure SslTrace
+        if debugLevel > 3 then
+           put :debugFile, ":", sslPointer-1, " ", operation, " ",
+	       sslTable(sslPointer)
+        end if
+    end SslTrace
+
+/*
+ * Walk : Called from outside this module.  It starts walking the S/SL table and
+ * driving the input/matching and calling of external mechanisms. See the
+ * sslskel.t program for more details. debugLevel controls how much debugging
+ * will go to the stream DebugStream. If debugLevel > 0 then debugFile will
+ * be open.
+ */
+    body procedure Walk % (var t:TreePointer, inFile)
+#if DEBUG then
+	handler (quitCode)
+	    if quitCode not= excpSIGINT then
+		Types.Dump(debugFile)
+	    end if
+	    quit >
+	end handler
+#end if
+	var register localSslTop:	0 .. sslStackSize := 0
+	var register localSslPointer:	int := 0
+	var register numberOfChoices:	int
+
+	inStream := inFile
+
+	/* fetch the first token */
+	var i : int
+	open :i, inStream, read
+	assert i = inStream
+
+	var expressionCount : int
+
+	/* initialize nextToken */
+	nextToken.tokenKind := aNewLine
+
+	Token.In(nextToken, inStream)   
+
+	loop 
+	    operation := sslTable(localSslPointer)
+	    localSslPointer += 1
+#if DEBUG then
+	    if debugLevel >= 4 then
+		sslPointer := localSslPointer
+		SslTrace 
+	    end if
+#end if
+	    case operation of
+		label oCall :
+		    assert localSslTop < sslStackSize 
+		    localSslTop += 1
+		    sslStack(localSslTop) := localSslPointer + 1
+		    localSslPointer := sslTable(localSslPointer)
+
+		label oReturn :
+		    if localSslTop = 0 then
+			/* Return from main S/SL procedure */
+			exit
+		    else
+			localSslPointer := sslStack(localSslTop)
+			localSslTop -= 1
+		    end if
+
+		label oRuleEnd :
+		    sslPointer := localSslPointer
+		    Error(ChoiceRuleFailed, nil(tNode), fatalError) 
+
+	    label oJump :
+		localSslPointer := sslTable(localSslPointer)
+
+	    label oInput :
+		if sslTable(localSslPointer) = nextToken.tokenKind then
+		    AcceptInputToken
+		else
+		    /* Syntax error in input */
+		    sslPointer := localSslPointer
+		    Error(SslSyntaxError, nil(tNode), fatalError)
+		end if
+		localSslPointer += 1
+
+	    label oInputAny :
+		if nextToken.tokenKind not = aEndOfFile then
+		    AcceptInputToken
+		else
+		    /* Premature end of file */
+		    sslPointer := localSslPointer
+		    Error(SslSyntaxError, nil(tNode), fatalError)
+		end if
+
+	    label oInputChoice :
+		localSslPointer := sslTable(localSslPointer)
+		numberOfChoices := sslTable(localSslPointer)
+		localSslPointer += 1
+
+		for : 1.. numberOfChoices
+		    if sslTable(localSslPointer) = nextToken.tokenKind then
+			localSslPointer := sslTable(localSslPointer+1)
+			AcceptInputToken
+			exit
+		    end if
+		    localSslPointer += 2
+		end for
+
+		label oError :
+		    Error (sslTable(localSslPointer), nil(tNode), fatalError)
+
+		label oChoice :
+		    localSslPointer := sslTable(localSslPointer)
+		    numberOfChoices := sslTable(localSslPointer)
+		    localSslPointer += 1
+
+		    for : 1..numberOfChoices
+			if sslTable(localSslPointer) = resultValue then
+			    localSslPointer:=sslTable(localSslPointer+1)
+			    exit
+			end if
+			    localSslPointer += 2
+		    end for
+
+		label oChoiceEnd :
+		    sslPointer := localSslPointer
+		    Error(SemanticChoiceFailed, nil(tNode), fatalError)
+
+		label oSetParameter :
+		    parameterValue := sslTable(localSslPointer)
+		    localSslPointer += 1
+
+		label oSetResult :
+		    resultValue := sslTable(localSslPointer)
+		    localSslPointer += 1
+		
+		label oSetResultFromInput :
+		    resultValue := nextToken.tokenKind
+
+	        include "walker.ops"     
+
+		label :
+		      Error(SemanticOperationNotImplemented, nil(tNode), fatalError)
+	    end case
+	end loop
+	/* return the built tree to caller */
+	Tree.End(t)
+	if debugLevel > 0 then
+	   Tree.Dump(t, 0, debugFile)
+	   Types.Dump(debugFile)
+	end if
+  	/*  make sure stack is now empty */
+  	Tree.AssertStackIsEmpty(debugFile)
+    end Walk
+
+end Walker

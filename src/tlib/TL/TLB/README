@@ -1,0 +1,48 @@
+This directory contains the machine-independent implementations of the
+Turing Plus buffer memory management library routines.
+
+The various routines are as follows:
+
+TLB.ch		(internal)
+	The TLB parent module.
+
+TLBALL.ch	(pAllocate)
+	This routine is responsible for allocating memory for flex arrays.
+
+TLBDAL.ch	(pDeAllocate)
+	This routine is responsible for releasing memory allocated by TLBALL.
+
+TLBFRC.ch	(pFreeChecked)
+	This routine is responsible for free'ing checked collection elements
+	allocated by TLBNWC.
+
+TLBFRU.ch	(pFree)
+	This routine is responsible for free'ing unchecked collection elements
+	allocated by TLBNWU.
+
+TLBMAL.ch	(MemoryAllocate)
+	This routine is called by all allocation routines to perform the 
+	actual memory allocation.
+
+TLBMFR.ch	(MemoryDeallocate)
+	This routine is called by all de-allocation routines to perform the 
+	actual memory de-allocation.
+
+TLBNWC.ch	(pNewChecked)
+	This routine is responsible for new'ing a new checked collection
+	element.
+
+TLBNWU.ch	(pNew)
+	This routine is responsible for new'ing a new unchecked collection
+	element.
+
+TLBUNR.ch
+	This routine is the worker for uninitialization.  It interprets a
+	language designed for uninitializing variables.
+
+TLBUNI.ch	(pUninitializeVariable)
+	This routine just calls TLBUNR.
+
+TLBUUN.ch	(pUninitializeUnion)
+	This routine is used by the tag statement.  It uninitializes the
+	proper alternative of the union.  Calls TLBUNR.

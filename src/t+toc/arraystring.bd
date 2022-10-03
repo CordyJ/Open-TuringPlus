@@ -1,0 +1,214 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+% 
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+% 
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+/*
+ * Module:  Array Index and String Length
+ * Date:    9 Dec. 1986
+ * Author:  M. Mendell
+ */
+body "arraystring.st" module ArrayString
+
+    body procedure CreateStringNode % (var res : ArrayStringPointer,
+				    %      str : TreePointer,
+				    %      kind: TypeKinds,
+				    %	settype: SetProcType,
+				    %  needSize: boolean)
+	var register x : TreePointer
+
+	new asNode, res
+	asNode(res).next := nil(asNode)
+	bind var register a to asNode(res)
+
+	case kind of
+	    label tString, tCharString:
+		tag a.u, manifestStringLength
+		x := str
+		if tNode(x).operatorNumber = aType then
+		    x := tNode(x).operand
+		end if
+		if tNode(x).operand = nil (tNode) then
+		    a.u.mStringUpper := 4095
+		else
+		    x := tNode(x).operand
+		    assert tNode(x).operatorNumber = aStringSizeBound
+		    a.u.mStringUpper :=
+			Expression.GetInteger(tNode(tNode(x).operand).leaf)
+		end if
+
+	    label tChar, tSubrange:
+		tag a.u, manifestStringLength
+		a.u.mStringUpper := 1
+
+	    label tFlexCharString, tParameterCharString, tParameterString:
+		tag a.u, nonManifestStringLength
+		Expression.CreateUniqueIdentifier(a.u.nmStringUpper)
+		settype(a.u.nmStringUpper, predtree(pWithoutType, pInt4))
+		if needSize then
+		    Expression.CreateUniqueIdentifier(a.u.nmStringSize)
+		    settype(a.u.nmStringSize, predtree(pWithoutType, pInt4))
+		else
+		    a.u.nmStringSize := nil(eNode)
+		end if
+	end case
+    end CreateStringNode
+
+
+    body procedure CreateArrayNode % (refVal : int
+				   % var res : ArrayStringPointer,
+				   % arr : TreePointer,
+				   % settype: SetTypeProc,
+				   % gettype: GetTypeFunc,
+				   % entertypeinfo: EnterTypeInfoProc,
+				   % enterAttribute: EnterAttributeTypeProc)
+	var register x : ArrayStringPointer
+	var register t : TreePointer
+	var count := 0
+
+	new asNode, res
+	x := res
+
+	% handle the first subrange
+	if tNode(arr).operatorNumber = aPacked then
+	    assert tNode(tNode(arr).operand).operatorNumber = aArray
+	    t := tNode(tNode(arr).operand).operand
+	else
+	    assert tNode(arr).operatorNumber = aArray
+	    t := tNode(arr).operand
+	end if
+	if tNode(t).operatorNumber not= aSubrange and
+		tNode(t).operatorNumber not= aEnum then
+	    /* replace the subrange by its value */
+	    if tNode(t).operatorNumber = aPacked then
+		const sibling := tNode(t).sibling
+
+		tNode(t) := tNode(tNode(t).operand)
+		tNode(t).sibling := sibling
+	    else
+		const sibling := tNode(t).sibling
+
+		assert tNode(t).leaf not= nil(eNode)
+		tNode(t) := tNode(gettype(tNode(t).leaf))
+		tNode(t).sibling := sibling
+	    end if
+	end if
+	assert tNode(t).operatorNumber = aSubrange or
+	       tNode(t).operatorNumber = aEnum
+
+	if tNode(tNode(tNode(t).operand).sibling).nodeKind =
+		NodeKinds.OperatorNode then
+	    assert tNode(tNode(tNode(t).operand).sibling).operatorNumber =
+		    aNonManifest
+	    tag asNode(x).u, nonManifestUpperBound
+	    asNode(x).u.nmLower := 
+		Expression.GetInteger(tNode(tNode(t).operand).leaf)
+	    if refVal = -1 then
+		Expression.CreateUniqueIdentifier(asNode(x).u.nmUpper)
+	    else
+		Expression.CreateNamedId(asNode(x).u.nmUpper, refVal, count)
+		count += 1
+		enterAttribute(asNode(x).u.nmUpper, aaGrant)
+	    end if
+	    settype(asNode(x).u.nmUpper, predtree(pWithoutType, pInt4))
+	elsif eNode(tNode(tNode(tNode(t
+		).operand).sibling).leaf).u.operatorNumber = aStar then
+	    tag asNode(x).u, nonManifestUpperBound
+	    asNode(x).u.nmLower := 
+		Expression.GetInteger(tNode(tNode(t).operand).leaf)
+	    Expression.CreateUniqueIdentifier(asNode(x).u.nmUpper)
+	    settype(asNode(x).u.nmUpper, predtree(pWithoutType, pInt4))
+	else
+	    tag asNode(x).u, manifestUpperBound
+	    asNode(x).u.mLower := 
+		Expression.GetInteger(tNode(tNode(t).operand).leaf)
+	    asNode(x).u.mUpper := Expression.GetInteger(
+		    tNode(tNode(tNode(t).operand).sibling).leaf)
+	end if
+
+	% now handle the other indicies
+	t := tNode(t).sibling
+	loop
+	    exit when tNode(t).sibling = nil(tNode)
+	    if tNode(t).operatorNumber not= aSubrange and
+		    tNode(t).operatorNumber not= aEnum then
+		/* replace the subrange by its value */
+		if tNode(t).operatorNumber = aPacked then
+		    const sibling := tNode(t).sibling
+
+		    tNode(t) := tNode(tNode(t).operand)
+		    tNode(t).sibling := sibling
+		else
+		    const sibling := tNode(t).sibling
+
+		    assert tNode(t).leaf not= nil(eNode)
+		    tNode(t) := tNode(gettype(tNode(t).leaf))
+		    tNode(t).sibling := sibling
+		end if
+	    end if
+	    assert tNode(t).operatorNumber = aSubrange or
+		   tNode(t).operatorNumber = aEnum
+	    new asNode, asNode(x).next
+	    x := asNode(x).next
+	    if tNode(tNode(tNode(t).operand).sibling).nodeKind =
+		    NodeKinds.OperatorNode then
+		assert tNode(tNode(tNode(t).operand).sibling).operatorNumber =
+			aNonManifest
+		tag asNode(x).u, nonManifestUpperBound
+		asNode(x).u.nmLower := 
+		    Expression.GetInteger(tNode(tNode(t).operand).leaf)
+		if refVal = -1 then
+		    Expression.CreateUniqueIdentifier(asNode(x).u.nmUpper)
+		else
+		    Expression.CreateNamedId(asNode(x).u.nmUpper, refVal, count)
+		    count += 1
+		    enterAttribute(asNode(x).u.nmUpper, aaGrant)
+		end if
+		settype(asNode(x).u.nmUpper, predtree(pWithoutType, pInt4))
+	    elsif eNode(tNode(tNode(tNode(t
+		    ).operand).sibling).leaf).u.operatorNumber = aStar then
+		tag asNode(x).u, nonManifestUpperBound
+		asNode(x).u.nmLower := 
+		    Expression.GetInteger(tNode(tNode(t).operand).leaf)
+		Expression.CreateUniqueIdentifier(asNode(x).u.nmUpper)
+		settype(asNode(x).u.nmUpper, predtree(pWithoutType, pInt4))
+	    else
+		tag asNode(x).u, manifestUpperBound
+		asNode(x).u.mLower := 
+		    Expression.GetInteger(tNode(tNode(t).operand).leaf)
+		asNode(x).u.mUpper := Expression.GetInteger(
+			tNode(tNode(tNode(t).operand).sibling).leaf)
+	    end if
+	    t := tNode(t).sibling
+	end loop
+
+	% now handle the component type
+	new asNode, asNode(x).next
+	x := asNode(x).next
+
+	tag asNode(x).u, componentType
+	asNode(x).u.component := t
+	if tNode(t).leaf = nil(eNode) then
+	    /* no associated identifer -- make one */
+	    Expression.CreateUniqueIdentifier(asNode(x).u.id)
+	    settype(asNode(x).u.id, t)
+	    entertypeinfo(asNode(x).u.id)
+	else
+	    asNode(x).u.id := tNode(t).leaf
+	end if
+    end CreateArrayNode
+
+end ArrayString

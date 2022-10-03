@@ -1,0 +1,75 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+%
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+%
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+grant (
+    % Modules
+	var TLE,
+	var TLB,
+	var TLI,
+	var TLM,
+	var TLK,
+	var TLA,
+	var TLS,
+	var TLX,
+
+    % Procedures
+	TLQUIT,
+
+    % Collections
+	var TL_Handler,
+	var TL_Process,
+
+    % Variables
+	    TLECU,
+	var TLKPD,
+
+    % Constants
+	defaultew,
+	defaultfw,
+	maxargfiles,
+	maxint,
+	maxnat,
+	maxstream,
+	maxstr,
+	minint
+    )
+
+include "TL.def"
+
+var TLECU: boolean	:= false	% Check underflows
+
+#if M88K then
+  % Some trickery here.
+  % On multi-cpus, want each cpu to have a private version of the pointer to
+  % the currently running process.
+  % On the M88K, this location is hard-coded in the startup code. 
+  %
+  % !!!!! BEWARE OF CHANGE !!!!!
+  %
+  external 16#80104 var TLKPD : TL_PDpointer := nil(TL_Process)	
+#else
+   % the currently running process
+   %
+   % We declare it to be external, since we require
+   % both TLKPD and TLCPD to be at the same data location
+   % to avoid naming conflicts with cinterface declarations
+   % when using the C translator.  The actual declaration should
+   % be done in the machine-specific directory, probably in assembler.
+   %
+  external "TL_TLKPD" var TLKPD: TL_PDpointer := nil(TL_Process)	
+#end if

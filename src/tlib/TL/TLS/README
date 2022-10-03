@@ -1,0 +1,110 @@
+This directory contains the machine-independent implementations of the
+Turing Plus string manipulation library routines.
+
+The various routines are as follows:
+
+TLS.ch		(internal)
+	The TLS parent module.
+
+TLSASN.ch	(pStringAssign)
+	This routine performs a string assignment.
+	NOTE: This is required for the C-translator only.
+
+TLSBS.ch	(pSubStringStar)
+	This routine implements s(*-#), for string s.
+
+TLSBSS.ch	(pSubStringStarStar)
+	This routine implements s(*-# .. *-#), for string s.
+
+TLSBSX.ch	(pSubStringStarExpn)
+	This routine implements s(*-# .. #), for string s.
+
+TLSBX.ch	(pSubStringExpn)
+	This routine implements s(#), for string s.
+
+TLSBXS.ch	(pSubStringExpnStar)
+	This routine implements s(# .. *-#), for string s.
+
+TLSBXX.ch	(pSubStringExpnExpn)
+	This routine implements s(# .. #), for string s.
+
+TLSCAT.ch	(pStringConcatenate)
+	This routine implements string concatenation.
+	NOTE: This is required for the C-translator only.
+
+TLSCTA.ch	(pStringConcatenateAssign)
+	This routine implements string concatenation assign.
+	NOTE: This is required for the C-translator only.
+
+TLSCSS.ch	(pSubStringCharStarStar)
+	This routine implements c(*-# .. *-#), for charstring c.
+
+TLSCSX.ch	(pSubStringCharStarExpn)
+	This routine implements c(*-# .. #), for charstring c.
+
+TLSCXS.ch	(pSubStringCharExpnStar)
+	This routine implements c(# .. *-#), for charstring c.
+
+TLSCXX.ch	(pSubStringCharExpnExpn)
+	This routine implements c(# .. #), for charstring c.
+
+TLSDEL.ch	(pStrDelete)
+	This routine implements the strdelete routine.
+
+TLSIND.ch	(pIndex)
+	This routine implements the index function.
+
+TLSLEN.ch	(pLength)
+	This routine implements the length function.
+
+TLSMCC.ch	(pStrMoveCC)
+	This routine implements the strmove routine to
+	charstring from charstring.
+
+TLSMCS.ch	(pStrMoveCS)
+	This routine implements the strmove routine to
+	charstring from string.
+
+TLSMSC.ch	(pStrMoveSC)
+	This routine implements the strmove routine to
+	string from charstring.
+
+TLSMSS.ch	(pStrMoveSS)
+	This routine implements the strmove routine to
+	string from string.
+
+TLSREC.ch	(pStrReplaceC)
+	This routine implements the strreplace routine for charstrings.
+
+TLSRES.ch	(pStrReplaceS)
+	This routine implements the strreplace routine for strings.
+
+TLSRPT.ch	(pRepeat)
+	This routine implements the repeat function.
+
+TLSVCS.ch	(pConvertCharStringToString)
+	This routine converts a charstring to a string.
+
+TLSVES.ch	(pERealStr)
+	This routine implements the erealstr routine.
+
+TLSVFS.ch	(pFRealStr)
+	This routine implements the frealstr routine.
+
+TLSVIS.ch	(pIntStr)
+	This routine implements the intstr routine.
+
+TLSVNS.ch	(pNatStr)
+	This routine implements the natstr routine.
+
+TLSVRS.ch	(pRealStr)
+	This routine implements the realstr routine.
+
+TLSVS8.ch	(pStrReal)
+	This routine implements the strreal routine.
+
+TLSVSI.ch	(pStrInt)
+	This routine implements the strint routine.
+
+TLSVSN.ch	(pStrNat)
+	This routine implements the strnat routine.

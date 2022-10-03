@@ -1,0 +1,520 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+% 
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+% 
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+body "outpututil2.st" module Misc2
+
+    body procedure OutputQuit % (t : TreePointer, indent : int)
+	var register tp := tNode(t).operand
+
+	OutputIndent(indent)
+	if tp = nil(tNode) then
+	    put : outFile, predefNames(pQuit), " (", intCast, "1, ",
+		    macdepType(mQuitPlace), ", 0)" ..
+	elsif tNode(tp).operatorNumber = aQuitReason then
+	    put : outFile, predefNames(pQuit), " (" , intCast ..
+	    OutputExpression(tNode(tNode(tp).operand).leaf, noParen)
+	    put : outFile, ", ", macdepType(mQuitPlace), ", 0)" ..
+	elsif tNode(tp).operatorNumber = aGreater then
+	    put : outFile, predefNames(pQuit), " (", intCast ..
+	    tp := tNode(tp).sibling
+	    if tp = nil(tNode) then
+		put : outFile, "1, ", macdepType(mQuitPlace), ", 0)" ..
+	    else
+		OutputExpression(tNode(tNode(tp).operand).leaf, noParen)
+		put : outFile, ", ", macdepType(mQuitPlace), ", 1)" ..
+	    end if
+	else
+	    assert tNode(tp).operatorNumber = aLess
+	    tp := tNode(tp).sibling
+	    if lineNumbering then
+		put :outFile, predefNames(pRestoreLineAndFile), "();"
+		OutputIndent(indent)
+	    end if
+	    put : outFile, predefNames(pQuit), " (", intCast ..
+	    if tp = nil(tNode) then
+		put : outFile, "1" ..
+	    else
+		OutputExpression(tNode(tNode(tp).operand).leaf, noParen)
+	    end if
+	    put : outFile, ", ", macdepType(mQuitPlace), ", -1)" ..
+	end if
+    end OutputQuit
+
+
+    body procedure OutputFork % (t : TreePointer, indent : int)
+	pre eNode(tNode(t).leaf).u.operatorNumber = aCall
+	var register tp := t
+	var register ep := eNode(tNode(tp).leaf).u.operand
+
+	OutputIndent(indent)
+	/* parameter size */
+	put :outFile, predefNames(pStartProcess), "(" ,
+	    intCast, ParameterSize(ep, eNode(ep).sibling) ..
+
+	/* process name */
+	put :outFile, ", \"" ..
+	OutputExpression(ep, noParen)
+	put :outFile, "\", " ..
+
+	/* process address */
+	OutputExpression(ep, noParen)
+	put :outFile, ", " ..
+
+	/* fork Address */
+	tp := tNode(tp).sibling
+	if tp not= nil(tNode) and
+		tNode(tNode(tp).operand).sibling not= nil(tNode) and
+		tNode(tNode(tNode(tNode(tp).operand).sibling).operand).sibling
+		    not= nil(tNode) then
+	    put :outFile, "&" ..
+	    OutputExpression(tNode(tNode(tNode(tNode(tNode(tNode(
+		    tp).operand).sibling).operand).sibling).operand).leaf,
+		noParen)
+	else
+	    put :outFile, "(", macdepType(mAddressint), " *) 0" ..
+	end if
+	put :outFile, ", " ..
+
+	/* stack size */
+	if tp not= nil(tNode) and
+		tNode(tNode(tp).operand).sibling not= nil(tNode) then
+	    OutputCastedExpression(tNode(tNode(tNode(tNode(
+		tp).operand).sibling).operand).leaf)
+	else
+	    /* try to get the size from the process header */
+	    var register temp := Types.GetType(ep)
+
+	    temp := tNode(tNode(temp).operand).sibling
+	    if tNode(temp).operatorNumber = aSubs then
+		temp := tNode(temp).sibling
+	    end if
+	    if temp not= nil(tNode) and
+		    tNode(temp).operatorNumber = aProcessStackSize then
+		OutputCastedExpression(tNode(tNode(temp).operand).leaf)
+	    else
+		/* use the default stack size */
+		put :outFile, intCast, macdepStackSize ..
+	    end if
+	end if
+	put :outFile, ", " ..
+
+	/* fork status */
+	if tp not= nil(tNode) then
+	    put :outFile, "&" ..
+	    OutputExpression(tNode(tNode(tp).operand).leaf, noParen)
+	else
+	    put :outFile, "(", macdepType(mBoolean), " *) 0" ..
+	end if
+
+	/* parameters */
+	if eNode(ep).sibling not= nil(eNode) then
+	    put :outFile, ", " ..
+	    OutputExpn.OutputParameters(ep, eNode(eNode(ep).sibling).u.operand)
+	end if
+	put :outFile, ")" ..
+    end OutputFork
+
+
+    body procedure OutputParameterParameter % (var as : ArrayStringPointer)
+	loop
+	    exit when asNode(as).u.kind = componentType
+	    if asNode(as).u.kind = nonManifestUpperBound then
+		put :outFile, ", " ..
+		OutputExpression(asNode(as).u.nmUpper, false)
+	    end if
+	    as := asNode(as).next
+	end loop
+    end OutputParameterParameter
+
+
+    body procedure OutputParameters % (t : TreePointer, var firstTime : boolean)
+	var register x := t
+	var register id : ExpressionPointer
+
+	/* list of parameter names */
+	loop
+	    exit when x = nil(tNode)
+	    if not firstTime then
+		put :outFile, ", " ..
+	    else
+		firstTime := false
+	    end if
+	    id := tNode(x).leaf
+	    const indir := Types.Indirection(id)
+
+	    Types.SetIndirection(id, 0, inPointer)
+	    Types.SetIndirection(id, 0, inSubprogram)
+	    OutputExpression(id, noParen)
+	    Types.SetIndirection(id, indir(inPointer), inPointer)
+	    Types.SetIndirection(id, indir(inSubprogram), inSubprogram)
+
+	    /* handle * parameters */
+	    const tKind := Types.GetKind(id)
+	    var as : ArrayStringPointer
+	    case tKind of
+		label tParameterCharString, tParameterString:
+		    put :outFile, ", " ..
+		    OutputExpression(asNode(Types.ArrayStringInformation(
+			    id)).u.nmStringUpper, false)
+
+		label tParameterArray:
+		    as := Types.ArrayStringInformation(id)
+		    OutputParameterParameter(as)
+
+		label tParameterArrayParameterCharString,
+			tParameterArrayParameterString:
+		    as := Types.ArrayStringInformation(id)
+		    OutputParameterParameter(as)
+
+		    /* as now points to the component type -- get that */
+		    as := Types.ArrayStringInformation(
+			    tNode(asNode(as).u.component).leaf)
+
+		    put :outFile, ", " ..
+		    OutputExpression(asNode(as).u.nmStringUpper, noParen)
+		    put :outFile, ", " ..
+		    OutputExpression(asNode(as).u.nmStringSize, noParen)
+
+		label :
+	    end case
+	    x := tNode(x).sibling
+	end loop
+    end OutputParameters
+
+
+    body procedure OutputParameterParameterDeclaration % (indent : int,
+					          % var as : ArrayStringPointer)
+	var register dummyId : TreePointer
+
+	new tNode, dummyId
+	tNode(dummyId).operatorNumber := 0
+	tNode(dummyId).nodeKind := NodeKinds.ExpressionLeaf
+	tNode(dummyId).operand := nil(tNode)
+	tNode(dummyId).sibling := nil(tNode)
+	tNode(dummyId).lineNumber := 0
+
+	loop
+	    exit when asNode(as).u.kind = componentType
+	    if asNode(as).u.kind = nonManifestUpperBound then
+		OutputIndent(indent)
+		tNode(dummyId).leaf := asNode(as).u.nmUpper
+
+		const register tipe := Types.GetTree(tNode(dummyId).leaf)
+
+		CTypes.Output(Types.GetType(tNode(dummyId).leaf), dummyId,
+			      outFile, indent)
+		put :outFile, ";"
+	    end if
+	    as := asNode(as).next
+	end loop
+    end OutputParameterParameterDeclaration
+
+
+    var dummyId : TreePointer
+
+    new tNode, dummyId
+    tNode(dummyId).operatorNumber := 0
+    tNode(dummyId).nodeKind := NodeKinds.ExpressionLeaf
+    tNode(dummyId).operand := nil(tNode)
+    tNode(dummyId).sibling := nil(tNode)
+    tNode(dummyId).lineNumber := 0
+
+
+    body procedure OutputParameterDeclarations % (t : TreePointer, indent : int)
+	var register x := t
+	var register id : ExpressionPointer
+
+	/* list of parameter names */
+	loop
+	    exit when x = nil(tNode)
+	    OutputIndent(indent)
+	    id := tNode(x).leaf
+	    if Types.HasAttribute(id, aaRegister) then
+		put :outFile, "register " ..
+	    end if
+
+	    tNode(dummyId).leaf := id
+
+	    const register tipe := Types.GetTree(tNode(dummyId).leaf)
+	    const tKind := Types.GetKind(id)
+
+	    if tKind = tFunction and Types.HasAttribute(id, aaNonScalar) then
+		put : outFile, macdepType(mVoid), " " ..
+		OutputFunctionId(id)
+		put :outFile, " ()" ..
+	    else
+		CTypes.Output(Types.GetTree(tNode(dummyId).leaf), dummyId,
+			      outFile, indent)
+	    end if
+	    put :outFile, ";"
+
+	    /* handle * parameters */
+	    var as : ArrayStringPointer
+	    case tKind of
+		label tParameterCharString, tParameterString:
+		    OutputIndent(indent)
+		    tNode(dummyId).leaf :=
+			asNode(Types.ArrayStringInformation(id)).u.nmStringUpper
+		    CTypes.Output(Types.GetTree(tNode(dummyId).leaf), dummyId,
+				  outFile, indent)
+		    put :outFile, ";"
+
+		label tParameterArray:
+		    as := Types.ArrayStringInformation(id)
+		    OutputParameterParameterDeclaration(indent, as)
+
+		label tParameterArrayParameterCharString,
+			tParameterArrayParameterString:
+		    as := Types.ArrayStringInformation(id)
+		    OutputParameterParameterDeclaration(indent, as)
+
+		    /* as now points to the component type -- get that */
+		    as := Types.ArrayStringInformation(
+			    tNode(asNode(as).u.component).leaf)
+
+		    OutputIndent(indent)
+		    tNode(dummyId).leaf := asNode(as).u.nmStringUpper
+		    CTypes.Output(Types.GetTree(tNode(dummyId).leaf), dummyId,
+				  outFile, indent)
+		    put :outFile, ";"
+
+		    OutputIndent(indent)
+		    tNode(dummyId).leaf := asNode(as).u.nmStringSize
+		    CTypes.Output(Types.GetTree(tNode(dummyId).leaf), dummyId,
+				  outFile, indent)
+		    put :outFile, ";"
+
+		label :
+	    end case
+	    x := tNode(x).sibling
+	end loop
+    end OutputParameterDeclarations
+
+
+    procedure OutputCharStringInit(e : ExpressionPointer)
+	const register s := eNode(e).u.charValue
+
+	put :outFile, "{" ..
+	for i : 1 .. eNode(e).u.charLen
+	    if i not= 1 then
+		put :outFile, ", " ..
+	    end if
+	    put :outFile, "'" ..
+	    Expression.OutputChar(strings(s)(i), outFile)
+	    put :outFile, "'" ..
+	end for
+	put :outFile, "}" ..
+    end OutputCharStringInit
+
+
+    /*
+     * An init list. Each subtree is a single entry. These may be other init
+     * lists or trees rooted at Boolean,Nat,Int,Real,String or Ident. Each of
+     * these give the base object. The left subtree may be a StorageSize
+     * subtree and the right subtree is the compile time value being stored.
+     * The string is an exception where the left subtree is the value being
+     * stored and the right subtree is the maximum size of the destination of
+     * the store.
+     */
+    procedure OutputInit(t : TreePointer, indent : int)
+	const maxInitPerLine := 10
+	var register tp := tNode(t).operand
+	var register firstTime := true
+	var register count := 1
+
+	if tNode(tp).operatorNumber = aIdent then
+	    /* this is a union init */
+	    Error(eUnionInit, tp, fatalError)
+	end if
+
+	OutputIndent(indent)
+	put : outFile, "{" ..
+	loop
+	    exit when tp = nil(tNode)
+	    if firstTime then
+		firstTime := false
+	    else
+		if count = maxInitPerLine then
+		    put :outFile, ","
+		    OutputIndent(indent)
+		    count := 1
+		else
+		    put :outFile, ", " ..
+		    count += 1
+		end if
+	    end if
+	    case tNode(tp).operatorNumber of
+		label aInit:
+		    put :outFile, ""
+		    OutputInit(tp, indent+4)
+		    count := maxInitPerLine
+
+		label aNat, aInt, aReal, aBoolean, aChar:
+		    OutputExpression(tNode(tNode(tp).operand).leaf, noParen)
+
+		label aString:
+		    const register e := tNode(tNode(tp).operand).leaf
+
+		    if eNode(e).u.operatorNumber = aStringLit then
+			OutputExpression (e, noParen)
+		    else
+			/* this is a char variable -- special case */
+			OutputCharStringInit(e)
+			count := maxInitPerLine
+		    end if
+
+		label :
+		    assert tNode(tp).nodeKind = NodeKinds.ExpressionLeaf
+		    OutputExpression(tNode(tp).leaf, noParen)
+	    end case
+	    tp := tNode(tp).sibling
+	end loop
+	put : outFile, "}" ..
+    end OutputInit
+
+
+    body procedure OutputVarConst % (t : TreePointer, indent : int)
+	/* input: aVar|aConst id (aType type | aCollection) */
+	var register next := tNode(t).operand
+	var isExtern := false
+
+	if tNode(next).operatorNumber = aPervasive then
+	    next := tNode(next).sibling
+	end if
+	OutputIndent(indent)
+	if tNode(next).operatorNumber = aRegister then
+	    put :outFile, "register " ..
+	    next := tNode(next).sibling
+	else
+	    if Types.HasAttribute(tNode(next).leaf,
+		    aaExternalMemoryLocation) then
+		/* no declaration for external 999 var x : .... */
+		return
+	    end if
+	    if Types.HasAttribute(tNode(next).leaf, aaExternal) then
+		put :outFile, "extern " ..
+		isExtern := true
+	    elsif inRoutine and
+		    Types.HasAttribute(tNode(next).leaf, aaConstStatic) then
+		put :outFile, "static " ..
+	    elsif not inRoutine and
+		    not Types.HasAttribute(tNode(next).leaf, aaGrant) then
+		put :outFile, "static " ..
+	    end if
+	end if
+	assert tNode(tNode(next).sibling).operatorNumber = aType
+	CTypes.Output(tNode(tNode(next).sibling).operand, next, outFile, 0)
+	next := tNode(tNode(next).sibling).sibling
+
+	if not isExtern and next not= nil(tNode) then
+	    assert tNode(next).operatorNumber = aInit
+	    put :outFile, " = "
+	    OutputInit(next, indent+4)
+	end if
+    end OutputVarConst
+
+
+    body procedure OutputProcedureHeader % (t : TreePointer, indent : int,
+					 %  mustOutputParameters : boolean)
+	var register tp := t
+	const register fcnId := tNode(tp).leaf
+
+	OutputIndent(indent)
+	if Types.HasAttribute(fcnId, aaExternal) and
+		not mustOutputParameters then
+	    put :outFile, "extern " ..
+	elsif not Types.HasAttribute(fcnId, aaGrant) then
+	    put :outFile, "static " ..
+	end if
+	put : outFile, macdepType(mVoid), " " ..
+	OutputExpression(fcnId, noParen)
+
+	if (Types.HasAttribute(fcnId, aaExternal) and
+		    not mustOutputParameters) or
+		Types.HasAttribute(fcnId, aaForward) then
+	    put :outFile, " ()" ..
+	    return
+	end if
+
+	tp := tNode(tp).sibling
+	if tp not= nil(tNode) and tNode(tp).operatorNumber = aSubs then
+	    var firstTime := true
+	    put :outFile, " (" ..
+	    OutputParameters(tNode(tp).operand, firstTime)
+	    put :outFile, ")"
+	    OutputParameterDeclarations(tNode(tp).operand, indent)
+	    OutputIndent(indent)
+	    put :outFile, "{"
+	    tp := tNode(tp).sibling
+	else
+	    put :outFile, " () {"
+	end if
+    end OutputProcedureHeader
+
+
+    body procedure OutputFunctionHeader % (tp: TreePointer, indent : int,
+					%  mustOutputParameters)
+	var register tp := t
+	var register params := nil(tNode)
+	var register id := tNode(tp).leaf
+
+	tp := tNode(tp).sibling
+	if tNode(tp).operatorNumber = aSubs then
+	    params := tp
+	    tp := tNode(tp).sibling
+	end if
+
+	/* tp now points to the function id */
+	tp := tNode(tp).sibling
+
+	/* now tp = function type */
+	OutputIndent(indent)
+	if Types.HasAttribute(id, aaExternal) and not mustOutputParameters then
+	    put :outFile, "extern " ..
+	elsif not Types.HasAttribute(id, aaGrant) then
+	    put :outFile, "static " ..
+	end if
+	if Types.HasAttribute(id, aaNonScalar) then
+	    put :outFile, macdepType(mVoid), " " ..
+	else
+	    CTypes.Output(tNode(tp).operand, nil(tNode), outFile, 0)
+	    put :outFile, " " ..
+	end if
+	OutputFunctionId(id)
+
+	if (Types.HasAttribute(id, aaExternal) and not mustOutputParameters) or
+		Types.HasAttribute(id, aaForward) then
+	    put :outFile, " ()" ..
+	    return
+	end if
+
+	if params not= nil(tNode) then
+	    var firstTime := true
+	    put :outFile, " (" ..
+	    OutputParameters(tNode(params).operand, firstTime)
+	    put :outFile, ")"
+	    OutputParameterDeclarations(tNode(params).operand, indent)
+	    OutputIndent(indent)
+	    put :outFile, "{"
+	else
+	    put :outFile, " () {"
+	end if
+    end OutputFunctionHeader
+
+
+end Misc2

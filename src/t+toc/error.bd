@@ -1,0 +1,157 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+% 
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+% 
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+/*
+ * Error Message printer
+ */
+body "error.st"  procedure Error % (msg : int, t : TreePointer, fatal : boolean)
+    if t = nil(tNode) then
+       put "Line ", currentLineNumber, " of file ", 
+	    LineInfo.FileName(currentFileNumber), ": " ..
+    else
+       put "Line ", tNode(t).lineNumber, " of file ", 
+	    LineInfo.FileName(tNode(t).fileNumber), ": " ..
+    end if
+    case msg of
+	/* Expression Module Errors */
+	label expressionStackOverflow : 
+	    put "Expression Stack Overflow"
+
+	label expressionStackUnderflow : 
+	    put "Expression Stack Underflow"
+
+	label expressionStackInvalidTop :
+	    put "Expression Stack Invalid Top"
+
+	label expressionBadCallSequence :
+	    put "Expression Probable Bad Call Sequence"
+
+	label expressionEndOpBadKidCount :
+	    put "Expression.EndOp Given Bad Child Count"
+
+	label expressionEndOpBadOpNumber :
+	    put "Expression.EndOp Given Illegal Operator Number"
+
+	label expressionBadFirstOperand :
+	    put "Expression.(Get|Set)FirstOp got invalid node"
+
+	label expressionBadNextOperand :
+	    put "Expression.(Get|Set)NextOp got invalid node"
+
+	label expressionBadLabelOperand :
+	    put "Expression.(Get|Set)Label got invalid node"
+
+	label expressionBadNode2TokenOperand :
+	    put "Expression.NodeToToken got invalid node"
+
+	label expressionBadIsLeafOperand :
+	    put "Expression.IsLeafNode got invalid node"
+
+	label expressionBadNewOp :
+	    put "Expression.NewOperatorNode got leaf op number"
+
+	label expressionGetSetIntBadOperand:
+	    put "Expression.(Get|Set)Integer non integer leaf passed"
+
+	label expressionOverlayBadOperand:
+	    put "Expression.Overlay an operand is corrupt"
+
+	label expressionGetSetIdBadOperand:
+	    put "Expression.(Get|Set)Identifier bad operand"
+
+	label cannotConvertTokenToString :
+	    put "TokenToString : unknown token number passed"
+
+	label outputStringTooBig :
+	    put "Output string too big to store in a TokenType field"
+
+	label inputStringTooBig  :
+	    put "Input string too big to store in a TokenType field"
+
+	label eSelfReferentialCollection:
+	    put "Self referential collections are not supported"
+
+	label eTooManyDynamicArrays:
+	    put "Too many dynamic arrays at one time"
+
+	label eUnionInit :
+	    put "Union 'init's are not supported by translator"
+
+	label eTypesIdStackOverflow :
+	    put "Declaration list is too big"
+
+	label treeStackOverflow :
+	    put "Tree Stack Overflow -- current value is ", treeStackSize
+	    put "Use -wSIZE to increase the limit"
+
+	label treeStackUnderflow :
+	    put "Tree Stack Underflow"
+
+	label treeStackInvalidTop :
+	    put "Tree Stack Invalid Top"
+
+	label treeBadCallSequence :
+	    put "Tree Probable Bad Call Sequence"
+
+	label treeBadFirstOperand :
+	    put "Bad tree passed to Tree.(Get|Set)FirstOp"
+
+	label treeBadNextOperand :
+	    put "Bad tree passed to Tree.(Get|Set)NextOp"
+
+	label treeBadLabelOperand :
+	    put "Bad tree passed to Tree.(Get|Set)Label"
+
+	label treeBadExprLeafOperand :
+	    put "Bad tree passed to Tree.(Get|Set)ExprLeaf"
+
+	label treeBadIsLeafOperand :
+	    put "Bad tree passed to Tree.IsLeafNode"
+
+	label treeBadIsExprOperand :
+	    put "Bad tree passed to Tree.IsExprNode"
+
+	label treeBadWritesOperand :
+	    put "Bad tree passed to Tree.(Get|Set) Writes"
+
+	label SslStackOverflow :
+	    put "S/SL Stack Overflowed"
+
+	label SemanticChoiceFailed :
+	    put "Semantic Choice Failed"
+
+	label SemanticOperationNotImplemented :
+	    put "Semantic Operation Not Implemented"
+
+	label ChoiceRuleFailed :
+	    put "Choice Rule Failed"
+
+	label SslSyntaxError :
+	    put "Syntax Error In Input Stream"
+
+	label SslPrematureEOF :
+	    put "Premature End Of File In Input Stream"
+
+	label BadExpressionEnterLeafCall :
+	    put "Bad Parameter To oExpressionEnterLeaf by Walker"
+
+    end case
+    if fatal then
+	sysexit(1)
+    end if
+end Error

@@ -1,0 +1,1155 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+% 
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+% 
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+/*
+ * Turing Plus to C Translator
+ *   Module:C Types
+ *   By:    Mark Mendell
+ *   Date:  31 Oct 1986
+ */
+
+body "ctype.st" module CTypes
+    
+    procedure OutputIndent (indent : nat, stream : int)
+	if indent > 0 then
+	    put :stream, repeat("\t", indent div 8),
+		repeat(" ", indent mod 8) ..
+	end if
+    end OutputIndent
+
+
+    procedure OutputIds(ids, tipe : TreePointer, append : string, stream : int,
+			extraIndirection : boolean)
+	/*
+	 * loop through the ids, putting append after each one,
+	 * and commas between ids.
+	 */
+	if ids = nil(tNode) then
+	    return
+	end if
+
+	assert tNode(ids).nodeKind = NodeKinds.ExpressionLeaf
+	var register next := ids
+
+	put :stream, "\t" ..
+	loop
+	    const register id := tNode(next).leaf
+	    var register indir := Types.Indirection(id)
+
+	    if extraIndirection then
+		indir(inPointer) += 1
+	    end if
+	    if indir(inPointer) > 0 then
+		put :stream, repeat("*", indir(inPointer)) ..
+	    end if
+	    if Types.HasAttribute(id, aaSubprogramVariable) then
+		if indir(inSubprogram) > 0 then
+		    put :stream, "(", repeat("*", indir(inSubprogram)) ..
+		    Expression.Output(id, stream)
+		    put :stream, ")" ..
+		else
+		    Expression.Output(id, stream)
+		end if
+	    else
+		Expression.Output(id, stream)
+	    end if
+	    put :stream, append ..
+	    if Types.HasAttribute(id, aaResetIndirection) then
+		Types.ResetIndirection(id)
+	    end if
+	    next := tNode(next).sibling
+	    exit when next = nil(tNode) or next = tipe or
+		    tNode(next).nodeKind not= NodeKinds.ExpressionLeaf
+	    put :stream, ", " ..
+	end loop
+    end OutputIds
+
+
+    body procedure OutputSimpleType %(t, ids : TreePointer, stream, indent: int,
+				    % outputIndent : boolean)
+	if outputIndent then
+	    OutputIndent(indent, stream)
+	end if
+	case tNode(t).operatorNumber of
+	    label aInt:
+		put :stream, macdepType(mInt4) ..
+		OutputIds(ids, t, "", stream, false)
+
+	    label aNat, aVaryingParameter:
+		put :stream, macdepType(mNat4) ..
+		OutputIds(ids, t, "", stream, false)
+
+	    label aAddressint:
+		put :stream, macdepType(mAddressint) ..
+		OutputIds(ids, t, "", stream, false)
+
+	    label aChar:
+		put :stream, macdepType(mChar) ..
+		OutputIds(ids, t, "", stream, false)
+
+	    label aString:
+		put :stream, macdepType(mString) ..
+		OutputIds(ids, t, "", stream, false)
+
+	    label aReal:
+		put :stream, macdepType(mReal8) ..
+		OutputIds(ids, t, "", stream, false)
+
+	    label aBoolean:
+		put :stream, macdepType(mBoolean) ..
+		OutputIds(ids, t, "", stream, false)
+	    
+	    label aCondition:
+		put :stream, macdepType(mCondition) ..
+		OutputIds(ids, t, "", stream, false)
+	    
+	    label aMonitor:
+		put :stream, macdepType(mMonitorVariable) ..
+		OutputIds(ids, t, "", stream, false)
+
+	    label :
+		put :stream, "***BAD TYPE *** ", tNode(t).operatorNumber, " " ..
+		OutputIds(ids, t, "", stream, false)
+	end case
+    end OutputSimpleType
+
+
+    body procedure OutputComplexType % (t, ids: TreePointer, stream,indent: int,
+				     % pack, outputIndent, suppressStar:boolean)
+	var register first, next : TreePointer
+	var s : int
+
+	if outputIndent then
+	    OutputIndent(indent, stream)
+	end if
+	first := tNode(t).operand
+	case tNode(t).operatorNumber of
+	    label aInt, aNat:
+		assert tNode(first).operatorNumber = aStorageSize
+		var unsigned := 0
+
+		if tNode(t).operatorNumber = aNat then
+		    unsigned := 3
+		end if
+		next := tNode(first).operand
+		case Expression.GetInteger(tNode(next).leaf) of
+		    label 1:
+			put :stream, macdepType(mInt1 + unsigned) ..
+		    label 2:
+			put :stream, macdepType(mInt2 + unsigned) ..
+		    label 4:
+			put :stream, macdepType(mInt4 + unsigned) ..
+		    label :
+			Error(eInvalidStorageSize, t, nonFatalError)
+		end case
+		OutputIds(ids, t, "", stream, false)
+
+	    label aChar:
+		assert tNode(first).operatorNumber = aStringSizeBound
+
+		next := tNode(first).operand
+		put :stream, macdepType(mChar) ..
+		if tNode(next).operatorNumber = aNonManifest then
+		    OutputIds(ids, t, "", stream, true)
+		elsif eNode(tNode(next).leaf).u.operatorNumber = aStar then
+		    OutputIds(ids, t, "[]", stream, false)
+		else
+		    OutputIds(ids, t, "["+
+			intstr(Expression.GetInteger(tNode(next).leaf)) +
+			"]", stream, false)
+		end if
+
+	    label aString:
+		assert tNode(first).operatorNumber = aStringSizeBound
+
+		next := tNode(first).operand
+		put :stream, macdepType(mChar) ..
+		if eNode(tNode(next).leaf).u.operatorNumber = aStar then 
+		    OutputIds(ids, t, "[]", stream, false)
+		else
+		    OutputIds(ids, t, "["+
+			intstr(Expression.GetInteger(tNode(next).leaf)+1) +
+			"]", stream, false)
+		end if
+
+	    label aReal:
+		assert tNode(first).operatorNumber = aStorageSize
+		first := tNode(first).operand
+		assert tNode(first).nodeKind = NodeKinds.ExpressionLeaf
+		/* this is real : size form */
+		s := Expression.GetInteger(tNode(first).leaf)
+		if s = 4 then
+		    put :stream, macdepType(mReal4) ..
+		elsif s = 8 then
+		    put :stream, macdepType(mReal8) ..
+		else
+		    Error(eInvalidStorageSize, t, nonFatalError)
+		end if
+		OutputIds(ids, t, "", stream, false)
+
+	    label aSubrange, aEnum:
+		var u,l : int4
+
+		if eNode(tNode(first).leaf).u.operatorNumber = aCharLit then
+		    /* char subrange! */
+		    put :stream, macdepType(mChar) ..
+		else
+		    next := tNode(first).sibling
+		    l := Expression.GetInteger(tNode(first).leaf)
+		    u := Expression.GetInteger(tNode(next).leaf)
+		    if tNode(next).sibling = nil(tNode) then
+			/* no storage size specified */
+			if not pack then
+			    put :stream, macdepType(mInt4) ..
+			else
+			    /* must pack the subrange */
+			    if l >= 0 then
+				if u <= 127 then
+				    put :stream, macdepType(mInt1) ..
+				elsif u <= 255 then
+				    put :stream, macdepType(mNat1) ..
+				elsif u <= 32767 then
+				    put :stream, macdepType(mInt2) ..
+				elsif u <= 65535 then
+				    put :stream, macdepType(mNat2) ..
+				else
+				    put :stream, macdepType(mInt4) ..
+				end if
+			    else
+				if l >= -128 and u <= 127 then
+				    put :stream, macdepType(mInt1) ..
+				elsif l >= -32768 and u <= 32767 then
+				    put :stream, macdepType(mInt2) ..
+				else
+				    put :stream, macdepType(mInt4) ..
+				end if
+			    end if
+			end if
+		    else
+			next := tNode(tNode(next).sibling).operand
+			case Expression.GetInteger(tNode(next).leaf) of
+			    label 1:
+				if l >= 0 and u > 127 then
+				    put :stream, macdepType(mNat1) ..
+				else
+				    put :stream, macdepType(mInt1) ..
+				end if
+			    label 2:
+				if l >= 0 and u > 32767 then
+				    put :stream, macdepType(mNat2) ..
+				else
+				    put :stream, macdepType(mInt2) ..
+				end if
+			    label 4:
+				put :stream, macdepType(mInt4) ..
+			    label :
+				Error(eInvalidStorageSize, t, nonFatalError)
+			end case
+		    end if
+		end if
+		OutputIds(ids, t, "", stream, false)
+
+	    label aSet:
+		if tNode(first).operatorNumber not= aSubrange and
+			tNode(first).operatorNumber not= aEnum then
+		    if tNode(first).operatorNumber not= aPacked then
+			first := Types.GetType(tNode(first).leaf)
+		    end if
+		    if tNode(first).operatorNumber = aPacked then
+			first := tNode(first).operand
+		    end if
+		end if
+		assert tNode(first).operatorNumber = aSubrange or
+			tNode(first).operatorNumber = aEnum
+		var u, l : int4
+		var n : nat4
+
+		first := tNode(first).operand
+		next := tNode(first).sibling
+		l := Expression.GetInteger(tNode(first).leaf)
+		u := Expression.GetInteger(tNode(next).leaf)
+		n := u - l + 1
+		n := (n + 7) div 8
+		case n of
+		    label 1:
+			put :stream, macdepType(mNat1) ..
+			OutputIds(ids, t, "", stream, false)
+
+		    label 2:
+			put :stream, macdepType(mNat2) ..
+			OutputIds(ids, t, "", stream, false)
+
+		    label 3, 4:
+			put :stream, macdepType(mNat4) ..
+			OutputIds(ids, t, "", stream, false)
+
+		    label :
+			if n mod 2 not= 0 then
+			    n += 1
+			end if
+			put :stream, macdepType(mChar) ..
+			OutputIds(ids, t, "[" + intstr(n) + "]", stream, false)
+		end case
+
+
+	    label aArray:
+		/*
+		 * {subrange| namedType}+ elementType
+		 * output:   elementType{[upper-lower]}+
+		 * find the element type
+		 */
+		var register etype := first
+		loop
+		    etype := tNode(etype).sibling
+		    exit when tNode(etype).sibling = nil(tNode)
+		end loop
+		const tKind := TypeKind (t)
+		if tKind = tParameterArrayParameterString or
+			tKind = tParameterArrayParameterCharString then
+		    OutputType(Types.GetType(tNode(etype).leaf),
+			       nil(tNode), stream, indent, pack, false, true)
+		    OutputIds(ids, t, "[]", stream, false)
+		    return
+		else
+		    OutputType(etype, nil(tNode), stream, indent, pack, false,
+			true)
+		    case tKind of
+			label tArray:
+
+			label tFlexArray:
+			    OutputIds(ids, t, "", stream, true)
+			    return
+
+			label :
+			    OutputIds(ids, t, "[]", stream, false)
+			    return
+		    end case
+		end if
+
+		/* now output the array ranges */
+		var ranges := ""
+		var u, l : int4
+		next := first
+		loop
+		    exit when next = etype
+
+		    if tNode(next).operatorNumber not= aSubrange and
+			    tNode(next).operatorNumber not= aEnum then
+			var temp := Types.GetType(tNode(next).leaf)
+			tNode(temp).sibling := tNode(next).sibling
+			tNode(next) := tNode(temp)
+		    end if
+
+		    if tNode(next).operatorNumber = aPacked then
+			assert tNode(tNode(next).operand).operatorNumber =
+				aSubrange or
+			    tNode(tNode(next).operand).operatorNumber = aEnum
+			first := tNode(tNode(next).operand).operand
+		    else
+			assert tNode(next).operatorNumber = aSubrange or
+			    tNode(next).operatorNumber = aEnum
+			first := tNode(next).operand
+		    end if
+		    l := Expression.GetInteger(tNode(first).leaf)
+		    u := Expression.GetInteger(tNode(tNode(first).sibling).leaf)
+		    ranges += "[" + intstr(u-l+1) + "]"
+		    next := tNode(next).sibling
+		end loop
+		OutputIds(ids, t, ranges, stream, false)
+
+	    label aRecord:
+		/*
+		 * input {id1,id2... aRecordElementType type}+
+		 * output struct { type id1, id2; type2 id3... }
+		 */
+		put :stream, "struct {"
+		OutputRecordFields(first, stream, indent+4, pack, true)
+		OutputIndent(indent, stream)
+		put :stream, "} " ..
+		OutputIds(ids, t, "", stream, false)
+
+	    label aUnion:
+		/*
+		 * input unionTagId tagType mapId ...
+		 *	... aLabel expns aUnionLabelBody (like record)
+		 *	... aLabel aOtherwise ...
+		 * output struct {
+		 *		tagType unionTagId;
+		 *		union { 
+		 *			struct { ...} first fields
+		 *			 ...
+		 *		}
+		 *	}
+		 */
+		put :stream, "struct {"
+		OutputUnionBody(first, stream, indent, pack, outputIndent)
+		OutputIds(ids, t, "", stream, false)
+
+	    label aProcedure:
+		/*
+		 * input id [aSubs parameters]
+		 * output void p()
+		 */
+		put :stream, macdepType(mVoid), " " ..
+		OutputIds(ids, t, "()", stream, false)
+
+	    label aFunction:
+		/*
+		 * input id [aSubs parameters] resultId resultType
+		 * output resultType f()
+		 */
+		next := tNode(first).sibling	/* aSubs? */
+		if tNode(next).operatorNumber = aSubs then
+		    next := tNode(next).sibling	/* resultId */
+		end if
+		next := tNode(next).sibling	/* resultType */
+		if NonScalar(tNode(next).operand) then
+		    /* It's really a procedure with an extra parameter! */
+		    put :stream, macdepType(mVoid) ..
+		else
+		    OutputType(tNode(next).operand, nil(tNode), stream,
+			       indent, pack, false, true)
+		end if
+		put :stream, " " ..
+		OutputIds(ids, t, "()", stream, false)
+
+	    label aPacked:
+		OutputComplexType(first, ids, stream, indent,
+				  true, outputIndent, suppressStar)
+
+	    label aCondition:
+		put :stream, macdepType(mCondition) ..
+		OutputIds(ids, t, "", stream, false)
+
+	    label aCollection:
+		next := tNode(t).operand
+		if tNode(next).nodeKind = NodeKinds.OperatorNode and
+			tNode(next).operatorNumber = aForward then
+		    OutputType(tNode(next).operand, ids, stream, indent,
+			pack, outputIndent, suppressStar)
+		else
+		    OutputType(next, ids, stream, indent, pack, outputIndent,
+			suppressStar)
+		end if
+
+	    label aPointer:
+		next := tNode(t).operand
+		if tNode(next).nodeKind = NodeKinds.ExpressionLeaf then
+		    OutputType(next, ids, stream, indent, pack, outputIndent,
+		        suppressStar)
+		else
+		    OutputType(Types.GetTree(tNode(next).leaf), ids, stream,
+			indent, pack, outputIndent, suppressStar)
+		end if
+		if ids = nil(tNode) and not suppressStar then
+		    put :stream, " *" ..
+		end if
+
+	    label aRecordElementType, aType:
+		OutputType(tNode(t).operand, ids, stream, indent, pack,
+		    outputIndent, false)
+
+	    label :
+		put :stream, "*** BAD TYPE ***** ",
+		    tNode(t).operatorNumber, " " ..
+	end case
+    end OutputComplexType
+
+
+    body procedure OutputRecordFields  % (t : TreePointer, stream, indent : int,
+				       % pack : boolean, outputIndent : boolean)
+	var register next, rtype : TreePointer
+	next := t
+	loop
+	    /* through all the elements */
+	    rtype := next
+	    /* find the record type */
+	    loop
+		rtype := tNode(rtype).sibling
+		exit when tNode(rtype).operatorNumber = aRecordElementType
+	    end loop
+	    OutputType(tNode(rtype).operand, next, stream, indent,
+		       pack, outputIndent, false)
+	    put :stream, ";"
+
+	    next := tNode(rtype).sibling
+	    exit when next = nil(tNode)
+	end loop
+    end OutputRecordFields
+
+
+    body procedure OutputType % (t, ids : TreePointer, stream, indent : int,
+			      %  pack, outputIndent, suppressStar : boolean)
+	var register tp := t
+
+	if tp = nil(tNode) then
+	    /* Try to get the type from the ids */
+	    tp := Types.GetType(tNode(ids).leaf)
+	    assert tp not= nil(tNode)
+	end if
+
+	case tNode(tp).nodeKind of
+	    label NodeKinds.SimpleLeaf:
+		/* int, nat, ... */
+		OutputSimpleType(tp, ids, stream, indent, outputIndent)
+	    
+	    label NodeKinds.OperatorNode:
+		/* int4, nat2, array, record, ... */
+		OutputComplexType(tp, ids, stream, indent, false, outputIndent,
+		    suppressStar)
+
+	    label NodeKinds.ExpressionLeaf:
+		var tKind := Types.GetKind(tNode(tp).leaf)
+
+		if tKind = tPointer then
+		    var register temp := Types.GetType(tNode(tp).leaf)
+
+		    if Types.HasAttribute(tNode(tp).leaf, aaForward) then
+			/*
+			 * this is a pointer to a forward type;  replace
+			 * it with the collection type
+			 */
+			temp := Types.GetType(tNode(tNode(temp).operand).leaf)
+
+			/* Output the forward type */
+			OutputType(tNode(tNode(temp).operand).operand, ids,
+			    stream, indent, false, false, suppressStar)
+			
+			/* there was an aPointer above */
+			if ids = nil(tNode) and not suppressStar then
+			    put :stream, " *" ..
+			end if
+		    else
+			OutputType(temp, ids, stream, indent, false, false,
+			    suppressStar)
+		    end if
+		    return
+		elsif tKind = tCollection then
+		    var register temp := Types.GetType(tNode(tp).leaf)
+
+		    if tNode(temp).nodeKind = NodeKinds.OperatorNode and
+			    tNode(temp).operatorNumber = aForward then
+			OutputType(tNode(temp).operand, ids, stream, indent,
+			    pack, outputIndent, suppressStar)
+		    else
+			OutputType(temp, ids, stream, indent, pack,
+			    outputIndent, suppressStar)
+		    end if
+		    return
+		elsif tKind = tRecord or tKind = tUnion then
+		    OutputIndent(indent, stream)
+		    if not Types.HasAttribute(tNode(tp).leaf,
+			    aaTypeNameRenames) then
+			put :stream, "struct " ..
+		    end if
+		    Expression.Output (tNode(tp).leaf, stream)
+		elsif tKind = tForward then
+		    /* undeclared forward collection type */
+		    OutputIndent(indent, stream)
+		    put :stream, macdepType(mVoid) ..
+		else
+		    OutputIndent(indent, stream)
+		    Expression.Output (tNode(tp).leaf, stream)
+		end if
+		OutputIds(ids, tp, "", stream, false)
+	end case
+    end OutputType
+
+
+    body procedure Output % (t, ids : TreePointer, stream, indent : int)
+	OutputType(t, ids, stream, indent, false, false, false)
+    end Output
+
+
+    body proc OutputUnionBody % (t : TreePointer, stream, indent : int,
+			      % pack, outputIndent : boolean)
+	var register first, next : TreePointer
+	var unionNumber := 0
+
+	first := t
+	next := tNode(tNode(first).sibling).operand
+	OutputType(next, first, stream, indent+4, pack, true, false)
+	put :stream, ";"
+	OutputIndent(indent+4, stream)
+	put :stream, "union {"
+
+	/* skip the map ident */
+	next := tNode(first).sibling
+	next := tNode(next).sibling
+	next := tNode(next).sibling
+
+	/* next now points to the first aLabel */
+	/* run through the alternatives */
+	loop
+	    assert tNode(next).operatorNumber = aLabel
+	    next := tNode(next).sibling
+	    exit when next = nil(tNode)
+
+	    if tNode(next).operatorNumber = aUnionLabelBody then
+		OutputIndent(indent+8, stream)
+		put :stream, "struct {"
+		OutputRecordFields(tNode(next).operand, 
+		    stream, indent+12, pack, true)
+		OutputIndent(indent+8, stream)
+		put :stream, "} " ..
+
+		/*
+		 * must name the structure -- take the number from the first
+		 * field
+		 */
+		put :stream, "__u",
+		    Types.UnionFieldNumber(tNode(tNode(next).operand).leaf), ";"
+		
+		/* must also name the union! */
+		if unionNumber = 0 then
+		    unionNumber :=
+			Types.UnionNumber(tNode(tNode(next).operand).leaf)
+		end if
+		next := tNode(next).sibling
+	    end if
+
+	    exit when next = nil(tNode)
+	end loop
+	if unionNumber = 0 then
+	    /* no union declarations!!! */
+	    OutputIndent(indent+8, stream)
+	    put :stream, "int\tTLDUMMY;"
+	end if
+	OutputIndent(indent+4, stream)
+	put :stream, "} __u", unionNumber, ";"
+	OutputIndent(indent, stream)
+	put :stream, "} " ..
+    end OutputUnionBody
+
+
+    body proc OutputStructureType % (t, ids : TreePointer, stream, indent : int,
+			  	  %  pack : boolean, outputIndent: boolean)
+	if tNode(t).operatorNumber = aRecord then
+	    /*
+	     * input {id1,id2... aRecordElementType type}+
+	     * output struct ids { type id1, id2; type2 id3... }
+	     */
+	    put :stream, "struct" ..
+	    OutputIds(ids, t, "", stream, false)
+	    put :stream, " {"
+	    OutputRecordFields(tNode(t).operand, stream, indent+4, pack, true)
+	    OutputIndent(indent, stream)
+	    put :stream, "}" ..
+	else
+	    assert tNode(t).operatorNumber =  aUnion
+	    /*
+	     * input unionTagId tagType mapId ...
+	     *	... aLabel expns aUnionLabelBody (like record)
+	     *	... aLabel aOtherwise ...
+	     *	output struct ids {
+	     *		tagType unionTagId;
+	     *		union { 
+	     *			struct { ...} first fields
+	     *			...
+	     *		}
+	     *	}
+	     */		
+	    put :stream, "struct" ..
+	    OutputIds(ids, t, "", stream, false)
+	    put :stream, " {"
+	    OutputUnionBody(
+		tNode(t).operand, stream, indent, pack, outputIndent)
+	end if
+    end OutputStructureType
+
+
+    body procedure OutputStructure %(t, ids : TreePointer, stream, indent : int)
+	case tNode(t).operatorNumber of
+	    label aPacked:
+		OutputStructureType(tNode(t).operand, ids, stream,
+		    indent, false, false)
+
+	    label aRecord, aUnion:
+		OutputStructureType(t, ids, stream, indent, true, false)
+	end case
+    end OutputStructure
+
+
+    body function NonScalar % (t : TreePointer) : boolean
+	case tNode(t).nodeKind of
+	    label NodeKinds.SimpleLeaf:
+		/* int, nat, ... */
+		case tNode(t).operatorNumber of
+		    label aInt, aNat, aAddressint, aChar, aReal, aBoolean,
+			    aVaryingParameter:
+			result false
+
+		    label aString, aNonScalar, aCondition:
+			result true
+
+		    label :
+			quit < : 1200 + tNode(t).operatorNumber
+		end case
+
+	    label NodeKinds.OperatorNode:
+		case tNode(t).operatorNumber of
+		    label aInt, aNat, aReal, aSubrange, aEnum, aProcedure,
+			    aFunction, aPointer:
+			result false
+		    
+		    label aType, aRecordElementType, aPacked:
+			result NonScalar(tNode(t).operand)
+
+		    label aChar, aString, aArray, aRecord, aUnion,
+			    aCondition:
+			result true
+
+		    label aSet:
+			var u, l : int4
+			var n : nat4
+			var register first := tNode(t).operand
+			var register next : TreePointer
+
+			if tNode(first).operatorNumber not= aSubrange and
+				tNode(first).operatorNumber not= aEnum then
+			    if tNode(first).operatorNumber not= aPacked then
+				first := Types.GetType(tNode(first).leaf)
+			    end if
+			    if tNode(first).operatorNumber = aPacked then
+				first := tNode(first).operand
+			    end if
+			end if
+
+			assert tNode(first).operatorNumber = aSubrange or
+				tNode(first).operatorNumber = aEnum
+
+			first := tNode(first).operand
+			next := tNode(first).sibling
+			l := Expression.GetInteger(tNode(first).leaf)
+			u := Expression.GetInteger(tNode(next).leaf)
+			n := u - l + 1
+			n := (n + 7) div 8
+			result n > 4
+
+		    label :
+			quit < : 200 + tNode(t).operatorNumber
+		end case
+
+	    label NodeKinds.ExpressionLeaf:
+		result NonScalar(Types.GetType(tNode(t).leaf))
+	end case
+    end NonScalar
+
+
+    body function TypeKind % (t : TreePointer) : TypeKinds
+	case tNode(t).nodeKind of
+	    label NodeKinds.SimpleLeaf:
+		/* int, nat, ... */
+		case tNode(t).operatorNumber of
+		    label aInt:
+			result tInt
+		    label aNat, aVaryingParameter:
+			result tNat
+		    label aAddressint:
+			result tAddressInt
+		    label aChar:
+			result tChar
+		    label aReal:
+			result tReal
+		    label aBoolean:
+			result tBoolean
+		    label aString:
+			result tString
+		    label aCondition:
+			result tCondition
+		    label aNonScalar:
+			result tNoType
+		    label aMonitor:
+			result tMonitorVariable
+		    label aForward:
+			result tForward
+		    label :
+			quit < : 1200 + tNode(t).operatorNumber
+		end case
+
+	    label NodeKinds.OperatorNode:
+		case tNode(t).operatorNumber of
+		    label aInt, aForRange:
+			result tInt
+
+		    label aNat:
+			result tNat
+
+		    label aReal:
+			result tReal
+
+		    label aSubrange:
+			result tSubrange
+
+		    label aEnum:
+			result tEnumeration
+
+		    label aProcedure:
+			result tProcedure
+
+		    label aFunction:
+			result tFunction
+
+		    label aProcess:
+			result tProcess
+
+		    label aChar:
+			if tNode(t).operand = nil(tNode) then
+			    result tCharString
+			else
+			    var register x := tNode(t).operand
+
+			    assert tNode(x).operatorNumber = aStringSizeBound
+			    x := tNode(x).operand
+			    if tNode(x).operatorNumber = aNonManifest then
+				result tFlexCharString
+			    elsif eNode(tNode(x).leaf).u.operatorNumber =
+				    aStar then
+				result tParameterCharString
+			    else
+				result tCharString
+			    end if
+			end if
+
+		    label aString:
+			if tNode(t).operand = nil(tNode) then
+			    result tString
+			else
+			    var register x := tNode(t).operand
+
+			    assert tNode(x).operatorNumber = aStringSizeBound
+			    x := tNode(x).operand
+			    if eNode(tNode(x).leaf).u.operatorNumber =
+				    aStar then
+				result tParameterString
+			    else
+				result tString
+			    end if
+			end if
+
+		    label aArray:
+			/* look at the first subrange */
+			var register x := tNode(t).operand
+			if tNode(x).nodeKind = NodeKinds.ExpressionLeaf then
+			    /* this is a named type:  must be array */
+			    result tArray
+			end if
+			var register y := tNode(tNode(x).operand).sibling
+			if tNode(y).operatorNumber = aNonManifest then
+			    result tFlexArray
+			elsif eNode(tNode(y).leaf).u.operatorNumber = aStar then
+			    /*
+			     * parameter array something..
+			     * find the component type
+			     */
+			    x := tNode(x).sibling
+			    loop
+				exit when not (tNode(x).operatorNumber =
+						aSubrange or
+					       tNode(x).operatorNumber = aEnum)
+				    or tNode(x).sibling = nil(tNode)
+				x := tNode(x).sibling
+			    end loop
+			    const componentKind := TypeKind(x)
+			    if componentKind = tParameterString then
+				result tParameterArrayParameterString
+			    elsif componentKind = tParameterCharString then
+				result tParameterArrayParameterCharString
+			    else
+				result tParameterArray
+			    end if
+			else
+			    /* must look through all subranges */
+			    loop
+				exit when not (tNode(x).operatorNumber =
+						aSubrange or
+					       tNode(x).operatorNumber = aEnum)
+				    or tNode(x).sibling = nil(tNode)
+				y := tNode(tNode(x).operand).sibling
+				if tNode(y).operatorNumber = aNonManifest then
+				    result tFlexArray
+				end if
+				x := tNode(x).sibling
+			    end loop
+			    result tArray
+			end if
+
+		    label aRecord:
+			result tRecord
+
+		    label aPacked, aType, aRecordElementType:
+			result TypeKind(tNode(t).operand)
+
+		    label aForward:
+			const register x := tNode(t).operand
+			assert tNode(x).nodeKind = NodeKinds.ExpressionLeaf
+
+			const register ty := Types.GetType(tNode(x).leaf)
+			if ty = nil(tNode) then
+			    result tCollection
+			else
+			    result TypeKind(ty)
+			end if
+
+		    label aUnion:
+			result tUnion
+
+		    label aSet:
+			result tSet
+
+		    label aCondition:
+			if tNode(t).operand = nil(tNode) then
+			    result tCondition
+			else
+			    var register x := tNode(t).operand
+			    if tNode(x).operatorNumber = aPriority then
+				result tPriorityCondition
+			    elsif tNode(x).operatorNumber = aDeferred then
+				result tDeferredCondition
+			    else
+				assert tNode(x).operatorNumber = aTimeout
+				result tTimeoutCondition
+			    end if
+			end if
+
+		    label aModule:
+			result tModule
+
+		    label aMonitor:
+			result tMonitor
+
+		    label aCollection:
+			result tCollection
+
+		    label aPointer:
+			result tPointer
+
+		    label :
+			quit < : 200 + tNode(t).operatorNumber
+		end case
+
+	    label NodeKinds.ExpressionLeaf:
+		result TypeKind(Types.GetType(tNode(t).leaf))
+
+	    label :
+		assert tNode(t).nodeKind = NodeKinds.Unknown
+		result tNoType
+	end case
+    end TypeKind
+
+
+    body procedure EnterTypeSize % (var e : ExpressionType, t : TreePointer,
+				 %  pack : boolean)
+#if DEBUG then
+	handler (quitCode)
+	    if quitCode not= excpSIGINT then
+		put :debugFile, "EnterTypeSize abort dump:"
+		TreeDump(t, 0, debugFile)
+	    end if
+	    quit >
+	end handler
+#end if
+	tag e.u, aIntegerLit
+	e.u.integerKind := iInteger
+	case tNode(t).nodeKind of
+	    label NodeKinds.SimpleLeaf:
+		/* int, nat, ... */
+		case tNode(t).operatorNumber of
+		    label aInt, aNat, aVaryingParameter:
+			e.u.integerValue := 4
+		    label aAddressint:
+			e.u.integerValue := macdepAddressSize
+		    label aReal:
+			e.u.integerValue := 8
+		    label aBoolean, aChar:
+			e.u.integerValue := 1
+		    label aString:
+			e.u.integerValue := 256
+		    label aCondition:
+			e.u.integerValue := macdepConditionSize
+		end case
+
+	    label NodeKinds.OperatorNode:
+		var register first := tNode(t).operand
+		var register next : TreePointer
+
+		case tNode(t).operatorNumber of
+		    label aPacked, aType:
+			EnterTypeSize(e, first, true)
+
+		    label aInt, aNat:
+			assert tNode(first).operatorNumber = aStorageSize
+			next := tNode(first).operand
+			e.u.integerValue :=
+			    Expression.GetInteger(tNode(next).leaf)
+
+		    label aSubrange, aEnum:
+			/* aSubrange low high [ aStorageSize size] */
+			var u,l : int4
+
+			if eNode(tNode(first).leaf).u.operatorNumber
+				= aCharLit then
+			    /* char subrange! */
+			    e.u.integerValue := 4
+			else
+			    next := tNode(first).sibling
+			    l := Expression.GetInteger(tNode(first).leaf)
+			    u := Expression.GetInteger(tNode(next).leaf)
+			    if tNode(next).sibling = nil(tNode) then
+				/* no storage size specified */
+				if not pack then
+				    e.u.integerValue := 4
+				else
+				    /* must pack the subrange */
+				    if l >= 0 then
+					if u <= 255 then
+					    e.u.integerValue := 1
+					elsif u <= 65535 then
+					    e.u.integerValue := 2
+					else
+					    e.u.integerValue := 4
+					end if
+				    else
+					if l >= -128 and u <= 127 then
+					    e.u.integerValue := 1
+					elsif l >= -32768 and u <= 32767 then
+					    e.u.integerValue := 2
+					else
+					    e.u.integerValue := 4
+					end if
+				    end if
+				end if
+			    else
+				next := tNode(tNode(next).sibling).operand
+				e.u.integerValue :=
+				    Expression.GetInteger(tNode(next).leaf)
+			    end if
+			end if
+
+		    label aChar:
+			assert tNode(first).operatorNumber = aStringSizeBound
+
+			next := tNode(first).operand
+			e.u.integerValue :=
+			    Expression.GetInteger(tNode(next).leaf)
+
+		    label aString:
+			assert tNode(first).operatorNumber = aStringSizeBound
+
+			next := tNode(first).operand
+			e.u.integerValue :=
+			    Expression.GetInteger(tNode(next).leaf) + 1
+
+		    label aReal:
+			assert tNode(first).operatorNumber = aStorageSize
+			first := tNode(first).operand
+			assert tNode(first).nodeKind = NodeKinds.ExpressionLeaf
+			/* this is real : size form */
+			e.u.integerValue :=
+			    Expression.GetInteger(tNode(first).leaf)
+
+		    label aSet:
+			if tNode(first).operatorNumber not= aSubrange and
+				tNode(first).operatorNumber not= aEnum then
+			    if tNode(first).operatorNumber not= aPacked then
+				first := Types.GetType(tNode(first).leaf)
+			    end if
+			    if tNode(first).operatorNumber = aPacked then
+				first := tNode(first).operand
+			    end if
+			end if
+
+			assert tNode(first).operatorNumber = aSubrange or
+				tNode(first).operatorNumber = aEnum
+			var u, l : int4
+			var n : nat4
+
+			first := tNode(first).operand
+			next := tNode(first).sibling
+			l := Expression.GetInteger(tNode(first).leaf)
+			u := Expression.GetInteger(tNode(next).leaf)
+			n := u - l + 1
+			n := (n + 7) div 8
+			if n <= 4 then
+			    if n = 3 then
+				n := 4
+			    end if
+			else
+			    if n mod 2 not= 0 then
+				n += 1
+			    end if
+			end if
+			e.u.integerValue := n
+
+		    label aProcedure, aFunction, aPointer:
+			e.u.integerValue := macdepAddressSize
+
+		    label aCondition:
+			e.u.integerValue := macdepConditionSize
+		end case
+
+	    label NodeKinds.ExpressionLeaf:
+		/* return a size(typname) */
+		/*
+		 * Special case:  sizeof (forward pointer) doesn't work, as
+		 *		  the forward pointer declaration is removed
+		 *		  Replace it with the address size.
+		 */
+		const register tKind := Types.GetKind(tNode(t).leaf)
+		if tKind = tPointer and
+			Types.HasAttribute(tNode(t).leaf, aaForward) then
+		    e.u.integerValue := macdepAddressSize
+		else
+		    case tKind of
+			label tArray, tRecord, tUnion, tCollection,
+				tCondition, tPriorityCondition,
+				tDeferredCondition, tTimeoutCondition,
+				tForward, tFlexArray, tFlexCharString,
+				tParameterArray, tParameterCharString,
+				tParameterArrayParameterCharString,
+				tParameterString,
+				tParameterArrayParameterString:
+
+			label :
+			    EnterTypeSize(e, Types.GetType(tNode(t).leaf),
+				false)
+			    return
+		    end case
+		    var register ep : ExpressionPointer
+
+		    tag e.u, aCall
+
+		    new eNode, e.u.operand
+		    ep := e.u.operand
+		    tag eNode(ep).u, aPredefinedId
+		    eNode(ep).u.funcOrProcNumber := pSize
+
+		    new eNode, eNode(ep).sibling
+		    ep := eNode(ep).sibling
+		    tag eNode(ep).u, aSubs
+		    eNode(ep).sibling := nil(eNode)
+
+		    eNode(ep).u.operand := tNode(t).leaf
+		    Types.EnterAttribute(tNode(t).leaf, aaSizeofType)
+		end if
+	end case
+    end EnterTypeSize
+
+    CTypeEnterSize := EnterTypeSize
+
+end CTypes

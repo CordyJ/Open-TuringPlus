@@ -1,0 +1,826 @@
+% Turing+ v6.2, Sept 2022
+% Copyright 1986 University of Toronto, 2022 Queen's University at Kingston
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+% and associated documentation files (the “Software”), to deal in the Software without restriction,
+% including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+% and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+% subject to the following conditions:
+% 
+% The above copyright notice and this permission notice shall be included in all copies
+% or substantial portions of the Software.
+% 
+% THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+% INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+% AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+% DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+/*
+ * Utility routines - get ids & types, is manifest, etc
+ */
+body "util.st" module Utility
+
+    body function VariableId % (expn : ExpressionPointer) : ExpressionPointer
+	case eNode(expn).u.operatorNumber of
+	    label aIdent:
+		result expn
+
+	    label aField:
+		var register x := eNode(eNode(expn).u.operand).sibling
+		if eNode(x).u.operatorNumber = aTagCheck then
+		    result eNode(x).sibling
+		else
+		    result x
+		end if
+
+	    label aSubstring, aRangeCheck:
+		result VariableId(eNode(expn).u.operand)
+
+	    label aSubs:
+		var register as := Types.ArrayStringInformation(
+				VariableId(eNode(expn).u.operand))
+
+		loop
+		    exit when asNode(as).u.kind = componentType
+		    as := asNode(as).next
+		end loop
+
+		result asNode(as).u.id
+
+	    label aCall, aCallVariable:
+		var register x := eNode(expn).u.operand
+
+		if eNode(x).u.operatorNumber = aPredefinedId then
+		    if eNode(x).u.funcOrProcNumber = pAddr or
+			    eNode(x).u.funcOrProcNumber = pInternalAddr then
+			result VariableId(eNode(eNode(x).sibling).u.operand)
+		    else
+			result nil(eNode)
+		    end if
+		else
+		    /* return the function result variable */
+		    var register t := Types.GetType(VariableId(x))
+
+		    t := tNode(tNode(t).operand).sibling
+		    if tNode(t).operatorNumber = aSubs then
+			t := tNode(t).sibling
+		    end if
+		    if t = nil(tNode) then
+			/* procedure */
+			result nil(eNode)
+		    else
+			result tNode(t).leaf
+		    end if
+		end if
+
+	    label aTypeCheat:
+		/* return the unique id of the typecheat */
+		var register x :=
+		    eNode(eNode(eNode(expn).u.operand).sibling).sibling
+
+		if x not= nil(eNode) and eNode(x).u.operatorNumber = aIdent then
+		    result x
+		else
+		    /* haven't transformed it yet */
+		    /* try for a named type */
+		    x := eNode(expn).u.operand
+		    if eNode(x).u.operatorNumber = aType then
+			const register t := eNode(x).u.expnType
+
+			if tNode(t).nodeKind = NodeKinds.ExpressionLeaf and
+				eNode(tNode(t).leaf).u.operatorNumber =
+				    aIdent then
+			    result tNode(t).leaf
+			else
+			    result nil(eNode)
+			end if
+		    else
+			result nil(eNode)
+		    end if
+		end if
+
+	    label aAt:
+		assert false
+
+	    label aSet:
+		result eNode(expn).u.operand
+
+	    label aCollection:
+		var register x := Types.GetType(eNode(expn).u.operand)
+
+		assert tNode(x).operatorNumber = aCollection
+		x := tNode(x).operand
+		if tNode(x).operatorNumber = aForward then
+		    x := tNode(x).operand
+		end if
+		if tNode(x).leaf not= nil(eNode) then
+		    /* we have an id to give */
+		    result tNode(x).leaf
+		else
+		    /* else just give the collection reference */
+		    result eNode(expn).u.operand
+		end if
+
+	    label aSetDifference, aSetIntersection, aSetUnion, aSetXor:
+		/* for set expressions, need to see if it is a small set */
+		result VariableId(eNode(expn).u.operand)
+
+	    label :
+		result nil(eNode)
+	end case
+    end VariableId
+
+
+    body procedure VariableType % (expn : ExpressionPointer,
+				%  var res : TreePointer)
+#if DEBUG then
+	handler (quitCode)
+	    if quitCode not= excpSIGINT then
+		put :0, "VariableType Abort"
+		Expression.Dump(expn, 0, 0)
+		put :0, ""
+	    end if
+	    quit >
+	end handler
+#end if
+	case eNode(expn).u.operatorNumber of
+	    label aIdent:
+		res := Types.GetTree(expn)
+
+	    label aField:
+		var register x := eNode(eNode(expn).u.operand).sibling
+		if eNode(x).u.operatorNumber = aTagCheck then
+		    VariableType(eNode(x).sibling, res)
+		else
+		    VariableType(x, res)
+		end if
+
+	    label aSubstring, aRangeCheck:
+		VariableType(VariableId(eNode(expn).u.operand), res)
+
+	    label aSubs:
+		var register as := Types.ArrayStringInformation(
+				VariableId(eNode(expn).u.operand))
+
+		if as = nil(asNode) then
+		    /* not yet defined */
+		    res := nil(tNode)
+		    return
+		end if
+
+		loop
+		    exit when asNode(as).u.kind = componentType
+		    as := asNode(as).next
+		end loop
+		res := asNode(as).u.component
+
+	    label aCall, aCallVariable:
+		if eNode(eNode(expn).u.operand).u.operatorNumber =
+			aPredefinedId then
+		    const pNum :=
+			eNode(eNode(expn).u.operand).u.funcOrProcNumber
+		    if pNum = pNil then
+			var register x := eNode(eNode(expn).u.operand).sibling
+			assert eNode(x).u.operatorNumber = aSubs
+			x := eNode(x).u.operand
+
+			res := Types.CollectionInformation(x)
+			if res not= nil(tNode) then
+			    return
+			end if
+
+			/* must create a pointer type */
+			new tNode, res
+			var register tp := res
+
+			tNode(tp).operatorNumber := aPointer
+			tNode(tp).nodeKind := NodeKinds.OperatorNode
+			tNode(tp).sibling := nil(tNode)
+			tNode(tp).leaf := nil(eNode)
+			tNode(tp).transformed := false
+			tNode(tp).lineNumber := 0
+
+			new tNode, tNode(tp).operand
+			tp := tNode(tp).operand
+			tNode(tp).nodeKind := NodeKinds.ExpressionLeaf
+			tNode(tp).sibling := nil(tNode)
+			tNode(tp).operand := nil(tNode)
+			tNode(tp).leaf := x
+			tNode(tp).transformed := false
+			tNode(tp).lineNumber := 0
+		    else
+			case Predefined.ResultType(pNum) of
+			    label tReal:
+				res := predtree(pWithoutType, pReal4)
+
+			    label tAddressInt:
+				res := predtree(pWithoutType, pAddressint)
+
+			    label tInt:
+				res := predtree(pWithoutType, pInt4)
+
+			    label tChar:
+				res := predtree(pWithoutType, pChar)
+
+			    label tBoolean:
+				res := predtree(pWithoutType, pBoolean)
+
+			    label tString:
+				res := predtree(pWithoutType, pString)
+
+			    label tNat:
+				res := predtree(pWithoutType, pNat4)
+			end case
+		    end if
+		else
+		    var register x := Types.GetType(eNode(expn).u.operand)
+
+		    if x = nil(tNode) then
+			/* not yet defined */
+			res := nil(tNode)
+			return
+		    end if
+
+		    x := tNode(x).operand
+		    loop
+			exit when tNode(x).operatorNumber = aType
+			x := tNode(x).sibling
+		    end loop
+		    res := tNode(x).operand
+		end if
+
+	    label aCollection:
+		var register comp := Types.GetType(eNode(expn).u.operand)
+
+		assert tNode(comp).operatorNumber = aCollection
+		comp := tNode(comp).operand
+
+		if tNode(comp).operatorNumber = aForward then
+		    comp := tNode(comp).operand
+		end if
+		res := comp
+
+	    label aNil:
+		const register x := eNode(expn).u.operand
+		assert eNode(x).u.operatorNumber = aIdent
+
+		res := Types.CollectionInformation(x)
+		if res not= nil(tNode) then
+		    return
+		end if
+
+		/* must create a pointer type */
+		new tNode, res
+		var register tp := res
+
+		tNode(tp).operatorNumber := aPointer
+		tNode(tp).nodeKind := NodeKinds.OperatorNode
+		tNode(tp).sibling := nil(tNode)
+		tNode(tp).leaf := nil(eNode)
+		tNode(tp).transformed := false
+		tNode(tp).lineNumber := 0
+
+		new tNode, tNode(tp).operand
+		tp := tNode(tp).operand
+		tNode(tp).nodeKind := NodeKinds.ExpressionLeaf
+		tNode(tp).sibling := nil(tNode)
+		tNode(tp).operand := nil(tNode)
+		tNode(tp).leaf := x
+		tNode(tp).transformed := false
+		tNode(tp).lineNumber := 0
+
+	    label aTypeCheat:
+		res := eNode(eNode(expn).u.operand).u.expnType
+
+	    label aBits, aHash:
+		VariableType(eNode(expn).u.operand, res)
+
+	    label :
+		res := nil(tNode)
+	end case
+    end VariableType
+
+
+    body function ExpnType % (expn: ExpressionPointer) : TypeKinds
+	case eNode(expn).u.operatorNumber of
+	    label aIntegerLit, aDiv:
+		result tInt
+
+	    label aRealLit, aDivideReal:
+		result tReal
+
+	    label aStringLit:
+		result tString
+
+	    label aCharLit:
+		if eNode(expn).u.charLen = 1 then
+		    result tChar
+		else
+		    result tCharString
+		end if
+
+	    label aNil:
+		result tPointer
+	    
+	    label aTrue, aFalse, aInfixCompare, aInfixAnd, aInfixImply,
+		    aInfixOr, aNot, aInfixBooleanCompare:
+		result tBoolean
+
+	    label aConcatenate:
+		result tString
+
+	    label aPredefinedId:
+		const pFcn := eNode(expn).u.funcOrProcNumber
+
+		if pFcn = pSucc or pFcn = pPred then
+		    result ExpnType(eNode(eNode(expn).sibling).u.operand)
+		else
+		    result Predefined.ResultType(pFcn)
+		end if
+	    
+	    label aIdent:
+		const register k := Types.GetKind(expn)
+
+		if k not= tCollection then
+		    result k
+		else
+		    /* return the kind of the collection element */
+		    var register x := Types.GetTree(expn)
+
+		    assert tNode(x).operatorNumber = aCollection
+		    x := tNode(x).operand
+
+		    if tNode(x).operatorNumber = aForward then
+			result Types.GetKind(tNode(tNode(x).operand).leaf)
+		    elsif tNode(x).nodeKind = NodeKinds.ExpressionLeaf then
+			result Types.GetKind(tNode(x).leaf)
+		    else
+			result CTypes.TypeKind(x)
+		    end if
+		end if
+
+	    label aHash, aAnd, aAt, aBits, aLogicalAnd, aLogicalOr, aLogicalXor,
+		    aShiftLeft, aShiftRight:
+		result tNat
+
+	    label aSetDifference, aSetIntersection, aSetUnion, aSetXor:
+		result tSet
+
+	    label aField:
+		var register x := eNode(eNode(expn).u.operand).sibling
+		if eNode(x).u.operatorNumber = aTagCheck then
+		    result ExpnType(eNode(x).sibling)
+		else
+		    result ExpnType(x)
+		end if
+
+	    label aCollection:
+		const register comp := Types.GetType(eNode(expn).u.operand)
+
+		if tNode(comp).operatorNumber = aForward then
+		    result Types.GetKind(tNode(comp).leaf)
+		else
+		    assert tNode(comp).operatorNumber = aCollection
+		    result CTypes.TypeKind(tNode(comp).operand)
+		end if
+
+	    label aSubs:
+		const register comp :=
+		    Types.Component(VariableId(eNode(expn).u.operand))
+
+		if tNode(comp).nodeKind = NodeKinds.ExpressionLeaf then
+		    result Types.GetKind(tNode(comp).leaf)
+		else
+		    result CTypes.TypeKind(comp)
+		end if
+
+	    label aSubstring:
+		const opKind := ExpnType(eNode(expn).u.operand)
+
+		if opKind = tString or opKind = tParameterString then
+		    result tString
+		else
+		    /* must be a char substring  -- find the substring kind */
+		    var register x := eNode(expn).u.operand
+		    loop
+			if x = nil(eNode) then
+			    /* must have transformed it already */
+			    result tChar
+			end if
+			exit when eNode(x).u.operatorNumber = aEndSubstring
+			x := eNode(x).sibling
+		    end loop
+		    if eNode(x).u.substringKind mod 256 = ssNone then
+			result tChar
+		    else
+			result tString	/* charstring(x..y) == string */
+		    end if
+		end if
+
+	    label aCall, aCallVariable:
+		if eNode(eNode(expn).u.operand).u.operatorNumber =
+			aPredefinedId then
+		    const pFcn :=
+			eNode(eNode(expn).u.operand).u.funcOrProcNumber
+
+		    if pFcn = pSucc or pFcn = pPred then
+			result ExpnType(
+			    eNode(eNode(eNode(
+				expn).u.operand).sibling).u.operand)
+		    else
+			result Predefined.ResultType(pFcn)
+		    end if
+		else
+		    var register x :=
+			Types.GetType(VariableId(eNode(expn).u.operand))
+
+		    x := tNode(x).operand
+		    loop
+			exit when tNode(x).operatorNumber = aType
+			x := tNode(x).sibling
+		    end loop
+		    result CTypes.TypeKind(tNode(x).operand)
+		end if
+
+	    label aPlus, aRangeCheck, aAbs, aRangeCheck2:
+		result ExpnType(eNode(expn).u.operand)
+
+	    label aMinus:
+		if ExpnType(eNode(expn).u.operand) = tReal then
+		    result tReal
+		else
+		    result tInt
+		end if
+
+	    label aMax, aMin, aMod, aMultiply, aSubtract, aAdd, aExponentiate:
+		if ExpnType(eNode(expn).u.operand) = tReal or
+			ExpnType(eNode(eNode(expn).u.operand).sibling) =
+			    tReal then
+		    result tReal
+		else
+		    result tInt
+		end if
+
+	    label aTypeCheat:
+		const register x :=
+		    eNode(eNode(eNode(expn).u.operand).sibling).sibling
+
+		if x not= nil(eNode) and eNode(x).u.operatorNumber = aIdent then
+		    result Types.GetKind(x)
+		else
+		    /* haven't transformed it yet */
+		    result CTypes.TypeKind(
+			eNode(eNode(expn).u.operand).u.expnType)
+		end if
+
+	    label aSet:
+		result tSet
+
+	    label :
+		/* !!! */
+		put :0, "Unknown operator in ExpnType"
+		Expression.Dump(expn,0,0)
+		put :0, ""
+		quit <
+	end case
+    end ExpnType
+
+
+    body function ManifestExpression %(e : ExpressionPointer) :boolean
+	/* We know the semantic pass has folded manifest expressions! */
+	case eNode(e).u.operatorNumber of
+	    label aIntegerLit, aRealLit, aStringLit, aCharLit, aTrue, aFalse,
+		    aNil:
+		result true
+	    label :
+		result false
+	end case
+    end ManifestExpression
+
+
+    body procedure InRange % (expn, high : ExpressionPointer,
+			  % low : int4, var res : ExpressionPointer,
+			  % subtractLower: boolean, abort : int)
+
+	if ManifestExpression(expn) and ManifestExpression(high) then
+	    const mExpn := Expression.GetInteger(expn)
+	    const mHigh := Expression.GetInteger(high)
+	    if low <= mExpn and mExpn <= mHigh then
+		if subtractLower and low not= 0 then
+		    if eNode(expn).u.operatorNumber = aCharLit then
+			assert eNode(expn).u.charLen = 1
+			var dummy : TokenString
+			dummy(1) := chr(mExpn - low)
+			Expression.EnterChar(dummy,1)
+		    else
+			assert eNode(expn).u.operatorNumber = aIntegerLit
+			Expression.EnterInteger(mExpn - low, iInteger)
+		    end if
+		    Expression.Pop(res)
+		else
+		    Expression.Copy(expn, res)
+		end if
+		eNode(res).sibling := nil(eNode)
+		return
+	    end if
+	end if
+
+	if unChecked then
+	    if not subtractLower or low = 0 then
+		/* nothing is needed */
+		Expression.Copy(expn, res)
+	    else
+		var register e : ExpressionPointer
+
+		new eNode, e
+		res := e
+		tag eNode(e).u, aSubtract
+		Expression.Copy(expn, eNode(e).u.operand)
+		e := eNode(e).u.operand
+
+		new eNode, eNode(e).sibling
+		e := eNode(e).sibling
+		tag eNode(e).u, aIntegerLit
+		eNode(e).u.integerValue := low
+		eNode(e).u.integerKind := iInteger
+		eNode(e).sibling := nil(eNode)
+	    end if
+	    eNode(res).sibling := nil(eNode)
+	    return
+	end if
+
+	/* high is non-manifest, or value is out of range */
+	var register e : ExpressionPointer
+
+	new eNode, e
+	res := e
+
+	tag eNode(e).u, aCall
+	eNode(e).sibling := nil(eNode)
+
+	new eNode, eNode(e).u.operand
+	e := eNode(e).u.operand
+	tag eNode(e).u, aPredefinedId
+	if subtractLower then
+	    eNode(e).u.funcOrProcNumber := pCheckRangeSubtractLower
+	else
+	    eNode(e).u.funcOrProcNumber := pCheckRange
+	end if
+
+	new eNode, eNode(e).sibling
+	e := eNode(e).sibling
+
+	tag eNode(e).u, aSubs
+	eNode(e).sibling := nil(eNode)
+
+	Expression.Copy(expn, eNode(e).u.operand)
+	e := eNode(e).u.operand
+
+	new eNode, eNode(e).sibling
+	e := eNode(e).sibling
+	tag eNode(e).u, aIntegerLit
+	eNode(e).u.integerValue := low
+	eNode(e).u.integerKind := iInteger
+
+	Expression.Copy(high, eNode(e).sibling)
+	e := eNode(e).sibling
+
+	new eNode, eNode(e).sibling
+	e := eNode(e).sibling
+
+	eNode(e).sibling := nil(eNode)
+	tag eNode(e).u, aIntegerLit
+	eNode(e).u.integerValue := abort
+	eNode(e).u.integerKind := iInteger
+    end InRange
+
+
+    body procedure ExpnTypeTree % (expn : ExpressionPointer,
+				%  var res : TreePointer)
+	case eNode(expn).u.operatorNumber of
+	    label aIntegerLit, aDiv:
+		res := predtree(pWithoutType, pInt4)
+
+	    label aRealLit, aDivideReal:
+		res := predtree(pWithoutType, pReal8)
+
+	    label aStringLit:
+		Tree.Copy(predtree(pWithoutType, pStringStorage), res)
+		eNode(tNode(tNode(tNode(
+		    res).operand).operand).leaf).u.integerValue :=
+			eNode(expn).u.stringLen
+
+	    label aCharLit:
+		if eNode(expn).u.charLen = 1 then
+		    res := predtree(pWithoutType, pChar)
+		else
+		    Tree.Copy(predtree(pWithoutType, pCharStringStorage), res)
+		    eNode(tNode(tNode(tNode(
+			res).operand).operand).leaf).u.integerValue :=
+			    eNode(expn).u.charLen
+		end if
+
+	    label aTrue, aFalse, aInfixCompare, aInfixAnd, aInfixImply,
+		    aInfixOr:
+		res := predtree(pWithoutType, pBoolean)
+
+	    label aType:
+		res := eNode(expn).u.expnType
+
+	    label aConcatenate:
+		res := predtree(pWithoutType, pString)
+
+	    label aHash, aAnd, aAt, aBits, aLogicalAnd, aLogicalOr, aLogicalXor,
+		    aShiftLeft, aShiftRight:
+		res := predtree(pWithoutType, pNat4)
+
+	    label aSetDifference, aSetIntersection, aSetUnion, aSetXor,
+		    aPlus, aMinus, aRangeCheck, aAbs:
+		ExpnTypeTree(eNode(expn).u.operand, res)
+
+	    label aSubstring:
+		if ExpnType(eNode(expn).u.operand) = tString then
+		    res := predtree(pWithoutType, pString)
+		else
+		    /* must be a char substring  -- find the substring kind */
+		    var register x := eNode(expn).u.operand
+		    loop
+			if x = nil(eNode) then
+			    /* must have transformed it already */
+			    res := predtree(pWithoutType, pChar)
+			    return
+			end if
+			exit when eNode(x).u.operatorNumber = aEndSubstring
+			x := eNode(x).sibling
+		    end loop
+		    if eNode(x).u.substringKind mod 256 = ssNone then
+			res := predtree(pWithoutType, pChar)
+		    else
+			res := predtree(pWithoutType, pString)
+		    end if
+		end if
+
+	    label aMax, aMin, aMod, aMultiply, aSubtract, aAdd, aExponentiate:
+		if ExpnType(eNode(expn).u.operand) = tReal or
+			ExpnType(eNode(eNode(expn).u.operand).sibling) =
+			    tReal then
+		    res := predtree(pWithoutType, pReal8)
+		else
+		    res := predtree(pWithoutType, pInt4)
+		end if
+
+	    label aSet:
+		res := Types.GetTree(eNode(expn).u.operand)
+
+	    label :
+		VariableType(expn, res)
+	end case
+    end ExpnTypeTree
+
+
+    /*
+     * Return true if this is a simple expression:
+     *	i.e. one that can be duplicated without side effects or high cost
+     */
+    body function SimpleExpression % (e : ExpressionPointer) : boolean
+	case eNode(e).u.operatorNumber of
+	    label aIdent, aIntegerLit, aRealLit, aStringLit, aCharLit,
+		    aTrue, aFalse, aNil:
+		result true
+
+	    label aField:
+		var register x := eNode(eNode(e).u.operand).sibling
+
+		if eNode(x).u.operatorNumber = aTagCheck then
+		    result SimpleExpression(eNode(x).sibling)
+		else
+		    result SimpleExpression(x)
+		end if
+
+	    label aSubs:
+		var register x := eNode(eNode(e).u.operand).sibling
+
+		loop
+		    exit when x = nil(eNode)
+		    if not SimpleExpression(x) then
+			result false
+		    end if
+		    x := eNode(x).sibling
+		end loop
+		result true
+
+	    label aRangeCheck:
+		result SimpleExpression(eNode(e).u.operand)
+
+	    label :
+		result false
+	end case
+    end SimpleExpression
+
+
+    procedure SimpleTypeTree(p : pFirstTree .. pLastTree, t : int)
+	var register x := predtree(pWithType, p)
+
+	new tNode, tNode(x).operand
+	x := tNode(x).operand
+	predtree(pWithoutType, p) := x
+	tNode(x).nodeKind := NodeKinds.SimpleLeaf
+	tNode(x).operatorNumber := t
+	tNode(x).sibling := nil(tNode)
+	tNode(x).operand := nil(tNode)
+	tNode(x).leaf := nil(eNode)
+	tNode(x).transformed := false
+	tNode(x).lineNumber := 0
+    end SimpleTypeTree
+
+
+    procedure StorageTypeTree(p : pFirstTree .. pLastTree,
+			      t, sz : int, isString : boolean)
+	var register x := predtree(pWithType, p)
+
+	new tNode, tNode(x).operand
+	x := tNode(x).operand
+	predtree(pWithoutType, p) := x
+	tNode(x).nodeKind := NodeKinds.OperatorNode
+	tNode(x).operatorNumber := t
+	tNode(x).sibling := nil(tNode)
+	tNode(x).leaf := nil(eNode)
+	tNode(x).transformed := false
+	tNode(x).lineNumber := 0
+
+	new tNode, tNode(x).operand
+	x := tNode(x).operand
+	tNode(x).nodeKind := NodeKinds.OperatorNode
+	if isString then
+	    tNode(x).operatorNumber := aStringSizeBound
+	else
+	    tNode(x).operatorNumber := aStorageSize
+	end if
+	tNode(x).sibling := nil(tNode)
+	tNode(x).leaf := nil(eNode)
+	tNode(x).transformed := false
+	tNode(x).lineNumber := 0
+
+	new tNode, tNode(x).operand
+	x := tNode(x).operand
+	tNode(x).nodeKind := NodeKinds.ExpressionLeaf
+	tNode(x).operatorNumber := 0
+	tNode(x).operand := nil(tNode)
+	tNode(x).sibling := nil(tNode)
+	tNode(x).transformed := false
+	tNode(x).lineNumber := 0
+
+	var register e : ExpressionPointer
+	new eNode, e
+	tNode(x).leaf := e
+
+	tag eNode(e).u, aIntegerLit
+	eNode(e).u.integerValue := sz
+	eNode(e).u.integerKind := iInteger
+	eNode(e).sibling := nil(eNode)
+    end StorageTypeTree
+
+
+    begin
+	var register x : TreePointer
+
+	for i : pFirstTree .. pLastTree
+	    new tNode, x
+	    predtree(pWithType, i) := x
+	    tNode(x).nodeKind := NodeKinds.OperatorNode
+	    tNode(x).operatorNumber := aType
+	    tNode(x).sibling := nil(tNode)
+	    tNode(x).leaf := nil(eNode)
+	    tNode(x).transformed := false
+	    tNode(x).lineNumber := 0
+	end for
+
+	SimpleTypeTree(pBoolean, aBoolean)
+
+	SimpleTypeTree(pChar, aChar)
+	StorageTypeTree(pCharString1, aChar, 1, true)
+	StorageTypeTree(pCharStringStorage, aChar, 0, true)
+
+	StorageTypeTree(pInt1, aInt, 1, false)
+	StorageTypeTree(pInt2, aInt, 2, false)
+	SimpleTypeTree(pInt4, aInt)
+
+	StorageTypeTree(pNat1, aNat, 1, false)
+	StorageTypeTree(pNat2, aNat, 2, false)
+	SimpleTypeTree(pNat4, aNat)
+
+	StorageTypeTree(pReal4, aReal, 4, false)
+	SimpleTypeTree(pReal8, aReal)
+
+	SimpleTypeTree(pString, aString)
+	StorageTypeTree(pString1, aString, 1, true)
+	StorageTypeTree(pString2, aString, 2, true)
+	StorageTypeTree(pStringStorage, aString, 0, true)
+
+	SimpleTypeTree(pAddressint, aAddressint)
+	SimpleTypeTree(pMonitorVar, aMonitor)
+    end
+
+
+end Utility
