@@ -9,8 +9,8 @@ echo /bin/rm -rf /usr/local/include/tplus/*
 /bin/rm -rf /usr/local/include/tplus/* 
 
 echo ""
-echo /bin/cp -r usr/local/include/tplus/* /usr/local/include/tplus
-/bin/cp -r usr/local/include/tplus/* /usr/local/include/tplus
+echo /bin/cp -r include/* /usr/local/include/tplus
+/bin/cp -r include/* /usr/local/include/tplus
 
 # install lib files
 mkdir -p /usr/local/lib/tplus
@@ -20,8 +20,8 @@ echo /bin/rm -rf /usr/local/lib/tplus/*
 /bin/rm -rf /usr/local/lib/tplus/* 
 
 echo ""
-echo /bin/cp -r usr/local/lib/tplus/* /usr/local/lib/tplus
-/bin/cp -r usr/local/lib/tplus/* /usr/local/lib/tplus
+echo /bin/cp -r lib/* /usr/local/lib/tplus
+/bin/cp -r lib/* /usr/local/lib/tplus
 
 echo ""
 echo ranlib /usr/local/lib/tplus/*.a
@@ -35,8 +35,8 @@ echo /bin/rm -f /usr/local/bin/tpc /usr/local/bin/tssl
 /bin/rm -f /usr/local/bin/tpc /usr/local/bin/tssl
 
 echo ""
-echo /bin/cp usr/local/bin/* /usr/local/bin
-/bin/cp usr/local/bin/* /usr/local/bin
+echo /bin/cp bin/* /usr/local/bin
+/bin/cp bin/* /usr/local/bin
 
 # Enable the Turing+ commands in MacOS
 if [ `uname -s` = Darwin ]; then

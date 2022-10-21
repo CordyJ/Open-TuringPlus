@@ -22,9 +22,9 @@
 /* JRC 24.4.14 */
 
 #ifdef UNIX32 
-    #include <UNIX32/cinterface>
+    #include <UNIX32/cinterface.h>
 #else /* UNIX64 */
-    #include <UNIX64/cinterface>
+    #include <UNIX64/cinterface.h>
 #endif
 
 int main (argc, argv)
