@@ -59,7 +59,7 @@ const *CoderPass	:= "/coder"
 const *PreprocessorPass	:= "/cpp"
 const *AssemblerPass	:= "/as"
 const *OptimizerPass	:= "/optim"
-const *TranslatorPass	:= "/t+toc"
+const *TranslatorPass	:= "/tp2c"
 const *CCompilePass	:= "/cc"
 const *LinkerPass	:= "/ld"
 
@@ -1296,7 +1296,7 @@ procedure Translate (cFileName : string, var status : int)
 	PrintCall (pass, tArgs)
 	status := 0
     else
-	callsys (status, "t+toc", pass, tArgs)
+	callsys (status, "tp2c", pass, tArgs)
     end if
 end Translate
 

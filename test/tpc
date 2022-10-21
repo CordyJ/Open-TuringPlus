@@ -1,0 +1,2 @@
+#!/bin/sh
+../bin/tpc -L ../lib -i ../include $*

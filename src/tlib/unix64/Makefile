@@ -1,13 +1,16 @@
+SYS=UNIX64
+
 all: 
 	cp -r ../generic/* .
 	cp -r machdep/* .
-	if [ "`uname -o`" = "Cygwin" -o "`uname -o`" = "Msys" ]; then \
-	    cp ./TLK/TLKCS-CYGWIN.s ./TLK/TLKCS.s; \
-	    make -f Makefile_Generic ARCH="-m64" SYS=UNIX64 DEFINES="-DIEEE -DUNIX64 -DCYGWIN"; \
-	else \
-	    cp machdep/TLK/TLKCS-UNIX64.s machdep/TLK/TLKCS.s; \
-	    make -f Makefile_Generic ARCH="-m64" SYS=UNIX64; \
-	fi
+	case `uname -s` in \
+	    CYGWIN*|MINGW*) \
+	        cp ./TLK/TLKCS-CYGWIN.s ./TLK/TLKCS.s; \
+	        make -f Makefile_Generic ARCH="-m64" SYS=UNIX64 DEFINES="-DIEEE -DUNIX64 -DCYGWIN";; \
+	    *) \
+	        cp machdep/TLK/TLKCS-UNIX64.s machdep/TLK/TLKCS.s; \
+	        make -f Makefile_Generic ARCH="-m64" SYS=UNIX64;; \
+	esac
 
 clean:
 	make -f Makefile_Generic clean
