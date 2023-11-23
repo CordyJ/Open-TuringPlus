@@ -23,7 +23,7 @@ grant error, flushstreams, system, sysexit, cleanup
 include "%system"
 include "%limits"
 
-const *version := "Turing+ v6.2 (27.9.22) (c) 1986 University of Toronto, (c) 2022 Queen's University at Kingston"
+const *version := "Turing+ v6.2 (23.11.23) (c) 1986 University of Toronto, (c) 2023 Queen's University at Kingston"
 
 const *usage := "tpc [-help] [other options] file.t [ file ... ]"
 const *files := "Only '.t', '.t+', '.ch', '.ch+', '.st', '.st+', '.bd', '.bd+', '.s', '.c', '.o', '.a' files allowed"
@@ -1459,11 +1459,9 @@ child "signal.st"
 
 SetupSignals
 
-put version
-
 if nargs = 0 then
-    help
-    sysexit (10)
+    put version
+    useerror
 end if
 
 % Process Options 

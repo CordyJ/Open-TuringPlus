@@ -23,7 +23,8 @@
 #   ( processDescriptorPtr used by TLK and by cinterface)
 #  Both these labels must point to the SAME data location
 #
-    .bss 		# MUST be BSS area, in case we use "as -R"
+    # MUST be BSS area, in case we use "as -R"
+    .bss
     .align 8
     .global _TL_TLKPD, _TL_TLCPD
     .global TL_TLKPD, TL_TLCPD
@@ -33,4 +34,5 @@ _TL_TLCPD:
 TL_TLKPD:
 TL_TLCPD:
     # allocate 4 or 8 bytes in bss (uninitialized data)
-    .int 0,0		# must be 8 bytes for -m64 
+    # must be 8 bytes for -m64 
+    .int 0,0		

@@ -1,2 +1,2 @@
 #!/bin/sh
-cc -c -m64 -fPIC $*
+cc -c -m64 -fPIC -ansi $*
