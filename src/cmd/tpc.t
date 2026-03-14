@@ -23,7 +23,7 @@ grant error, flushstreams, system, sysexit, cleanup
 include "%system"
 include "%limits"
 
-const *version := "Turing+ v6.2 (23.11.23) (c) 1986 University of Toronto, (c) 2023 Queen's University at Kingston"
+const *version := "Turing+ v6.2 (14.03.26) (c) 1986 University of Toronto, (c) 2026 Queen's University at Kingston"
 
 const *usage := "tpc [-help] [other options] file.t [ file ... ]"
 const *files := "Only '.t', '.t+', '.ch', '.ch+', '.st', '.st+', '.bd', '.bd+', '.s', '.c', '.o', '.a' files allowed"
@@ -1341,6 +1341,10 @@ procedure CompileC (cFileName : string, var s : string, var status : int)
 	tArgs(i) := "-R"
 	i += 1
     end if
+
+    % allow K+R style C
+    tArgs(i) := "-std=c89"
+    i += 1
 
     % ignore warnings from C compiler 
     tArgs(i) := "-w"

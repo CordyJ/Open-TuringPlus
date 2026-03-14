@@ -25,6 +25,9 @@
 %	    Author:	Stephen Perelgut
 %	Date:	6 November 1985
 
+% v6.2.2, March 2026
+%   Fixed bug in end-of-file line comments
+
 input:
     % The input filter will classify characters into one of the following
     % input classes.  All input choices in the S/SL are based on the
@@ -967,7 +970,7 @@ SkipToEndOfLine:
 	    oSkipWhile(ccLetter)
 	| cDigit:
 	    oSkipWhile(ccDigit)
-	| cEOL:
+	| cEOL, cEOF:
 	    .tNewLine
 	    >>
 	| *:

@@ -1,0 +1,1 @@
+put "ok" % comment w/o newline
