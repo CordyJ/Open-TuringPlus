@@ -16,14 +16,18 @@
 % DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 % OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+% v6.2.2, March 2026
+%   Added types for T+ to C predefineds
+ 
 /*
  * Predefined Routine Module
  */
 body "predefined.st"  module Predefined
 
     const *predefinedTypes : array 
-	firstPredefinedRoutine..lastLibraryPredefinedRoutine of TypeKinds :=
+	firstPredefinedRoutine..lastPredefinedRoutine of TypeKinds :=
 	  init (
+        /* Language predefineds */
 	    tReal,		/* pAbs */
 	    tAddressInt,	/* pAddr */
 	    tReal,		/* pArctan */
@@ -75,6 +79,7 @@ body "predefined.st"  module Predefined
 	    tInt,		/* pSucc */
 	    tInt,		/* pUpper */
 
+        /* Library predefineds */
 	    tNoType,		/* pAllocate */
 	    tNoType,		/* pPause */
 	    tNoType,		/* pClose */
@@ -158,15 +163,95 @@ body "predefined.st"  module Predefined
 	    tNoType,		/* pWrite */
 	    tNoType,		/* pWriteWithResult */
 	    tNoType,		/* pSetStdInputStream */
-	    tNoType)		/* pSetStdOutputStream */
+	    tNoType,		/* pSetStdOutputStream */
 
+	    /* T+ to C predefineds */
+        tNoType,		/* pDynamicArrayRangeCheck*/
+        tNoType,		/* pStringAssignment*/
+        tNoType,		/* pStructureAssignment*/
+        tNoType,		/* pNonScalarAssignment*/
+        tNoType,		/* pCheckRange*/
+        tNoType,		/* pCheckRangeSubtractLower*/
+        tNoType,		/* pSmallSetConstructor*/
+        tNoType,		/* pLargeSetClear*/
+        tNoType,		/* pLargeSetManifestConstructor*/
+        tNoType,		/* pLargeSetConstructor*/
+        tNoType,		/* pLargeSetIn*/
+        tNoType,		/* pLargeSetIntersection*/
+        tNoType,		/* pLargeSetDifference*/
+        tNoType,		/* pLargeSetXor*/
+        tNoType,		/* pLargeSetUnion*/
+        tNoType,		/* pLargeSetAll*/
+        tNoType,		/* pLargeSetIntersectionAssign*/
+        tNoType,		/* pLargeSetDifferenceAssign*/
+        tNoType,		/* pLargeSetXorAssign*/
+        tNoType,		/* pLargeSetUnionAssign*/
+        tNoType,		/* pLargeSetEqual*/
+        tNoType,		/* pLargeSetNotEqual*/
+        tNoType,		/* pLargeSetLessEqual*/
+        tNoType,		/* pLargeSetGreaterEqual*/
+        tNoType,		/* pStringConcatenateAssign*/
+        tNoType,		/* pTempPointer*/
+        tNoType,		/* pStringConcatenate*/
+        tNoType,		/* pConvertCharToString*/
+        tNoType,		/* pConvertCharToCharString*/
+        tChar,		    /* pConvertToChar*/
+        tNoType,		/* pStringCompare*/
+        tNoType,		/* pBind*/
+        tNoType,		/* pBindRegister*/
+        tNoType,		/* pEnterCHandler*/
+        tNoType,		/* pLargeSetClearFcn*/
+        tNoType,		/* pLargeSetConstructorFcn*/
+        tNoType,		/* pLargeSetInFcn*/
+        tNoType,		/* pLargeSetIntersectionFcn*/
+        tNoType,		/* pLargeSetDifferenceFcn*/
+        tNoType,		/* pLargeSetXorFcn*/
+        tNoType,		/* pLargeSetUnionFcn*/
+        tNoType,		/* pLargeSetAllFcn*/
+        tNoType,		/* pLargeSetEqualFcn*/
+        tNoType,		/* pLargeSetNotEqualFcn*/
+        tNoType,		/* pLargeSetLessEqualFcn*/
+        tNoType,		/* pLargeSetGreaterEqualFcn*/
+        tNoType,		/* pNewReg*/
+        tNoType,		/* pFreeReg*/
+        tNoType,		/* pCharStringCompare*/
+        tNoType,		/* pIgnoreOneIndirection*/
+        tNoType,		/* pIntMin*/
+        tNoType,		/* pRealMin*/
+        tNoType,		/* pIntMax*/
+        tNoType,		/* pRealMax*/
+        tNoType,		/* pInternalAddr*/
+        tNoType,		/* pIntAbs*/
+        tNoType,		/* pRealAbs*/
+        tNoType,		/* pRangeCheckString*/
+        tNoType,		/* pCaseAbort*/
+        tNoType,		/* pFunctionResultAbort*/
+        tNoType,		/* pStackCheck*/
+        tNoType,		/* pRealDiv8*/
+        tNoType,		/* pRealMod8*/
+        tNoType,		/* pRangeCheck*/
+        tNoType,		/* pRangeCheck2*/
+        tNoType,		/* pAssert*/
+        tNoType,		/* pInvariant*/
+        tNoType,		/* pPre*/
+        tNoType,		/* pPost*/
+        tNoType,		/* pComplexSignal*/
+        tNoType,		/* pComplexDeferredSignal*/
+        tNoType,		/* pComplexPrioritySignal*/
+        tNoType,		/* pComplexTimeoutSignal*/
+        tNoType,		/* pInitializeInterruptProcedure*/
+        tNoType,		/* pSaveLineAndFile*/
+        tNoType,		/* pRestoreLineAndFile*/
+        tNoType,		/* pSetLineNumber*/
+        tNoType,		/* pSetFileTable*/
+        tNoType,		/* pIncrementLineNumber*/
+        tNoType,		/* pStackCheckAndSaveLineFile*/
+        tNoType,		/* pRealSmallSetConstructor*/
+        tNoType,		/* pInterruptProcedureEnter*/
+        tNoType)		/* pInterruptProcedureExit*/
 
     body function ResultType % (predef : int) : TypeKinds
-	if predef > lastLibraryPredefinedRoutine then
-	    result tInt
-	else
-	    result predefinedTypes(predef)
-	end if
+        result predefinedTypes(predef)
     end ResultType
 
 end Predefined
