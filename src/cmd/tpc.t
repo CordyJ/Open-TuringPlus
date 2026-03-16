@@ -23,7 +23,7 @@ grant error, flushstreams, system, sysexit, cleanup
 include "%system"
 include "%limits"
 
-const *version := "Turing+ v6.2 (14.03.26) (c) 1986 University of Toronto, (c) 2026 Queen's University at Kingston"
+const *version := "Turing+ v6.2.2 (16.03.26) (c) 1986 University of Toronto, (c) 2026 Queen's University at Kingston"
 
 const *usage := "tpc [-help] [other options] file.t [ file ... ]"
 const *files := "Only '.t', '.t+', '.ch', '.ch+', '.st', '.st+', '.bd', '.bd+', '.s', '.c', '.o', '.a' files allowed"

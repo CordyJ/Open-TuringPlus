@@ -28,34 +28,34 @@ body "predefined.st"  module Predefined
 	firstPredefinedRoutine..lastPredefinedRoutine of TypeKinds :=
 	  init (
         /* Language predefineds */
-	    tReal,		/* pAbs */
+	    tReal,  		/* pAbs */
 	    tAddressInt,	/* pAddr */
-	    tReal,		/* pArctan */
-	    tReal,		/* pArctand */
-	    tInt,		/* pCeil */
-	    tChar,		/* pChr */
-	    tReal,		/* pCos */
-	    tReal,		/* pCosd */
+	    tReal,  		/* pArctan */
+	    tReal,  		/* pArctand */
+	    tInt,   		/* pCeil */
+	    tChar,  		/* pChr */
+	    tReal,  		/* pCos */
+	    tReal,  		/* pCosd */
 	    tBoolean,		/* pEmpty */
 	    tBoolean,		/* pEof */
 	    tString,		/* pErealstr */
-	    tReal,		/* pExp */
-	    tInt,		/* pFloor */
+	    tReal,  		/* pExp */
+	    tInt,   		/* pFloor */
 	    tString,		/* pFrealstr */
-	    tNat,		/* pGetpriority */
-	    tInt,		/* pIndex */
-	    tReal,		/* pIntreal */
+	    tNat,   		/* pGetpriority */
+	    tInt,   		/* pIndex */
+	    tReal,  		/* pIntreal */
 	    tString,		/* pIntstr */
-	    tInt,		/* pLength */
-	    tReal,		/* pLn */
-	    tInt,		/* pLower */
-	    tReal,		/* pMax */
-	    tReal,		/* pMin */
-	    tReal,		/* pNatreal */
+	    tInt,   		/* pLength */
+	    tReal,  		/* pLn */
+	    tInt,   		/* pLower */
+	    tReal,  		/* pMax */
+	    tReal,  		/* pMin */
+	    tReal,  		/* pNatreal */
 	    tString,		/* pNatstr */
-	    tInt,		/* pNil */
-	    tInt,		/* pOrd */
-	    tInt,		/* pPred */
+	    tInt,   		/* pNil */
+	    tInt,   		/* pOrd */
+	    tInt,   		/* pPred */
 	    tNoType,		/* pRand */
 	    tNoType,		/* pRandInt */
 	    tNoType,		/* pRandNext */
@@ -63,21 +63,21 @@ body "predefined.st"  module Predefined
 	    tNoType,		/* pRandomize */
 	    tString,		/* pRealstr */
 	    tString,		/* pRepeat */
-	    tInt,		/* pRound */
+	    tInt,   		/* pRound */
 	    tNoType,		/* pSetpriority */
-	    tInt,		/* pSign */
-	    tReal,		/* pSin */
-	    tReal,		/* pSind */
-	    tInt,		/* pSize */
-	    tReal,		/* pSqrt */
-	    tInt,		/* pStrint */
-	    tNat,		/* pStrnat */
+	    tInt,   		/* pSign */
+	    tReal,  		/* pSin */
+	    tReal,  		/* pSind */
+	    tInt,   		/* pSize */
+	    tReal,  		/* pSqrt */
+	    tInt,   		/* pStrint */
+	    tNat,   		/* pStrnat */
 	    tNoType,		/* pStrdelete */
 	    tNoType,		/* pStrmove */
-	    tReal,		/* pStrreal */
+	    tReal,  		/* pStrreal */
 	    tNoType,		/* pStrreplace */
-	    tInt,		/* pSucc */
-	    tInt,		/* pUpper */
+	    tInt,   		/* pSucc */
+	    tInt,   		/* pUpper */
 
         /* Library predefineds */
 	    tNoType,		/* pAllocate */
@@ -113,9 +113,9 @@ body "predefined.st"  module Predefined
 	    tNoType,		/* pOpen */
 	    tNoType,		/* pOpenArg */
 	    tNoType,		/* pOpenFile */
-	    tInt,		/* pPowerii */
-	    tReal,		/* pPowerri */
-	    tReal,		/* pPowerrr */
+	    tInt,   		/* pPowerii */
+	    tReal,  		/* pPowerri */
+	    tReal,  		/* pPowerrr */
 	    tNoType,		/* pPriorityConditionInitialize */
 	    tNoType,		/* pPrioritySignal */
 	    tNoType,		/* pPriorityWait */
@@ -149,8 +149,8 @@ body "predefined.st"  module Predefined
 	    tString,		/* pSubstringExpnStar */
 	    tString,		/* pSubstringStarExpn */
 	    tString,		/* pSubstringStarStar */
-	    tChar,		/* pSubstringCharExpn */
-	    tChar,		/* pSubstringCharStar */
+	    tChar,  		/* pSubstringCharExpn */
+	    tChar,  		/* pSubstringCharStar */
 	    tString,		/* pSubstringCharExpnExpn */
 	    tString,		/* pSubstringCharExpnStar */
 	    tString,		/* pSubstringCharStarExpn */
@@ -216,19 +216,19 @@ body "predefined.st"  module Predefined
         tNoType,		/* pFreeReg*/
         tNoType,		/* pCharStringCompare*/
         tNoType,		/* pIgnoreOneIndirection*/
-        tNoType,		/* pIntMin*/
-        tNoType,		/* pRealMin*/
-        tNoType,		/* pIntMax*/
-        tNoType,		/* pRealMax*/
+        tInt,		    /* pIntMin*/
+        tReal,		    /* pRealMin*/
+        tInt,		    /* pIntMax*/
+        tReal,		    /* pRealMax*/
         tNoType,		/* pInternalAddr*/
-        tNoType,		/* pIntAbs*/
-        tNoType,		/* pRealAbs*/
+        tInt,		    /* pIntAbs*/
+        tReal,		    /* pRealAbs*/
         tNoType,		/* pRangeCheckString*/
         tNoType,		/* pCaseAbort*/
         tNoType,		/* pFunctionResultAbort*/
         tNoType,		/* pStackCheck*/
-        tNoType,		/* pRealDiv8*/
-        tNoType,		/* pRealMod8*/
+        tReal,		    /* pRealDiv8*/
+        tReal,		    /* pRealMod8*/
         tNoType,		/* pRangeCheck*/
         tNoType,		/* pRangeCheck2*/
         tNoType,		/* pAssert*/
