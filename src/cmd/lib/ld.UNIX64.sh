@@ -1,2 +1,2 @@
 #!/bin/sh
-cc -m64 -fPIC -ansi $*
+cc -m64 -fPIC -std=c89 $*
